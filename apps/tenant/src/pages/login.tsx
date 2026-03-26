@@ -17,17 +17,17 @@ export const Login: React.FC = () => {
     try {
       // 拨动 API 打入登录
       const resp: any = await httpClient.post('/auth/login', values);
-      // 接盘 JWT 数据落袋为安
-      login(resp.data.token, {
-        userId: resp.data.payload.userId,
-        username: resp.data.payload.username,
-        role: resp.data.payload.role,
-        tenantId: resp.data.payload.tenantId,
+      // 拦截器已剥离 axios 外壳，直接访问后端返回的 JSON 结构
+      login(resp.access_token, {
+        userId: resp.user.id,
+        username: resp.user.username,
+        role: resp.user.role,
+        tenantId: resp.user.tenantId,
       });
       message.success('口令验签通过！欢迎进入工作环境');
       navigate('/dashboard');
     } catch (err: any) {
-      // 在 axios 层已经 message 拦截过了，此处仅捕获防止抛出警告
+      console.error('前端解析异常:', err);
     } finally {
       setLoading(false);
     }
