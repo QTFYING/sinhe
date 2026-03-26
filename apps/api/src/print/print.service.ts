@@ -39,21 +39,24 @@ export class PrintService {
 
     // Format ready for frontend hidden iframe rendering
     return {
+      jobId: `print-${Date.now()}`,
+      orderCount: orders.length,
       printData: orders.map(o => ({
         orderId: o.id,
         erpOrderNo: o.erpOrderNo,
         customerName: o.customerName,
         deliveryAddress: o.deliveryAddress,
         deliveryPersonName: o.deliveryPersonName,
-        totalAmount: o.totalAmount,
-        discountAmount: o.discountAmount,
-        paidAmount: o.paidAmount,
+        totalAmount: o.totalAmount.toString(),
+        discountAmount: o.discountAmount.toString(),
         items: o.items.map(i => ({
           productName: i.productName,
           quantity: i.quantity,
-          unitPrice: i.unitPrice,
-          amount: i.amount
-        }))
+          unitPrice: i.unitPrice.toString(),
+          amount: i.amount.toString(),
+        })),
+        qrCodeUrl: `https://m.platform.com/pay/${o.qrCodeToken}`,
+        customFields: o.customFields || {},
       }))
     };
   }

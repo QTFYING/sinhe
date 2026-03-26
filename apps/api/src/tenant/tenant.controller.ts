@@ -13,12 +13,11 @@ export class TenantController {
   constructor(private readonly tenantService: TenantService) {}
 
   @Post()
-  @Roles(UserRoleEnum.OS_SUPER_ADMIN, UserRoleEnum.OS_OPERATOR)
+  @Roles(UserRoleEnum.OS_SUPER_ADMIN)
   async createTenant(
     @Body() createTenantDto: CreateTenantDto,
-    @CurrentUser() currentUser: JwtPayload,
   ) {
-    return this.tenantService.createTenant(createTenantDto, currentUser);
+    return this.tenantService.createTenant(createTenantDto);
   }
 
   @Get('me')

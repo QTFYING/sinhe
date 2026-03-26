@@ -1,9 +1,10 @@
-import { Injectable, BadRequestException } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
+import { LifecycleEventEnum } from '@prisma/client';
+import * as crypto from 'crypto';
+import dayjs from 'dayjs';
+import { JwtPayload } from '../auth/decorators/current-user.decorator';
 import { PrismaService } from '../prisma/prisma.service';
 import { ImportOrdersDto } from './dto/import-orders.dto';
-import { JwtPayload } from '../auth/decorators/current-user.decorator';
-import { LifecycleEventEnum } from '@prisma/client';
-import dayjs from 'dayjs';
 
 @Injectable()
 export class ImportService {
@@ -32,11 +33,11 @@ export class ImportService {
 
         if (existing) {
           existingCount++;
-          continue; 
+          continue;
         }
 
-        const qrCodeToken = `QR_${tenantId}_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
-        const qrExpireAt = dayjs().add(7, 'day').toDate();
+        const qrCodeToken = crypto.randomBytes(32).toString('hex');
+        const qrExpireAt = dayjs().add(90, 'day').toDate();
 
         // 生单，确立不可变的 `totalAmount` 恒等式约束基础
         const newOrder = await tx.order.create({
@@ -73,9 +74,9 @@ export class ImportService {
             tenantId,
             event: LifecycleEventEnum.ORDER_CREATED,
             operatorId: currentUser.userId,
-            snapshot: { 
+            snapshot: {
                totalAmount: newOrder.totalAmount.toString(),
-               itemCount: orderInput.items.length 
+               itemCount: orderInput.items.length
             }
           }
         });

@@ -11,7 +11,7 @@ import { UserRoleEnum } from '@prisma/client';
 export class ReportController {
   constructor(private readonly reportService: ReportService) {}
 
-  @Get('daily-summary')
+  @Get('summary')
   @Roles(UserRoleEnum.TENANT_OWNER, UserRoleEnum.TENANT_FINANCE, UserRoleEnum.TENANT_VIEWER)
   async getDailySummary(
     @Query('startDate') startDate: string,
