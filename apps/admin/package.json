@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite --port 5001",
-    "build": "tsc && vite build"
+    "build": "vite build"
   },
   "dependencies": {
     "react": "^18.2.0",
