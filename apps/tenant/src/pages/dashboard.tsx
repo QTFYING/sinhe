@@ -4,36 +4,58 @@ import { useQuery } from '@tanstack/react-query';
 import dayjs from 'dayjs';
 import { httpClient } from '../api/http-client';
 import { formatAmount } from 'shared-utils';
+import type { ApiResponse, ReportSummary } from '../types';
 
 export const Dashboard: React.FC = () => {
-  const { data, isLoading } = useQuery({
-    queryKey: ['report-daily-summary'],
-    queryFn: () => {
-      const today = dayjs().format('YYYY-MM-DD');
-      return httpClient.get('/report/daily-summary', {
-        params: { startDate: `${today}T00:00:00.000Z`, endDate: `${today}T23:59:59.999Z` }
-      });
-    }
+  const today = dayjs().format('YYYY-MM-DD');
+
+  const { data: summaryResp, isLoading } = useQuery({
+    queryKey: ['dashboard-summary', today],
+    queryFn: () => httpClient.get('/report/summary', {
+      params: { startDate: today, endDate: today },
+    }) as Promise<ApiResponse<ReportSummary>>,
   });
+
+  const summary = summaryResp?.data;
 
   return (
     <div>
-      <h2 style={{ marginBottom: 24, color: '#333' }}>今日数据概览</h2>
+      <h2 style={{ marginBottom: 24 }}>今日概览</h2>
       {isLoading ? <Spin size="large" /> : (
-        <Row gutter={16}>
-          <Col span={8}>
+        <Row gutter={[16, 16]}>
+          <Col span={6}>
             <Card hoverable>
-              <Statistic title="订单总应收 (元)" value={formatAmount(data?.data?.totalAmount || '0')} valueStyle={{ color: '#1677ff', fontWeight: 'bold' }} />
+              <Statistic title="应收总额" value={formatAmount(summary?.totalOrderAmount || '0')} prefix="¥" valueStyle={{ color: '#1677ff', fontWeight: 'bold' }} />
+            </Card>
+          </Col>
+          <Col span={6}>
+            <Card hoverable>
+              <Statistic title="实收总额" value={formatAmount(summary?.totalPaidAmount || '0')} prefix="¥" valueStyle={{ color: '#3f8600', fontWeight: 'bold' }} />
+            </Card>
+          </Col>
+          <Col span={6}>
+            <Card hoverable>
+              <Statistic title="折让总额" value={formatAmount(summary?.totalDiscountAmount || '0')} prefix="¥" valueStyle={{ color: '#cf1322', fontWeight: 'bold' }} />
+            </Card>
+          </Col>
+          <Col span={6}>
+            <Card hoverable>
+              <Statistic title="回款率" value={summary?.collectionRate || '0'} suffix="%" valueStyle={{ color: '#3f8600', fontWeight: 'bold' }} />
             </Card>
           </Col>
           <Col span={8}>
-            <Card hoverable>
-              <Statistic title="订单总实收 (元)" value={formatAmount(data?.data?.paidAmount || '0')} valueStyle={{ color: '#3f8600', fontWeight: 'bold' }} />
+            <Card>
+              <Statistic title="已收款订单" value={summary?.paidOrderCount || 0} suffix="笔" />
             </Card>
           </Col>
           <Col span={8}>
-            <Card hoverable>
-              <Statistic title="企业折让总计 (元)" value={formatAmount(data?.data?.discountAmount || '0')} valueStyle={{ color: '#cf1322', fontWeight: 'bold' }} />
+            <Card>
+              <Statistic title="未收款订单" value={summary?.unpaidOrderCount || 0} suffix="笔" valueStyle={{ color: '#faad14' }} />
+            </Card>
+          </Col>
+          <Col span={8}>
+            <Card>
+              <Statistic title="未收金额" value={formatAmount(summary?.unpaidAmount || '0')} prefix="¥" valueStyle={{ color: '#faad14' }} />
             </Card>
           </Col>
         </Row>
