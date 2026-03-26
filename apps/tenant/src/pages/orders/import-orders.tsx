@@ -3,7 +3,7 @@ import { Upload, Button, message, Table, Card } from 'antd';
 import { InboxOutlined } from '@ant-design/icons';
 import * as XLSX from 'xlsx';
 import { useMutation } from '@tanstack/react-query';
-import axios from 'axios';
+import { httpClient } from '../../api/http-client';
 
 const { Dragger } = Upload;
 
@@ -14,14 +14,14 @@ export const ImportOrders: React.FC = () => {
   const mutation = useMutation({
     mutationFn: (data: any[]) => {
       // 提交到我们在后端写的 ImportModule
-      return axios.post('/api/import/orders', { orders: data, templateId: 'dummy' });
+      return httpClient.post('/import/orders', { orders: data, templateId: 'dummy' });
     },
-    onSuccess: (res) => {
+    onSuccess: (res: any) => {
       message.success(`成功导入 ${res.data.successCount} 条订单`);
       setParsedData([]);
     },
     onError: () => {
-      message.error('导入失败，请检查数据格式或网络');
+      // 错误弹窗已交由底层 Axios 拦截器统管接管
     }
   });
 
