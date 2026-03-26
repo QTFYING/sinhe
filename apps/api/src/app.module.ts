@@ -1,0 +1,29 @@
+import { Module } from '@nestjs/common';
+import { PrismaModule } from './prisma/prisma.module';
+import { RedisModule } from './redis/redis.module';
+import { AuthModule } from './auth/auth.module';
+import { TenantModule } from './tenant/tenant.module';
+import { OrderModule } from './order/order.module';
+import { ImportModule } from './import/import.module';
+import { PaymentModule } from './payment/payment.module';
+import { PrintModule } from './print/print.module';
+import { ReportModule } from './report/report.module';
+import { NotificationModule } from './notification/notification.module';
+
+@Module({
+  imports: [
+    PrismaModule, 
+    RedisModule, 
+    AuthModule, 
+    TenantModule, 
+    OrderModule, 
+    ImportModule, 
+    PaymentModule,
+    PrintModule,
+    ReportModule,
+    NotificationModule
+  ],
+  controllers: [],
+  providers: [],
+})
+export class AppModule {}
