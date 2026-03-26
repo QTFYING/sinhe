@@ -6,6 +6,8 @@ import { Login } from './pages/login';
 import { Dashboard } from './pages/dashboard';
 import { OrderManager } from './pages/orders/order-manager';
 import { ImportOrders } from './pages/orders/import-orders';
+import { PrintCenter } from './pages/print/print-center';
+import { FinancialReport } from './pages/report/financial-report';
 
 export default function App() {
   return (
@@ -18,8 +20,8 @@ export default function App() {
              <Route path="dashboard" element={<Dashboard />} />
              <Route path="orders" element={<OrderManager />} />
              <Route path="import" element={<ImportOrders />} />
-             <Route path="print" element={<div>[发单] @media print 指令接收池正在上线</div>} />
-             <Route path="report" element={<div>[财务] 敏感数据看板呈现域</div>} />
+             <Route path="print" element={<PrintCenter />} />
+             <Route path="report" element={<FinancialReport />} />
              <Route path="*" element={<div style={{ padding: 24, fontSize: 18, color: '#f5222d' }}>404 越权页面未找到</div>} />
           </Route>
         </Routes>

@@ -24,12 +24,12 @@ export const DashboardLayout: React.FC = () => {
   const { sidebarCollapsed, toggleSidebar } = useUIStore();
   const { userInfo, token, logout } = useAuthStore();
   
-  // 按照实现架构：严格的前置防御跳板，空跑退信
+  // 未登录时自动拦截至登录页
   useEffect(() => {
     if (!token) navigate('/login', { replace: true });
   }, [token, navigate]);
 
-  if (!userInfo) return null; // 防止数据未响应前带来的路由穿透闪屏效应
+  if (!userInfo) return null; // 等待状态加载完成，防止路由组件闪现
 
   const menuItems = getMenuItems(userInfo.role);
 
@@ -42,7 +42,7 @@ export const DashboardLayout: React.FC = () => {
     <Layout style={{ minHeight: '100vh' }}>
       <Sider trigger={null} collapsible collapsed={sidebarCollapsed} theme="light">
         <div style={{ height: 64, margin: 16, background: '#1677ff', color: '#fff', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold' }}>
-          {sidebarCollapsed ? 'OS' : (userInfo.role === 'OS_SUPER_ADMIN' ? 'OS运营后台' : '数字经销商')}
+          {sidebarCollapsed ? 'OS' : (userInfo.role === 'OS_SUPER_ADMIN' ? '平台管理总控' : '经销商作业台')}
         </div>
         <Menu theme="light" mode="inline" selectedKeys={[location.pathname]} items={menuItems} onClick={({ key }) => navigate(key)} />
       </Sider>

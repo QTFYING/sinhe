@@ -20,7 +20,7 @@ export const OrderManager: React.FC = () => {
   const discountMutation = useMutation({
     mutationFn: (values: { discountAmount: string }) => httpClient.patch(`/order/${selectedOrder.id}/price`, values),
     onSuccess: () => {
-      message.success('财务改价已生效，底层快照审计录入成功！');
+      message.success('财务改价设定完毕，操作已并入底层审计网络！');
       queryClient.invalidateQueries({ queryKey: ['orders-list'] });
       setDiscountDrawerOpen(false);
     }
@@ -29,21 +29,21 @@ export const OrderManager: React.FC = () => {
   const paymentMutation = useMutation({
     mutationFn: (orderId: string) => httpClient.post(`/payment/initiate/${orderId}`),
     onSuccess: (res: any) => {
-      // 成功夺取 Redis 分布式防重锁后的安全 Token，并映射到 C 端预设端口
+      // 获取服务端安全锚点，提供专属 C 端支付码
       setPayUrl(`http://localhost:5002/pay/${res.data.qrToken}`);
       setPaymentModalOpen(true);
     }
   });
 
   const columns = [
-    { title: 'ERP源据号', dataIndex: 'erpOrderNo', key: 'erpOrderNo' },
-    { title: '商户名称', dataIndex: 'customerName', key: 'customerName' },
-    { title: '预估金池', dataIndex: 'totalAmount', render: (val: string) => `¥ ${formatAmount(val)}` },
-    { title: '折损豁免', dataIndex: 'discountAmount', render: (val: string) => <span style={{ color: '#cf1322' }}>-¥{formatAmount(val)}</span> },
-    { title: '纯入实收', dataIndex: 'paidAmount', render: (val: string) => <strong style={{ color: '#3f8600' }}>¥{formatAmount(val)}</strong> },
-    { title: '资金流态', dataIndex: 'payStatus', key: 'payStatus' },
+    { title: 'ERP订单号', dataIndex: 'erpOrderNo', key: 'erpOrderNo' },
+    { title: '企业客户', dataIndex: 'customerName', key: 'customerName' },
+    { title: '应付大纲金额', dataIndex: 'totalAmount', render: (val: string) => `¥ ${formatAmount(val)}` },
+    { title: '商务折让幅度', dataIndex: 'discountAmount', render: (val: string) => <span style={{ color: '#cf1322' }}>-¥{formatAmount(val)}</span> },
+    { title: '实收核销口径', dataIndex: 'paidAmount', render: (val: string) => <strong style={{ color: '#3f8600' }}>¥{formatAmount(val)}</strong> },
+    { title: '资金交付状态', dataIndex: 'payStatus', key: 'payStatus' },
     {
-      title: '高权操作区',
+      title: '业务核准操作',
       key: 'action',
       render: (_: any, record: any) => (
         <Space size="middle">
@@ -51,8 +51,8 @@ export const OrderManager: React.FC = () => {
             setSelectedOrder(record);
             form.setFieldsValue({ discountAmount: record.discountAmount });
             setDiscountDrawerOpen(true);
-          }}>干预调价金</Button>
-          <Button type="primary" loading={paymentMutation.isPending} onClick={() => paymentMutation.mutate(record.id)}>抛出防篡改收银锚点</Button>
+          }}>申请折让金调整</Button>
+          <Button type="primary" loading={paymentMutation.isPending} onClick={() => paymentMutation.mutate(record.id)}>建构终端支付链接</Button>
         </Space>
       ),
     },
@@ -60,26 +60,26 @@ export const OrderManager: React.FC = () => {
 
   return (
     <div>
-      <h2 style={{ marginBottom: 18, color: '#333' }}>高度管制的订单分发总闸</h2>
+      <h2 style={{ marginBottom: 18, color: '#333' }}>商用订单核销中心席</h2>
       <Table columns={columns} dataSource={ordersData?.data || []} rowKey="id" loading={isLoading} bordered />
 
-      <Drawer title="不可逆调价 (Immutable Price Audit)" open={discountDrawerOpen} onClose={() => setDiscountDrawerOpen(false)}>
+      <Drawer title="账单数字改价审批项" open={discountDrawerOpen} onClose={() => setDiscountDrawerOpen(false)}>
         <Form form={form} layout="vertical" onFinish={(val) => discountMutation.mutate(val)}>
-          <Form.Item name="discountAmount" label="施加扣减缓冲" rules={[{ required: true, message: '请在严格计算后下发改价数字' }]}>
-            <Input prefix="¥" placeholder="高危数据录入槽" />
+          <Form.Item name="discountAmount" label="设置折让扣除项" rules={[{ required: true, message: '必须严格输入下发的改价缓冲数字' }]}>
+            <Input prefix="¥" placeholder="企业减免金额录入" />
           </Form.Item>
           <Button type="primary" htmlType="submit" loading={discountMutation.isPending} block danger>
-            永久刻入时间线并锁定
+            经手锁定并确认记账
           </Button>
         </Form>
       </Drawer>
 
-      <Modal title="资金锁死支付视界" open={paymentModalOpen} onCancel={() => setPaymentModalOpen(false)} footer={null} centered>
+      <Modal title="企业终端支付路由收银组件" open={paymentModalOpen} onCancel={() => setPaymentModalOpen(false)} footer={null} centered>
         <div style={{ textAlign: 'center', padding: '40px 0' }}>
-           <p style={{ color: '#666', fontSize: 15 }}>当前资金数据已在服务端冷冻封装。</p>
-           <p>请出示给终端业务员或直接访问以下专属链接：</p>
+           <p style={{ color: '#666', fontSize: 15 }}>当前待结资金链已入库锁紧，不可随意更改。</p>
+           <p>请提供下方企业级官方收银通道链接予下游业务单位使用：</p>
            <a href={payUrl} target="_blank" rel="noreferrer" style={{ fontSize: 18, wordBreak: 'break-all', fontWeight: 'bold' }}>{payUrl}</a>
-           <p style={{ marginTop: 32, fontSize: 12, color: '#aaa', borderTop: '1px solid #eee', paddingTop: 16 }}>这串连接由于被底层 Redis 令牌保护，具备独享排他锁，杜绝了多客同时扫码造成系统对账错乱的可能性。</p>
+           <p style={{ marginTop: 32, fontSize: 12, color: '#aaa', borderTop: '1px solid #eee', paddingTop: 16 }}>提示：当前专属支付门禁代码已嵌入防连击防串账逻辑引擎体系内。</p>
         </div>
       </Modal>
     </div>

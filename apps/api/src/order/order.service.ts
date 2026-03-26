@@ -8,6 +8,19 @@ import { LifecycleEventEnum } from '@prisma/client';
 export class OrderService {
   constructor(private prisma: PrismaService) {}
 
+  async findAll(currentUser: JwtPayload) {
+    if (!currentUser.tenantId) throw new BadRequestException('OS Cannot directly query orders without tenant scope');
+    
+    const orders = await this.prisma.order.findMany({
+      where: { tenantId: currentUser.tenantId, deletedAt: null },
+      include: { items: true },
+      orderBy: { createdAt: 'desc' },
+      take: 100
+    });
+    
+    return { data: orders, total: orders.length };
+  }
+
   async getOrder(orderId: string, currentUser: JwtPayload) {
     if (!currentUser.tenantId) throw new BadRequestException('OS Cannot directly query orders without tenant scope');
     

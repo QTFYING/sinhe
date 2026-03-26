@@ -16,7 +16,7 @@ export const PrintCenter: React.FC = () => {
   const printMutation = useMutation({
     mutationFn: (orderIds: string[]) => httpClient.post('/print/jobs', { orderIds }),
     onSuccess: (res: any) => {
-      message.success('云端发货单生成完毕，正在强制接管系统物理打印驱动...');
+      message.success('企业发货工单生成完毕，系统打印驱动已响应接入');
       const printData = res.data; 
       
       const doc = iframeRef.current?.contentWindow?.document;
@@ -25,7 +25,7 @@ export const PrintCenter: React.FC = () => {
         doc.write(`
           <html>
             <head>
-              <title>批量面单脱机冲印</title>
+              <title>大宗企业面单打印流水</title>
               <style>
                 body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; padding: 0; margin: 0; color: #000; }
                 .print-page { page-break-after: always; padding: 20px; }
@@ -46,26 +46,26 @@ export const PrintCenter: React.FC = () => {
             <body>
               ${printData.map((job: any) => `
                 <div class="print-page">
-                   <div class="header">大宗发货单 (防伪凭证)</div>
+                   <div class="header">产品经销出库清单 (核销联)</div>
                    <div class="row">
-                     <span><strong>ERP 源单载体号:</strong> ${job.erpOrderNo}</span>
-                     <span><strong>核销客户:</strong> ${job.customerName}</span>
+                     <span><strong>官方订单编号:</strong> ${job.erpOrderNo}</span>
+                     <span><strong>下沉订货单位:</strong> ${job.customerName}</span>
                    </div>
                    <div class="row">
-                     <span><strong>流水暗号:</strong> ${job.printBatchNo}</span>
-                     <span><strong>印发原时刻:</strong> ${dayjs().format('YYYY/MM/DD HH:mm:ss')}</span>
+                     <span><strong>流水作业代码:</strong> ${job.printBatchNo}</span>
+                     <span><strong>作业列印时间:</strong> ${dayjs().format('YYYY/MM/DD HH:mm:ss')}</span>
                    </div>
                    <table>
-                     <thead><tr><th>商品品规基准名称</th><th>清点数量</th><th>财务认定金额</th></tr></thead>
+                     <thead><tr><th>商品通用规则名目</th><th>作业数量</th><th>会计归集金额</th></tr></thead>
                      <tbody>
                         ${ job.items && job.items.length > 0 ? job.items.map((item: any) => `
                           <tr><td>${item.productName}</td><td>${item.quantity}</td><td>${item.amount}</td></tr>
-                        `).join('') : `<tr><td colspan="3" style="text-align:center;">（裸单模型，无明细附载）</td></tr>` }
+                        `).join('') : `<tr><td colspan="3" style="text-align:center;">（无关联随货单详细）</td></tr>` }
                      </tbody>
                    </table>
                    <div class="footer">
-                      <span>盖印处：___________________</span>
-                      <span>法定位合计：¥${job.totalAmount}</span>
+                      <span>核签经办区：___________________</span>
+                      <span>票单账面合计总额：¥${job.totalAmount}</span>
                    </div>
                 </div>
               `).join('')}
@@ -83,14 +83,14 @@ export const PrintCenter: React.FC = () => {
   });
 
   const columns = [
-    { title: 'ERP源单号', dataIndex: 'erpOrderNo' },
-    { title: '大客称谓', dataIndex: 'customerName' },
-    { title: '锚定总款', dataIndex: 'totalAmount' },
-    { title: '流水分支', dataIndex: 'payStatus', render: (val: string) => <span style={{ fontWeight: 'bold' }}>{val}</span> },
+    { title: '企业关联订单号', dataIndex: 'erpOrderNo' },
+    { title: '商流订购方', dataIndex: 'customerName' },
+    { title: '业务汇总账面', dataIndex: 'totalAmount' },
+    { title: '资金结账状态', dataIndex: 'payStatus', render: (val: string) => <span style={{ fontWeight: 'bold' }}>{val}</span> },
   ];
 
   return (
-    <Card title="云端发单中心 (排队执行)" extra={<span style={{color:'#666', fontSize:12}}>调用浏览器自身内核排程渲染</span>}>
+    <Card title="综合打单发运室" extra={<span style={{color:'#666', fontSize:12}}>后台物理核心调度引擎</span>}>
        <div style={{ marginBottom: 16 }}>
           <Button 
             type="primary" 
@@ -99,7 +99,7 @@ export const PrintCenter: React.FC = () => {
             loading={printMutation.isPending}
             onClick={() => printMutation.mutate(selectedRowKeys as string[])}
           >
-            调度 {selectedRowKeys.length} 份数据下探底层打印机
+            请求授权分配打印所选的 {selectedRowKeys.length} 笔业务数据
           </Button>
        </div>
        <Table 
@@ -113,7 +113,7 @@ export const PrintCenter: React.FC = () => {
          loading={isLoading} 
          bordered
        />
-       {/* 无感知物理打印逃逸窗层 */}
+       {/* 隐形高权调用打印服务网关映射窗 */}
        <iframe ref={iframeRef} style={{ width: 0, height: 0, border: 'none', position: 'absolute', pointerEvents: 'none' }} title="hidden-print-frame" />
     </Card>
   );

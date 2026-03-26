@@ -12,6 +12,12 @@ import { UserRoleEnum } from '@prisma/client';
 export class OrderController {
   constructor(private readonly orderService: OrderService) {}
 
+  @Get()
+  @Roles(UserRoleEnum.TENANT_OWNER, UserRoleEnum.TENANT_OPERATOR, UserRoleEnum.TENANT_FINANCE, UserRoleEnum.TENANT_VIEWER)
+  async findAll(@CurrentUser() currentUser: JwtPayload) {
+    return this.orderService.findAll(currentUser);
+  }
+
   @Get(':id')
   @Roles(UserRoleEnum.TENANT_OWNER, UserRoleEnum.TENANT_OPERATOR, UserRoleEnum.TENANT_FINANCE, UserRoleEnum.TENANT_VIEWER)
   async getOrder(
