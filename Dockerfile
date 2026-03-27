@@ -3,12 +3,14 @@
 # ============================================
 FROM node:20-alpine AS deps
 
+# 配置国内镜像源（解决阿里云服务器无法访问 npmjs.org）
+ENV COREPACK_NPM_REGISTRY=https://registry.npmmirror.com
 RUN corepack enable
 
 WORKDIR /app
 
 # 先复制 pnpm 配置和所有 package.json，利用 Docker 缓存
-COPY package.json pnpm-lock.yaml pnpm-workspace.yaml turbo.json tsconfig.base.json ./
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml turbo.json tsconfig.base.json .npmrc ./
 
 # apps
 COPY apps/api/package.json apps/api/
