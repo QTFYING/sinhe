@@ -18,7 +18,7 @@
     "zustand": "^4.5.2",
     "axios": "^1.6.8",
     "dayjs": "^1.11.10",
-    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.1/xlsx-0.20.1.tgz",
+    "xlsx": "^0.18.5",
     "shared-types": "workspace:*",
     "shared-utils": "workspace:*",
     "shared-ui": "workspace:*"

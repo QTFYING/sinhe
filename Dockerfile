@@ -1,7 +1,7 @@
 # ============================================
 # Stage 1: 安装依赖
 # ============================================
-FROM node:20-alpine AS deps
+FROM node:22-alpine AS deps
 
 # 配置国内镜像源（解决阿里云服务器无法访问 npmjs.org）
 ENV COREPACK_NPM_REGISTRY=https://registry.npmmirror.com
@@ -38,29 +38,28 @@ RUN pnpm --filter api prisma:generate
 # Turbo 构建所有应用
 RUN pnpm run build
 
+# pnpm deploy 生成独立部署目录（无 symlink，node_modules 完整平铺）
+RUN pnpm --filter api deploy --prod --legacy /deploy/api
+
+# 把 dist 和 prisma 复制进去（deploy 只含运行时依赖，不含构建产物）
+RUN cp -r /app/apps/api/dist /deploy/api/dist && \
+    cp -r /app/apps/api/prisma /deploy/api/prisma
+
 # ============================================
 # Stage 3: API 运行时（精简镜像）
 # ============================================
-FROM node:20-alpine AS api
+FROM node:22-alpine AS api
+
+# Prisma 引擎依赖 OpenSSL
+RUN apk add --no-cache openssl
 
 WORKDIR /app
 
-# 复制 API 构建产物
-COPY --from=build /app/apps/api/dist ./dist
-COPY --from=build /app/apps/api/prisma ./prisma
-COPY --from=build /app/apps/api/package.json ./
-
-# 复制 node_modules（API 需要的运行时依赖）
-COPY --from=build /app/apps/api/node_modules ./node_modules
-
-# 复制 prisma 引擎（prisma db push 需要）
-COPY --from=build /app/node_modules/.pnpm ./node_modules/.pnpm
-COPY --from=build /app/node_modules/prisma ./node_modules/prisma
-COPY --from=build /app/node_modules/@prisma ./node_modules/@prisma
+COPY --from=build /deploy/api ./
 
 EXPOSE 3000
 
-CMD ["sh", "-c", "npx prisma db push --skip-generate && node dist/main"]
+CMD ["sh", "-c", "node_modules/.bin/prisma db push --skip-generate && node dist/main"]
 
 # ============================================
 # Stage 4: Nginx 托管前端静态文件
