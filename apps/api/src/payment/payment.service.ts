@@ -204,7 +204,7 @@ export class PaymentService {
 
     return this.prisma.$transaction(async (tx) => {
       const order = await tx.order.findFirst({
-        where: { id: orderId, tenantId: currentUser.tenantId, deletedAt: null }
+        where: { id: orderId, tenantId: currentUser.tenantId as string, deletedAt: null }
       });
       if (!order) throw new NotFoundException('订单不存在');
       if (order.payStatus === PayStatusEnum.PAID) throw new BadRequestException('已经完全支付');

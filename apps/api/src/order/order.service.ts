@@ -73,11 +73,11 @@ export class OrderService {
     if (!currentUser.tenantId) throw new BadRequestException('OS Cannot directly query orders without tenant scope');
 
     const order = await this.prisma.order.findFirst({
-      where: { id: orderId, tenantId: currentUser.tenantId, deletedAt: null },
+      where: { id: orderId, tenantId: currentUser.tenantId as string, deletedAt: null },
       include: {
         items: true,
-        paymentRecords: true,
-        lifecycleLogs: { orderBy: { createdAt: 'asc' } },
+        payments: true,
+        logs: { orderBy: { createdAt: 'asc' } },
       },
     });
 
@@ -85,8 +85,8 @@ export class OrderService {
 
     return {
       ...order,
-      payments: order.paymentRecords,
-      logs: order.lifecycleLogs,
+      payments: order.payments,
+      logs: order.logs,
     };
   }
 
@@ -95,7 +95,7 @@ export class OrderService {
 
     return this.prisma.$transaction(async (tx) => {
       const order = await tx.order.findFirst({
-        where: { id: orderId, tenantId: currentUser.tenantId, deletedAt: null }
+        where: { id: orderId, tenantId: currentUser.tenantId as string, deletedAt: null }
       });
 
       if (!order) throw new NotFoundException('订单不存在或无权操作');
@@ -128,7 +128,7 @@ export class OrderService {
       await tx.orderLifecycleLog.create({
         data: {
           orderId: order.id,
-          tenantId: currentUser.tenantId,
+          tenantId: currentUser.tenantId as string,
           event: LifecycleEventEnum.PRICE_ADJUSTED,
           operatorId: currentUser.userId,
           remark: adjustPriceDto.reason,

@@ -17,7 +17,7 @@ body {
   width: 90%;
   max-width: 400px;
 }
-.amount { fontSize: 36px; font-weight: bold; margin: 20px 0; color: #333; }
+.amount { font-size: 36px; font-weight: bold; margin: 20px 0; color: #333; }
 .btn-pay {
   background: #1677ff; color: white; border: none; padding: 12px 24px;
   border-radius: 8px; font-size: 18px; width: 100%; cursor: pointer;
