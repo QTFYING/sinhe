@@ -3,11 +3,15 @@
 # ============================================
 FROM node:22-alpine AS deps
 
+# Prisma 引擎依赖 OpenSSL（build 阶段 prisma generate 也需要）
+RUN apk add --no-cache openssl
+
 # 配置国内镜像源（解决阿里云服务器无法访问 npmjs.org）
 ENV COREPACK_NPM_REGISTRY=https://registry.npmmirror.com
 RUN corepack enable
 
 WORKDIR /app
+
 
 # 先复制 pnpm 配置和所有 package.json，利用 Docker 缓存
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml turbo.json tsconfig.base.json .npmrc ./
@@ -41,9 +45,12 @@ RUN pnpm run build
 # pnpm deploy 生成独立部署目录（无 symlink，node_modules 完整平铺）
 RUN pnpm --filter api deploy --prod --legacy /deploy/api
 
-# 把 dist 和 prisma 复制进去（deploy 只含运行时依赖，不含构建产物）
+# 把 dist 和 prisma schema 复制进去
 RUN cp -r /app/apps/api/dist /deploy/api/dist && \
     cp -r /app/apps/api/prisma /deploy/api/prisma
+
+# 在 deploy 目录内重新生成 prisma client（确保路径正确）
+RUN cd /deploy/api && node_modules/.bin/prisma generate
 
 # ============================================
 # Stage 3: API 运行时（精简镜像）
@@ -77,4 +84,4 @@ COPY deploy/nginx.conf /etc/nginx/conf.d/default.conf
 # 删除默认配置避免冲突
 RUN rm -f /etc/nginx/conf.d/default.conf.bak
 
-EXPOSE 8001 8002 8003
+EXPOSE 5001 5002 5003

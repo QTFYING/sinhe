@@ -46,9 +46,9 @@ services:
       target: nginx
     container_name: distributor-pay-nginx
     ports:
-      - "8001:8001"
-      - "8002:8002"
-      - "8003:8003"
+      - "5001:5001"
+      - "5002:5002"
+      - "5003:5003"
     depends_on:
       - api
     restart: always
