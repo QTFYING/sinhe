@@ -3,6 +3,7 @@
 本项目采用 `Turborepo` + `pnpm workspace` 搭建，包含一个基于 NestJS 的服务 API，以及三个前端应用（React/Preact）。
 
 ## 架构说明
+
 - `apps/api`: NestJS + Prisma + PostgreSQL + Redis (后端核心)
 - `apps/tenant`: 经销商 SaaS工作台 (React 18 + Vite + Antd 5 + Zustand + TanStack Query)
 - `apps/admin`: OS运营管理台 (React 18 + Vite)
@@ -11,9 +12,10 @@
 
 ## 本地启动指南
 
-请在项目根目录（`d:\Sinhe\sinho`）依次执行以下 4 个步骤，即可一键跑通所有端。
+请在项目根目录（`d:\Sinhe\api`）依次执行以下 4 个步骤，即可一键跑通所有端。
 
 ### 1. 安装全局依赖
+
 进入根目录，使用 `pnpm` 安装并链接所有工作区依赖：
 ```powershell
 pnpm install
@@ -35,6 +37,7 @@ docker-compose up -d
 *(注：`apps/api/.env` 文件已默认配置好适配裸机直连环境的连接串，无需任何修改)*
 
 ### 3. 生成 Prisma 客户端并推送表结构
+
 将按照红线安全规范设计的多租户业务表结构一次性推送到本地 Postgres 数据库中：
 ```powershell
 pnpm --filter api prisma:generate
@@ -42,6 +45,7 @@ pnpm --filter api prisma:push
 ```
 
 ### 4. 插入测试种子数据 (账号初始化)
+
 首次部署时数据库为空，为方便立即体验，请运行注水脚本：
 ```powershell
 node apps/api/prisma/seed.js
@@ -58,6 +62,7 @@ node apps/api/prisma/seed.js
 - **角色**：`TENANT_OWNER` (最高权限管理该经销商单体所有数据)
 
 ### 5. 一键启动全栈服务 ⚡️
+
 借助于 Turborepo 并发控制，只需一条命令即可拉起所有 4 个服务：
 ```powershell
 pnpm run dev
