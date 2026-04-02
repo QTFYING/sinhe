@@ -1,7 +1,8 @@
-import { Controller, Post, Body, Req, HttpCode, HttpStatus, UseGuards } from '@nestjs/common';
+import { Controller, Post, Get, Body, Req, HttpCode, HttpStatus, UseGuards } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
+import { CurrentUser, JwtPayload } from './decorators/current-user.decorator';
 import { Request } from 'express';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiBody, ApiResponse } from '@nestjs/swagger';
 
@@ -25,6 +26,15 @@ export class AuthController {
   @ApiBody({ schema: { type: 'object', properties: { refreshToken: { type: 'string', description: '用于续期的原长效Token' } }, required: ['refreshToken'] } })
   async refresh(@Body('refreshToken') refreshToken: string) {
     return this.authService.refresh(refreshToken);
+  }
+
+  @Get('me')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: '获取当前用户信息 (Me)', description: '返回当前已登录用户的基本信息，用于前端初始化用户状态' })
+  @ApiResponse({ status: 200, description: '返回用户信息' })
+  async me(@CurrentUser() currentUser: JwtPayload) {
+    return this.authService.getProfile(currentUser.userId);
   }
 
   @Post('logout')

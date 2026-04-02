@@ -179,7 +179,7 @@ curl -I http://127.0.0.1:5003
 
 ### 5.4 服务器重启后的自动拉起
 
-当前仓库的 [`docker-compose.yml`](/D:/Sinhe/sinho/docker-compose.yml) 已为 `db`、`redis`、`api`、`nginx` 四个服务统一配置 `restart: always`，这意味着：
+当前仓库的 [`docker-compose.yml`](/D:/Sinhe/api/docker-compose.yml) 已为 `db`、`redis`、`api`、`nginx` 四个服务统一配置 `restart: always`，这意味着：
 
 - 只要 Docker 守护进程在宿主机启动后自动恢复运行，这 4 个容器就会自动拉起。
 - 如果你执行过 `docker compose down`，容器会被删除；此时仅靠 `restart: always` 不会自动重新创建容器，需要再次执行 `docker compose up -d`。

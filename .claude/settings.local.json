@@ -1,7 +1,9 @@
 {
   "permissions": {
     "allow": [
-      "Bash(ls:*)"
+      "Bash(ls:*)",
+      "Read(//Users/**)",
+      "Bash(PGPASSWORD=postgres psql -U postgres -h localhost -d distributor_pay -c \"SELECT 1 AS connected;\")"
     ]
   }
 }

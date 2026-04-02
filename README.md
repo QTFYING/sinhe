@@ -36,12 +36,12 @@ docker-compose up -d
 2. **安装 Redis**：Windows 官方无纯净版，可下载微软的 [Memurai](https://www.memurai.com/) 或各类一键运行绿色包。双击启动即可，默认无密码，端口 `6379`。
 *(注：`apps/api/.env` 文件已默认配置好适配裸机直连环境的连接串，无需任何修改)*
 
-### 3. 生成 Prisma 客户端并推送表结构
+### 3. 生成 Prisma 客户端并推送表结构 (只要表结构更新，必须要执行，有一堆TS报错的时候，也可以试试)
 
 将按照红线安全规范设计的多租户业务表结构一次性推送到本地 Postgres 数据库中：
 ```powershell
-pnpm --filter api prisma:generate
-pnpm --filter api prisma:push
+pnpm --filter api prisma:push  # 建表（将架构表完美推送到你的本地 PostgreSQL）
+pnpm --filter api prisma:generate # 生成客户端，召唤 TypeScript 强类型大军（让你的 TS 编译器认识所有新字段）
 ```
 
 ### 4. 插入测试种子数据 (账号初始化)

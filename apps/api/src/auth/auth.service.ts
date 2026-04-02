@@ -92,6 +92,20 @@ export class AuthService {
     };
   }
 
+  async getProfile(userId: string) {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user) {
+      throw new UnauthorizedException('用户不存在');
+    }
+    return {
+      id: user.id,
+      username: user.username,
+      realName: user.realName,
+      role: user.role,
+      tenantId: user.tenantId,
+    };
+  }
+
   async logout(accessToken: string, refreshToken?: string) {
     // Access Token 加入黑名单（剩余有效期内）
     try {
