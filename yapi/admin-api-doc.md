@@ -84,9 +84,9 @@
 
 ### 金额字段约定
 
-- 面向前端展示的金额字段默认以“元”为单位返回，可使用 `number` 展示
-- 服务端内部落库与结算计算建议统一使用“分”为单位的整型，或数据库 `DECIMAL`
-- 前端不得将展示态金额直接作为结算依据回传或参与财务精算
+- 本项目金额字段传输统一使用字符串，单位为元，如 `"1580.00"`
+- 服务端内部落库使用数据库 `DECIMAL`
+- 前端不得将金额字段转为浮点后参与财务精算
 
 ### 通用状态码
 
@@ -792,40 +792,37 @@ interface AdminOrder {
 ### 7.3 导入订单（一步完成）
 
 - **POST** `/orders/import`
-- **Content-Type**：`multipart/form-data`
-- **描述**：通过 Excel 文件导入订单。字段映射由前端处理，一步完成。
+- **描述**：复用 Tenant 端导入主链路。前端先在浏览器端用 SheetJS 解析 Excel，再提交结构化 JSON，一步完成导入。
 - **关联表**：orders
 
 **请求参数：**
 
-| 字段 | 类型 | 说明 |
-|------|------|------|
-| `file` | File | Excel 文件（.xlsx / .xls / .csv） |
-| `mappings` | JSON string | 字段映射配置 |
-| `duplicateStrategy` | string | 重复处理策略：`skip`（默认）/ `overwrite` |
-
-**mappings 结构：**
-
 ```typescript
-Array<{
-  sourceColumn: string       // Excel 列名
-  targetField: string        // 系统字段名
-}>
+{
+  orders: Array<{
+    erpOrderNo: string
+    customerName: string
+    totalAmount: string
+    items?: unknown[]
+  }>
+}
 ```
 
 **响应 data：**
 
 ```typescript
 {
-  importedCount: number
-  skippedCount: number
-  errorCount: number
-  errors: Array<{
-    row: number
-    reason: string
-  }>
+  jobId: string
+  submittedCount: number
+  status: 'PENDING' | 'PROCESSING' | 'COMPLETED' | 'FAILED'
 }
 ```
+
+**说明：**
+
+- 不上传原始 Excel 文件
+- 字段映射与预检规则与 Tenant 端保持一致
+- 导入结果通过异步任务进度查询获取
 
 ### 7.4 导出订单
 
@@ -1902,7 +1899,7 @@ Array<{
 | 冻结租户 | Tenant 端登录后提示被冻结 |
 | 续费租户 | Tenant 端套餐和有效期更新 |
 | 创建/管理用户 | Tenant 端用户列表同步更新 |
-| 创建角色模板（租户角色） | Tenant 端可在设置中使用 |
+| 固定角色与权限树占位接口 | Tenant `GET /settings/roles`、`GET /settings/permissions` 只读返回固定枚举 |
 | 发布公告 | Tenant 端 `GET /notifications` 接收 |
 | 跨租户订单/流水查看 | 数据来源于各 Tenant 的订单和支付 |
 
@@ -1911,7 +1908,7 @@ Array<{
 | Admin 数据 | 关联的 H5 端 |
 |-----------|-------------|
 | `GET /payments` 收款流水 | 包含 H5 在线支付成功的记录 |
-| `GET /reconciliation/daily` 对账明细 | 包含 H5 支付产生的到账数据 |
+| `GET /reconciliation/daily` 对账明细 | 包含 H5 在线支付与现金核销产生的到账数据 |
 
 ### 数据隔离说明
 

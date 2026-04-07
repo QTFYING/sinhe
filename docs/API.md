@@ -1,10 +1,13 @@
 # 经销商订单收款平台 — API 接口文档
 
-> **文档版本**: V1.2
-> **编制日期**: 2026-03-26
+> **文档版本**: V1.3
+> **编制日期**: 2026-04-07
 > **对应后端**: NestJS（apps/api）
 > **数据库**: PostgreSQL + Prisma
-> **变更说明**: V1.1 修复路由冲突、补全缺失接口、统一 HTTP 动词语义、完善全局约定；V1.2 新增自定义字段扩展能力（`customFieldDefs` / `customFields`），涉及导入模板、订单列表/详情/导入、打印模块共 8 处接口变更
+> **变更说明**:
+> * V1.1 修复路由冲突、补全缺失接口、统一 HTTP 动词语义、完善全局约定；
+> * V1.2 新增自定义字段扩展能力（`customFieldDefs` / `customFields`），涉及导入模板、订单列表/详情/导入、打印模块共 8 处接口变更；
+> * V1.3 新增订单作废、H5 现金待核销、Tenant 财务现金核销，并将 H5 状态机扩展为五态
 
 ---
 
@@ -982,7 +985,7 @@ OS端和Tenant端共用同一登录接口，后端通过 `username` + `tenantId`
 |---|---|---|---|
 | `page` | `number` | ❌ | 默认 1 |
 | `pageSize` | `number` | ❌ | 默认 20 |
-| `payStatus` | `string` | ❌ | 枚举：`UNPAID` `PAYING` `PARTIAL_PAID` `PAID` `REFUNDED` |
+| `payStatus` | `string` | ❌ | 枚举：`UNPAID` `PAYING` `PENDING_VERIFICATION` `PARTIAL_PAID` `PAID` `REFUNDED` |
 | `deliveryStatus` | `string` | ❌ | 枚举：`PENDING` `IN_TRANSIT` `DELIVERED` |
 | `keyword` | `string` | ❌ | 模糊搜索：ERP单号 / 客户名称 / 送货人 |
 | `templateId` | `string` | ❌ | 按导入模板筛选 |
@@ -1274,7 +1277,48 @@ OS端和Tenant端共用同一登录接口，后端通过 `username` + `tenantId`
 
 ---
 
-### 6.7 更新配送状态
+### 6.7 作废订单
+
+**`POST /orders/:id/void`** `[TENANT_OWNER]`
+
+用于处理误导入、重复导入等错误订单数据。作废后订单保留数据库记录，但不再参与默认列表统计与财务报表汇总。
+
+**Request Body：**
+
+```json
+{
+  "reason": "Excel 错误导入，订单金额无效"
+}
+```
+
+| 字段 | 类型 | 必填 | 说明 |
+|---|---|---|---|
+| `reason` | `string` | ✅ | 作废原因，写入操作流水 |
+
+**业务规则：**
+
+- 仅未支付订单允许作废
+- 已支付订单不得直接作废，需走退款/冲正链路
+- 订单作废后写入 `ORDER_VOIDED` 生命周期日志
+
+**Response：**
+
+```json
+{
+  "code": 0,
+  "message": "ok",
+  "data": {
+    "id": "order-uuid-001",
+    "voided": true,
+    "voidReason": "Excel 错误导入，订单金额无效",
+    "voidedAt": "2026-04-07T12:00:00.000Z"
+  }
+}
+```
+
+---
+
+### 6.8 更新配送状态
 
 **`PATCH /orders/:id/delivery-status`** `[TENANT_OWNER, TENANT_OPERATOR]`
 
@@ -1303,7 +1347,7 @@ OS端和Tenant端共用同一登录接口，后端通过 `username` + `tenantId`
 
 ---
 
-### 6.8 获取订单支付二维码
+### 6.9 获取订单支付二维码
 
 **`GET /orders/:id/qrcode`** `[TENANT_OWNER, TENANT_OPERATOR]`
 
@@ -1417,9 +1461,36 @@ OS端和Tenant端共用同一登录接口，后端通过 `username` + `tenantId`
 
 ---
 
+### 8.2 现金核销
+
+**`POST /orders/:id/verify-cash`** `[TENANT_FINANCE]`
+
+用于核销 H5 端登记的现金支付订单。核销成功后订单状态由 `PENDING_VERIFICATION` 更新为 `PAID`，同时新增一条现金收款流水。
+
+**业务规则：**
+
+- 仅 `PENDING_VERIFICATION` 状态允许核销
+- 核销成功后写入生命周期日志
+
+**Response：**
+
+```json
+{
+  "code": 0,
+  "message": "ok",
+  "data": {
+    "id": "order-uuid-001",
+    "payStatus": "PAID",
+    "verifiedAt": "2026-04-07T13:00:00.000Z"
+  }
+}
+```
+
+---
+
 ## 九、买家收款页模块（C端）
 
-> 以下三个接口无需 JWT 鉴权，以 `qrCodeToken` 作为访问凭证。后端在处理每个请求时均校验 Token 有效性与订单状态。
+> 以下四个接口无需 JWT 鉴权，以 `qrCodeToken` 作为访问凭证。后端在处理每个请求时均校验 Token 有效性与订单状态。
 
 ### 9.1 查询订单信息
 
@@ -1461,6 +1532,24 @@ OS端和Tenant端共用同一登录接口，后端通过 `username` + `tenantId`
     "payStatus": "PAID",
     "paidAmount": "1480.00",
     "paidTime": "2026-03-25T09:30:00.000Z"
+  }
+}
+```
+
+**Response（现金待核销）：**
+
+```json
+{
+  "code": 0,
+  "message": "ok",
+  "data": {
+    "orderId": "order-uuid-001",
+    "payStatus": "PENDING_VERIFICATION",
+    "offlinePayment": {
+      "method": "CASH",
+      "remark": "买家表示以现金支付",
+      "submittedAt": "2026-04-07T12:30:00.000Z"
+    }
   }
 }
 ```
@@ -1523,7 +1612,47 @@ OS端和Tenant端共用同一登录接口，后端通过 `username` + `tenantId`
 
 ---
 
-### 9.3 主动查询支付状态（轮询）
+### 9.3 登记现金待核销
+
+**`POST /pay/:token/offline-payment`** `[PUBLIC]`
+
+买家选择现金支付后调用，订单状态转为 `PENDING_VERIFICATION`，等待 Tenant 财务核销。
+
+**Request Body：**
+
+```json
+{
+  "paymentMethod": "CASH",
+  "remark": "买家表示已线下现金支付"
+}
+```
+
+| 字段 | 类型 | 必填 | 说明 |
+|---|---|---|---|
+| `paymentMethod` | `string` | ✅ | 当前固定为 `CASH` |
+| `remark` | `string` | ✅ | 现金登记备注 |
+
+**Response：**
+
+```json
+{
+  "code": 0,
+  "message": "ok",
+  "data": {
+    "orderId": "order-uuid-001",
+    "payStatus": "PENDING_VERIFICATION",
+    "offlinePayment": {
+      "method": "CASH",
+      "remark": "买家表示已线下现金支付",
+      "submittedAt": "2026-04-07T12:30:00.000Z"
+    }
+  }
+}
+```
+
+---
+
+### 9.4 主动查询支付状态（轮询）
 
 **`GET /pay/:token/status`** `[PUBLIC]`
 
@@ -1551,6 +1680,25 @@ OS端和Tenant端共用同一登录接口，后端通过 `username` + `tenantId`
   "message": "ok",
   "data": {
     "payStatus": "PAYING"
+  }
+}
+```
+
+---
+
+**Response（现金待核销）：**
+
+```json
+{
+  "code": 0,
+  "message": "ok",
+  "data": {
+    "payStatus": "PENDING_VERIFICATION",
+    "offlinePayment": {
+      "method": "CASH",
+      "remark": "买家表示已线下现金支付",
+      "submittedAt": "2026-04-07T12:30:00.000Z"
+    }
   }
 }
 ```
@@ -1788,6 +1936,57 @@ OS端和Tenant端共用同一登录接口，后端通过 `username` + `tenantId`
 {
   "maxCreditDays": 45,
   "creditReminderDays": 7
+}
+```
+
+---
+
+### 12.3 获取固定角色列表（占位接口）
+
+**`GET /settings/roles`** `[TENANT_OWNER]`
+
+> Phase 1 仅返回系统固定角色枚举，不支持动态角色 CRUD。后续如进入统一权限中心，再扩展相关写接口。
+
+**Response：**
+
+```json
+{
+  "code": 0,
+  "message": "ok",
+  "data": [
+    { "code": "TENANT_OWNER", "label": "老板", "readonly": true },
+    { "code": "TENANT_OPERATOR", "label": "打单员", "readonly": true },
+    { "code": "TENANT_FINANCE", "label": "财务", "readonly": true },
+    { "code": "TENANT_VIEWER", "label": "只读账号", "readonly": true }
+  ]
+}
+```
+
+---
+
+### 12.4 获取固定权限树（占位接口）
+
+**`GET /settings/permissions`** `[TENANT_OWNER]`
+
+> Phase 1 仅返回固定权限树结构，用于前端展示角色与权限映射关系，不提供保存接口。
+
+**Response：**
+
+```json
+{
+  "code": 0,
+  "message": "ok",
+  "data": [
+    {
+      "id": "orders",
+      "label": "订单管理",
+      "children": [
+        { "id": "orders.list", "label": "查看订单列表" },
+        { "id": "orders.discount", "label": "调整订单金额" },
+        { "id": "orders.void", "label": "作废订单" }
+      ]
+    }
+  ]
 }
 ```
 

@@ -1,7 +1,7 @@
 # 收单吧 SaaS 平台 — API 架构总览
 
 > 本文档面向服务端团队，梳理三端（Admin / Tenant / H5）的完整 API 需求、跨项目关联、数据模型和端点清单。
-> 确认日期：2026-04-03
+> 确认日期：2026-04-07
 
 ---
 
@@ -46,19 +46,19 @@
 
 | 后端资源 | Admin 视角 | Tenant 视角 | H5 视角 |
 |---------|-----------|------------|---------|
-| **Auth** | 平台账号登录 | 租户账号登录 | 无需登录（orderNo 鉴权） |
-| **Tenant** | CRUD + 审核 + 冻结 + 续费（全量） | 查看自己的租户信息（只读） | — |
+| **Auth** | 平台账号登录 + 会话刷新 + 当前用户信息 | 租户账号登录 + 会话刷新 + 当前用户信息 | 无需登录（orderNo 鉴权） |
+| **Tenant** | CRUD + 审核 + 冻结 + 续费（全量） | 提交资质材料 + 查询资质状态 | — |
 | **User** | 跨租户管理所有用户 | 仅管理本租户下用户 | — |
-| **Order** | 跨租户查看/审计所有订单 | 本租户订单 CRUD + 导入导出 + 打印 | 单个订单只读 |
-| **Payment** | 跨租户收款流水汇总 | 本租户收款 + 现金核销 | 发起支付 |
-| **Agent** | 跨租户查看服务商（监管视角） | 本租户服务商管理 + 结算 | — |
+| **Order** | 跨租户查看/审计所有订单 | 本租户订单 CRUD + 导入导出 + 打印 + 账期管理 | 单个订单只读 |
+| **Payment** | 跨租户收款流水汇总 | 本租户收款 + 现金核销 + 财务对账 | 发起支付 |
+| **Agent** | 平台级服务商接入监管 | 本租户服务商管理 + 结算 | — |
 | **Analytics** | 平台级聚合指标 | 本租户经营数据 | — |
-| **Billing** | 套餐/合同/账单管理（运营） | 查看自己的套餐和账单（只读） | — |
+| **Billing** | 套餐 / 合同 / 发票管理（运营） | —（当前版本未开放独立计费页） | — |
 | **Security** | 角色模板 + 审计日志 + 安全策略 | — | — |
+| **Settings** | 全局配置 / 服务接入配置 | 通用配置 + 打印模板 + 租户审计日志 | — |
 | **Role** | 平台+租户角色模板管理 | 本租户角色+权限配置 | — |
-| **Notice** | 创建/发布公告 | 接收/阅读公告 | — |
-| **Ticket** | 分派/管理工单 | 提交/查看工单 | — |
-| **Config** | 全局配置管理 | — | — |
+| **Notice** | 创建 / 发布 / 删除公告 | 接收 / 阅读公告 | — |
+| **Ticket** | 分派 / 回复 / 关闭工单 | —（当前版本未开放工单页） | — |
 
 ### 关键设计原则
 
@@ -154,7 +154,36 @@
   submitAt: string
   status: '待初审' | '待复核' | '待确认' | '已通过' | '已驳回'
   comment: string | null
+  rejectReason: string | null
   reviewedAt: string | null
+}
+```
+
+**printer_templates 表**（租户打印配置）
+
+```typescript
+{
+  id: number
+  tenantId: string
+  name: string              // 模板名称
+  paperWidth: number        // 纸张宽度 mm
+  paperHeight: number       // 纸张高度 mm
+  fields: Array<{
+    id: string
+    key: string
+    label: string
+    x: number
+    y: number
+    w: number
+    h: number
+    fontSize: number
+    bold: boolean
+    align: 'left' | 'center' | 'right'
+    showLabel: boolean
+  }>
+  isDefault: boolean
+  createdAt: string
+  updatedAt: string
 }
 ```
 
@@ -306,10 +335,14 @@
   rate: string
   serviceStart: string
   serviceEnd: string
-  status: '履约中' | '待续约' | '待签署' | '待归档'
+  status: '履约中' | '待续约' | '待签署' | '待归档' | '已终止'
   signLink: string | null
   smsSent: boolean
+  remark: string | null
+  terminateReason: string | null
+  approvedAt: string | null
   createdAt: string
+  updatedAt: string
 }
 ```
 
@@ -321,8 +354,11 @@
   tenantId: string
   amount: string
   cycle: string             // 结算周期，如 "2026-03"
-  status: '已开票' | '待开票' | '对账中'
+  status: '已开票' | '待开票' | '对账中' | '已作废'
+  taxRate: number | null
   issuedAt: string | null
+  voidReason: string | null
+  voidedAt: string | null
   createdAt: string
 }
 ```
@@ -342,10 +378,23 @@
   scheduledAt: string | null
   reminder: boolean         // 24小时二次提醒
   isDraft: boolean
-  status: '已发布' | '草稿'
+  status: '已发布' | '草稿' | '已下架'
   publishAt: string | null
   createdAt: string
   updatedAt: string
+}
+```
+
+**notice_reads 表**（公告已读状态）
+
+```typescript
+{
+  id: string
+  noticeId: string
+  tenantId: string
+  userId: string
+  isRead: boolean
+  readAt: string | null
 }
 ```
 
@@ -358,8 +407,22 @@
   issue: string
   assignee: string
   status: '处理中' | '待分派' | '已解决'
+  resolution: string | null
   createdAt: string
   updatedAt: string
+}
+```
+
+**ticket_replies 表**
+
+```typescript
+{
+  id: string
+  ticketNo: string
+  content: string
+  attachments: string[]
+  repliedBy: string
+  repliedAt: string
 }
 ```
 
@@ -454,8 +517,11 @@
   id: string
   name: string
   category: string          // "消息通道" | "资质审核" | "合同管理"
+  contactName: string
+  contactPhone: string
   status: '已接入' | '试运行'
   score: string
+  updatedAt: string
 }
 ```
 
@@ -467,27 +533,30 @@
 | 2 | roles | 角色模板 | Admin + Tenant |
 | 3 | permissions | 权限树 | Admin + Tenant |
 | 4 | tenants | 租户 | Admin + Tenant |
-| 5 | tenant_certifications | 资质审核 | Admin |
-| 6 | orders | 订单 | Admin + Tenant + H5 |
-| 7 | order_items | 订单行项目 | Tenant + H5 |
-| 8 | payments | 收款流水 | Admin + Tenant |
-| 9 | payment_orders | H5 支付单 | H5 + Tenant（核销） |
-| 10 | agents | 服务商 | Admin + Tenant |
-| 11 | agent_settlements | 结算记录 | Tenant |
-| 12 | packages | 套餐定义 | Admin |
-| 13 | contracts | 合同 | Admin |
-| 14 | invoices | 账单 | Admin |
-| 15 | notices | 系统公告 | Admin（写）+ Tenant（读） |
-| 16 | tickets | 工单 | Admin + Tenant |
-| 17 | audit_logs | 操作日志 | Admin |
-| 18 | alert_rules | 告警规则 | Admin |
-| 19 | security_policies | 安全策略 | Admin |
-| 20 | ip_whitelist | IP 白名单 | Admin |
-| 21 | period_policies | 周期策略 | Admin |
-| 22 | system_configs | 系统配置 | Admin |
-| 23 | service_configs | 服务接入配置 | Admin |
-| 24 | service_providers | 外部服务商 | Admin |
-| — | **合计** | **24 张表** | — |
+| 5 | tenant_certifications | 资质审核 | Admin + Tenant |
+| 6 | printer_templates | 打印模板配置 | Tenant |
+| 7 | orders | 订单 | Admin + Tenant + H5 |
+| 8 | order_items | 订单行项目 | Tenant + H5 |
+| 9 | payments | 收款流水 | Admin + Tenant |
+| 10 | payment_orders | H5 支付单 | H5 + Tenant（核销） |
+| 11 | agents | 服务商 | Tenant |
+| 12 | agent_settlements | 结算记录 | Tenant |
+| 13 | packages | 套餐定义 | Admin |
+| 14 | contracts | 合同 | Admin |
+| 15 | invoices | 账单 | Admin |
+| 16 | notices | 系统公告 | Admin（写）+ Tenant（读） |
+| 17 | notice_reads | 公告已读状态 | Tenant |
+| 18 | tickets | 工单 | Admin |
+| 19 | ticket_replies | 工单回复 | Admin |
+| 20 | audit_logs | 操作日志 | Admin + Tenant |
+| 21 | alert_rules | 告警规则 | Admin |
+| 22 | security_policies | 安全策略 | Admin |
+| 23 | ip_whitelist | IP 白名单 | Admin |
+| 24 | period_policies | 周期策略 | Admin |
+| 25 | system_configs | 系统配置 | Admin |
+| 26 | service_configs | 服务接入配置 | Admin |
+| 27 | service_providers | 外部服务商 | Admin |
+| — | **合计** | **27 张表** | — |
 
 ---
 
@@ -534,7 +603,7 @@ H5 前端                    后端                     支付网关
 
 ---
 
-### 4.2 Tenant 端（商户 SaaS）— 47 个端点
+### 4.2 Tenant 端（商户 SaaS）— 52 个端点
 
 > 鉴权方式：业务请求走 Bearer Access Token；Refresh Token 存于 HttpOnly Cookie，后端通过 token 中的 tenantId 自动隔离数据
 > 角色：owner（老板）/ clerk（打单员）/ finance（财务）/ agent（服务商）
@@ -632,7 +701,7 @@ H5 前端                    后端                     支付网关
 | G3 | GET | `/analytics/payments/live` | 实时收款动态 | all | payments |
 | G4 | GET | `/analytics/dashboard` | 仪表盘聚合数据 | all | orders + payments + agents |
 
-#### 模块 H：系统设置（Settings）— 12 个端点
+#### 模块 H：系统设置（Settings）— 15 个端点
 
 | # | Method | Path | 说明 | 角色 | 关联表 |
 |---|--------|------|------|------|--------|
@@ -648,13 +717,23 @@ H5 前端                    后端                     支付网关
 | H10 | PUT | `/settings/users/{id}/status` | 启用/禁用用户 | owner | users |
 | H11 | GET | `/settings/general` | 获取通用配置（企业信息+通知） | owner | system_configs |
 | H12 | PUT | `/settings/general` | 保存通用配置 | owner | system_configs |
+| H13 | GET | `/settings/printer` | 获取打印配置 | owner | printer_templates |
+| H14 | PUT | `/settings/printer` | 保存打印配置 | owner | printer_templates |
+| H15 | GET | `/settings/audit-logs` | 获取本租户操作日志 | owner | audit_logs |
 
 #### 模块 I：通知（Notifications）— 2 个端点
 
 | # | Method | Path | 说明 | 角色 | 关联表 |
 |---|--------|------|------|------|--------|
-| I1 | GET | `/notifications` | 接收的平台公告列表 | all | notices |
-| I2 | POST | `/notifications/{id}/read` | 标记已读 | all | notices（读取状态表） |
+| I1 | GET | `/notifications` | 接收的平台公告列表 | all | notices + notice_reads |
+| I2 | POST | `/notifications/{id}/read` | 标记已读 | all | notice_reads |
+
+#### 模块 J：资质提交（Certification）— 2 个端点
+
+| # | Method | Path | 说明 | 角色 | 关联表 |
+|---|--------|------|------|------|--------|
+| J1 | POST | `/tenants/certification` | 提交当前租户资质材料 | owner | tenant_certifications |
+| J2 | GET | `/tenants/certification` | 查询当前租户资质状态 | owner | tenant_certifications |
 
 #### Tenant 端点汇总
 
@@ -667,24 +746,26 @@ H5 前端                    后端                     支付网关
 | Credit | 2 | orders, payments |
 | Agents | 6 | agents, agent_settlements |
 | Analytics | 4 | orders, payments |
-| Settings | 12 | roles, permissions, users, system_configs |
+| Settings | 15 | roles, permissions, users, system_configs, printer_templates, audit_logs |
 | Notifications | 2 | notices |
-| **合计** | **47** | — |
+| Certification | 2 | tenant_certifications |
+| **合计** | **52** | — |
 
 ---
 
-### 4.3 Admin 端（平台运营）— 72 个端点
+### 4.3 Admin 端（平台运营）— 84 个端点
 
 > 鉴权方式：业务请求走 Bearer Access Token；Refresh Token 存于 HttpOnly Cookie；tenantId = null 表示平台用户
 > 平台用户可跨租户查看和管理数据
 
-#### 模块 1：认证（Auth）— 3 个端点
+#### 模块 1：认证（Auth）— 4 个端点
 
 | # | Method | Path | 说明 | 关联表 |
 |---|--------|------|------|--------|
 | 1.1 | POST | `/auth/login` | 平台账号登录 | users |
 | 1.2 | POST | `/auth/refresh` | 刷新令牌 | — |
 | 1.3 | POST | `/auth/logout` | 登出 | — |
+| 1.4 | GET | `/auth/me` | 获取当前用户信息 | users |
 
 #### 模块 2：控制台（Console）— 1 个端点
 
@@ -766,39 +847,51 @@ H5 前端                    后端                     支付网关
 
 > 路径已从 `/packages` 统一为 `/billing/packages`。
 
-#### 模块 10：合同管理（Billing - Contracts）— 2 个端点
+#### 模块 10：合同管理（Billing - Contracts）— 5 个端点
 
 | # | Method | Path | 说明 | 关联表 |
 |---|--------|------|------|--------|
 | 10.1 | GET | `/billing/contracts` | 合同列表 | contracts |
 | 10.2 | POST | `/billing/contracts` | 发起合同 | contracts |
+| 10.3 | PUT | `/billing/contracts/{id}` | 更新合同 | contracts |
+| 10.4 | POST | `/billing/contracts/{id}/approve` | 审批合同 | contracts |
+| 10.5 | POST | `/billing/contracts/{id}/terminate` | 终止合同 | contracts |
 
-#### 模块 11：账单发票（Billing - Invoices）— 1 个端点
+#### 模块 11：账单发票（Billing - Invoices）— 3 个端点
 
 | # | Method | Path | 说明 | 关联表 |
 |---|--------|------|------|--------|
 | 11.1 | GET | `/billing/invoices` | 账单列表 | invoices |
+| 11.2 | POST | `/billing/invoices` | 开具发票 | invoices |
+| 11.3 | POST | `/billing/invoices/{id}/void` | 作废发票 | invoices |
 
-#### 模块 12：服务商管理（Service Providers）— 1 个端点
+#### 模块 12：服务商管理（Service Providers）— 4 个端点
 
 | # | Method | Path | 说明 | 关联表 |
 |---|--------|------|------|--------|
-| 12.1 | GET | `/service-providers` | 平台级服务商列表（只读监管） | service_providers |
+| 12.1 | GET | `/service-providers` | 平台级服务商列表 | service_providers |
+| 12.2 | POST | `/service-providers` | 新增服务商 | service_providers |
+| 12.3 | PUT | `/service-providers/{id}` | 更新服务商 | service_providers |
+| 12.4 | DELETE | `/service-providers/{id}` | 移除服务商 | service_providers |
 
-#### 模块 13：系统公告（Notices）— 3 个端点
+#### 模块 13：系统公告（Notices）— 4 个端点
 
 | # | Method | Path | 说明 | 关联表 |
 |---|--------|------|------|--------|
 | 13.1 | GET | `/notices` | 公告列表 | notices |
 | 13.2 | POST | `/notices` | 创建/发布公告 | notices |
 | 13.3 | PUT | `/notices/{id}` | 更新公告 | notices |
+| 13.4 | DELETE | `/notices/{id}` | 删除公告 | notices |
 
-#### 模块 14：工单管理（Tickets）— 2 个端点
+#### 模块 14：工单管理（Tickets）— 5 个端点
 
 | # | Method | Path | 说明 | 关联表 |
 |---|--------|------|------|--------|
 | 14.1 | GET | `/tickets` | 工单列表 | tickets |
 | 14.2 | GET | `/tickets/export` | 导出工单 | tickets |
+| 14.3 | POST | `/tickets/{id}/reply` | 回复工单 | tickets + ticket_replies |
+| 14.4 | PUT | `/tickets/{id}/assign` | 分配工单 | tickets |
+| 14.5 | POST | `/tickets/{id}/close` | 关闭工单 | tickets |
 
 #### 模块 15：角色管理（Security - Roles）— 4 个端点
 
@@ -854,7 +947,7 @@ H5 前端                    后端                     支付网关
 
 | 模块 | 端点数 | 主要关联表 |
 |------|--------|-----------|
-| Auth | 3 | users |
+| Auth | 4 | users |
 | Console | 1 | users |
 | Dashboard | 5 | tenants, orders, payments, audit_logs |
 | Tenant Center | 10 | tenants, tenant_certifications |
@@ -863,17 +956,17 @@ H5 前端                    后端                     支付网关
 | Payments | 2 | payments |
 | Reconciliation | 3 | orders, payments |
 | Billing (Packages) | 4 | packages |
-| Billing (Contracts) | 2 | contracts |
-| Billing (Invoices) | 1 | invoices |
-| Service Providers | 1 | service_providers |
-| Notices | 3 | notices |
-| Tickets | 2 | tickets |
+| Billing (Contracts) | 5 | contracts |
+| Billing (Invoices) | 3 | invoices |
+| Service Providers | 4 | service_providers |
+| Notices | 4 | notices |
+| Tickets | 5 | tickets |
 | Security (Roles) | 4 | roles |
 | Security (Audit) | 1 | audit_logs |
 | Security (Settings) | 8 | security_policies, ip_whitelist, period_policies |
 | Ops (Alert Rules) | 5 | alert_rules |
 | Ops (System Config) | 5 | system_configs, service_configs |
-| **合计** | **71** | — |
+| **合计** | **84** | — |
 
 ---
 
@@ -884,9 +977,9 @@ H5 前端                    后端                     支付网关
 | 项目 | 端点数 | 鉴权方式 |
 |------|--------|---------|
 | H5 | 5 | orderNo 资源鉴权（免登录） |
-| Tenant | 47 | Bearer Token（tenantId 自动隔离） |
-| Admin | 71 | Bearer Token（tenantId=null，跨租户） |
-| **合计** | **123** | — |
+| Tenant | 52 | Bearer Token（tenantId 自动隔离） |
+| Admin | 84 | Bearer Token（tenantId=null，跨租户） |
+| **合计** | **141** | — |
 
 ### 建表统计
 
@@ -894,13 +987,17 @@ H5 前端                    后端                     支付网关
 |----|------|------|
 | 用户与权限 | 3 | users, roles, permissions |
 | 租户 | 2 | tenants, tenant_certifications |
+| 租户设置 | 1 | printer_templates |
 | 订单 | 2 | orders, order_items |
 | 支付 | 2 | payments, payment_orders |
 | 服务商 | 2 | agents, agent_settlements |
 | 计费 | 3 | packages, contracts, invoices |
-| 运维 | 8 | notices, tickets, audit_logs, alert_rules, security_policies, ip_whitelist, period_policies, system_configs + service_configs |
-| 外部服务 | 2 | service_providers, service_configs |
-| **合计** | **24** | — |
+| 通知 | 2 | notices, notice_reads |
+| 工单 | 2 | tickets, ticket_replies |
+| 审计与安全 | 5 | audit_logs, alert_rules, security_policies, ip_whitelist, period_policies |
+| 系统配置 | 2 | system_configs, service_configs |
+| 外部服务 | 1 | service_providers |
+| **合计** | **27** | — |
 
 ### 已确认的关键设计决策
 
