@@ -3,11 +3,9 @@ import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../prisma/prisma.service';
 import { RedisService } from '../redis/redis.service';
 import { LoginDto } from './dto/login.dto';
+import { ACCESS_TOKEN_TTL, REFRESH_TOKEN_TTL } from './auth-session.util';
 import * as bcrypt from 'bcrypt';
 import * as crypto from 'crypto';
-
-const REFRESH_TOKEN_TTL = 7 * 24 * 60 * 60; // 7 days in seconds
-const ACCESS_TOKEN_TTL = 2 * 60 * 60; // 2 hours in seconds
 
 @Injectable()
 export class AuthService {
@@ -106,16 +104,18 @@ export class AuthService {
     };
   }
 
-  async logout(accessToken: string, refreshToken?: string) {
+  async logout(accessToken: string | null, refreshToken?: string) {
     // Access Token 加入黑名单（剩余有效期内）
-    try {
-      const decoded = this.jwtService.verify(accessToken) as { exp: number };
-      const ttl = decoded.exp - Math.floor(Date.now() / 1000);
-      if (ttl > 0) {
-        await this.redis.addToBlacklist(accessToken, ttl);
+    if (accessToken) {
+      try {
+        const decoded = this.jwtService.verify(accessToken) as { exp: number };
+        const ttl = decoded.exp - Math.floor(Date.now() / 1000);
+        if (ttl > 0) {
+          await this.redis.addToBlacklist(accessToken, ttl);
+        }
+      } catch {
+        // token 已过期，无需加黑名单
       }
-    } catch {
-      // token 已过期，无需加黑名单
     }
 
     // 删除 Refresh Token

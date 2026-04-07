@@ -70,20 +70,25 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
    * Store refresh token → userId mapping
    */
   async setRefreshToken(refreshToken: string, userId: string, ttlSeconds: number): Promise<void> {
-    await this.client.set(`rt:${refreshToken}`, userId, { EX: ttlSeconds });
+    await this.client.set(this.getRefreshTokenKey(refreshToken), userId, { EX: ttlSeconds });
   }
 
   /**
    * Get userId from refresh token
    */
   async getRefreshTokenUser(refreshToken: string): Promise<string | null> {
-    return this.client.get(`rt:${refreshToken}`);
+    return this.client.get(this.getRefreshTokenKey(refreshToken));
   }
 
   /**
    * Delete refresh token (logout)
    */
   async deleteRefreshToken(refreshToken: string): Promise<void> {
-    await this.client.del(`rt:${refreshToken}`);
+    await this.client.del(this.getRefreshTokenKey(refreshToken));
+  }
+
+  private getRefreshTokenKey(refreshToken: string): string {
+    const digest = crypto.createHash('sha256').update(refreshToken).digest('hex');
+    return `rt:${digest}`;
   }
 }

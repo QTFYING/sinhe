@@ -101,9 +101,9 @@
 |------|------|-----|------|
 | 0-1 | Vite proxy 指向后端 | 前端 | `vite.config.ts` 中 `/api` proxy target 设为 `http://localhost:3000` |
 | 0-2 | CORS 放通 | 后端 | 确认 `main.ts` 中 CORS 允许 `localhost:5001` |
-| 0-3 | 登录接口对齐 | 双端 | 确认 `POST /auth/login` 返回 `{ code: 0, data: { token, refreshToken, user } }`，前端 auth-store 保存完整信息 |
+| 0-3 | 登录接口对齐 | 双端 | 确认 `POST /auth/login` 返回 `{ code: 0, data: { accessToken, expiresIn, user } }`，并通过 `Set-Cookie` 下发 HttpOnly Refresh Cookie |
 | 0-4 | 新增 `/auth/me` | 后端 | 返回当前用户 profile（id, username, role, tenantId 等） |
-| 0-5 | Token 自动续期 | 前端 | 请求拦截器检测 401 后调用 `POST /auth/refresh`，成功则重发原请求 |
+| 0-5 | Token 自动续期 | 前端 | 请求拦截器检测 401 后调用 `POST /auth/refresh`（无 Body，依赖 Cookie），成功则重发原请求 |
 | 0-6 | 联调验证 | 双端 | 登录 → 获取 me → 进入 Dashboard → 退出，全链路手动走通 |
 
 ### Phase 1 — 用户与安全模块
@@ -262,7 +262,8 @@ GET /xxx?page=1&pageSize=20&keyword=xxx
 ### 6.3 鉴权约定
 
 - 所有 OS 管理接口需 JWT + `OS_SUPER_ADMIN` / `OS_ADMIN` 角色
-- Token 通过 `Authorization: Bearer <accessToken>` 传递
+- 业务接口通过 `Authorization: Bearer <accessToken>` 传递
+- Refresh Token 不暴露给前端 JS，统一存于 HttpOnly Cookie
 - 401 时前端自动尝试 refresh，失败则跳转登录页
 
 ### 6.4 Mock 切换

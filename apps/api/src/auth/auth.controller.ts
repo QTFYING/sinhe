@@ -1,10 +1,16 @@
-import { Controller, Post, Get, Body, Req, HttpCode, HttpStatus, UseGuards } from '@nestjs/common';
+import { Controller, Post, Get, Body, Req, Res, HttpCode, HttpStatus, UseGuards, UnauthorizedException } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { CurrentUser, JwtPayload } from './decorators/current-user.decorator';
-import { Request } from 'express';
-import { ApiTags, ApiOperation, ApiBearerAuth, ApiBody, ApiResponse } from '@nestjs/swagger';
+import { Request, Response } from 'express';
+import { ApiTags, ApiOperation, ApiBearerAuth, ApiResponse } from '@nestjs/swagger';
+import {
+  clearRefreshTokenCookie,
+  extractBearerToken,
+  getRefreshTokenFromCookie,
+  setRefreshTokenCookie,
+} from './auth-session.util';
 
 @ApiTags('Auth - 鉴权中心')
 @Controller('auth')
@@ -16,16 +22,34 @@ export class AuthController {
   @ApiOperation({ summary: '用户身份登录 (Login)', description: 'OS运营端人员或租户员工登录系统，获取访问 Token。前台通过判断 tenantId 进行区分。' })
   @ApiResponse({ status: 200, description: '登录成功，返回 accessToken 与用户信息' })
   @ApiResponse({ status: 401, description: '账号或密码错误' })
-  async login(@Body() loginDto: LoginDto) {
-    return this.authService.login(loginDto);
+  async login(@Body() loginDto: LoginDto, @Req() req: Request, @Res({ passthrough: true }) res: Response) {
+    const session = await this.authService.login(loginDto);
+
+    setRefreshTokenCookie(res, req, session.refreshToken);
+
+    return {
+      accessToken: session.accessToken,
+      expiresIn: session.expiresIn,
+      user: session.user,
+    };
   }
 
   @Post('refresh')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: '刷新令牌 (Refresh Token)', description: '当 accessToken 过期时，使用长效 refreshToken 换取新的凭证' })
-  @ApiBody({ schema: { type: 'object', properties: { refreshToken: { type: 'string', description: '用于续期的原长效Token' } }, required: ['refreshToken'] } })
-  async refresh(@Body('refreshToken') refreshToken: string) {
-    return this.authService.refresh(refreshToken);
+  async refresh(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
+    const refreshToken = getRefreshTokenFromCookie(req);
+    if (!refreshToken) {
+      throw new UnauthorizedException('Refresh Token 已失效，请重新登录');
+    }
+
+    const session = await this.authService.refresh(refreshToken);
+    setRefreshTokenCookie(res, req, session.refreshToken);
+
+    return {
+      accessToken: session.accessToken,
+      expiresIn: session.expiresIn,
+    };
   }
 
   @Get('me')
@@ -39,14 +63,12 @@ export class AuthController {
 
   @Post('logout')
   @HttpCode(HttpStatus.OK)
-  @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth()
-  @ApiOperation({ summary: '注销退出 (Logout)', description: '吊销当前用户的 Token 凭证，需携带有效 Access Token 访问' })
-  async logout(@Req() req: Request) {
-    const authHeader = req.headers.authorization || '';
-    const accessToken = authHeader.replace('Bearer ', '');
-    const refreshToken = req.body?.refreshToken;
+  @ApiOperation({ summary: '注销退出 (Logout)', description: '吊销当前会话的 refresh cookie；若请求中携带 accessToken，则一并加入黑名单' })
+  async logout(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
+    const accessToken = extractBearerToken(req.headers.authorization);
+    const refreshToken = getRefreshTokenFromCookie(req) ?? undefined;
     await this.authService.logout(accessToken, refreshToken);
+    clearRefreshTokenCookie(res, req);
     return null;
   }
 }
