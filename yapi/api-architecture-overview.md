@@ -536,7 +536,7 @@ H5 前端                    后端                     支付网关
 
 ### 4.2 Tenant 端（商户 SaaS）— 47 个端点
 
-> 鉴权方式：Bearer Token，后端通过 token 中的 tenantId 自动隔离数据
+> 鉴权方式：业务请求走 Bearer Access Token；Refresh Token 存于 HttpOnly Cookie，后端通过 token 中的 tenantId 自动隔离数据
 > 角色：owner（老板）/ clerk（打单员）/ finance（财务）/ agent（服务商）
 
 #### 模块 A：认证（Auth）— 4 个端点
@@ -549,6 +549,7 @@ H5 前端                    后端                     支付网关
 | A4 | GET | `/auth/me` | 当前用户信息 | 需鉴权 | users |
 
 > 三端共用同一套 Auth，后端通过 user.tenantId 区分平台用户 / 租户用户。
+> 登录仅返回 accessToken + user；`/auth/refresh` 与 `/auth/logout` 从 HttpOnly Refresh Cookie 读取会话。
 
 #### 模块 B：订单管理（Orders）— 11 个端点
 
@@ -674,7 +675,7 @@ H5 前端                    后端                     支付网关
 
 ### 4.3 Admin 端（平台运营）— 72 个端点
 
-> 鉴权方式：Bearer Token，tenantId = null 表示平台用户
+> 鉴权方式：业务请求走 Bearer Access Token；Refresh Token 存于 HttpOnly Cookie；tenantId = null 表示平台用户
 > 平台用户可跨租户查看和管理数据
 
 #### 模块 1：认证（Auth）— 3 个端点
