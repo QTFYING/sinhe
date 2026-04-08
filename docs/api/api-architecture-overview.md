@@ -245,10 +245,14 @@ https://api.platform.com/api/v1
 {
   id: string                // 如 "PLT-20260325-001"
   tenantId: string          // 所属租户
+  sourceOrderNo: string | null // ERP 源订单号（用于聚合）
+  groupKey: string | null   // 防重判定辅键
+  mappingTemplateId: string | null // 绑定的导入模板 ID
   customer: string          // 客户名称
   summary: string           // 商品摘要
   amount: number            // 订单金额（元）
   paid: number              // 已收金额（元）
+  customFieldValues: any    // JSON: 动态模板映射的自定义字段
   status: 'pending' | 'partial' | 'paid' | 'expired' | 'credit'
   payType: '现款' | '账期'
   prints: number            // 打印次数
@@ -275,6 +279,38 @@ https://api.platform.com/api/v1
   quantity: number
   unitPrice: number
   lineAmount: number
+}
+```
+
+**import_templates 表**（Excel 导入映射模板）
+
+```typescript
+{
+  id: string
+  tenantId: string
+  name: string
+  isDefault: boolean
+  mappings: any             // JSON: ColumnMapping[]
+  createdAt: string
+  updatedAt: string
+}
+```
+
+**import_jobs 表**（异步导入任务）
+
+```typescript
+{
+  id: string
+  tenantId: string
+  status: 'PENDING' | 'PROCESSING' | 'COMPLETED' | 'FAILED'
+  submittedCount: number
+  processedCount: number
+  successCount: number
+  skippedCount: number
+  failedCount: number
+  failedRows: any           // JSON: 行级报错日志
+  createdAt: string
+  updatedAt: string
 }
 ```
 
@@ -559,8 +595,10 @@ https://api.platform.com/api/v1
 | 6 | printer_templates | 打印模板配置 | Tenant |
 | 7 | orders | 订单 | Admin + Tenant + H5 |
 | 8 | order_items | 订单行项目 | Tenant + H5 |
-| 9 | payments | 收款流水 | Admin + Tenant |
-| 10 | payment_orders | H5 支付单 | H5 + Tenant（核销） |
+| 9 | import_templates | 导入模板 | Admin + Tenant |
+| 10 | import_jobs | 异步导入任务 | Admin + Tenant |
+| 11 | payments | 收款流水 | Admin + Tenant |
+| 12 | payment_orders | H5 支付单 | H5 + Tenant（核销） |
 | 11 | packages | 套餐定义 | Admin |
 | 12 | contracts | 合同 | Admin |
 | 13 | invoices | 账单 | Admin |
@@ -999,7 +1037,7 @@ H5 前端                    后端                     支付网关
 | 用户与权限 | 3 | users, roles, permissions |
 | 租户 | 2 | tenants, tenant_certifications |
 | 租户设置 | 1 | printer_templates |
-| 订单 | 2 | orders, order_items |
+| 订单 | 4 | orders, order_items, import_templates, import_jobs |
 | 支付 | 2 | payments, payment_orders |
 | 计费 | 3 | packages, contracts, invoices |
 | 通知 | 2 | notices, notice_reads |
@@ -1007,7 +1045,7 @@ H5 前端                    后端                     支付网关
 | 审计与安全 | 5 | audit_logs, alert_rules, security_policies, ip_whitelist, period_policies |
 | 系统配置 | 2 | system_configs, service_configs |
 | 外部服务 | 1 | service_providers |
-| **合计** | **25** | — |
+| **合计** | **27** | — |
 
 ### 已确认的关键设计决策
 

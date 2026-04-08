@@ -47,9 +47,9 @@ services:
       - "5002:5002"
       - "5003:5003"
     volumes:
-      - ./web/dist-admin:/usr/share/nginx/admin
-      - ./web/dist-tenant:/usr/share/nginx/tenant
-      - ./web/dist-pay-h5:/usr/share/nginx/pay-h5
+      - ./dist/admin:/usr/share/nginx/admin
+      - ./dist/tenant:/usr/share/nginx/tenant
+      - ./dist/h5:/usr/share/nginx/pay-h5
       - ./deploy/nginx.conf:/etc/nginx/conf.d/default.conf
     depends_on:
       - api

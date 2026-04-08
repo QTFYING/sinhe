@@ -160,6 +160,9 @@ type PayType = '现款' | '账期'
 
 interface TenantOrder {
   id: string                   // 如 "PLT-20260325-001"
+  sourceOrderNo?: string       // 由 Excel 导入的原始 ERP 订单号
+  groupKey?: string            // 用于防重的辅键
+  mappingTemplateId?: string   // 关联的导入模板
   customer: string             // 客户名称
   summary: string              // 商品摘要
   amount: number               // 订单金额（元）
@@ -168,6 +171,8 @@ interface TenantOrder {
   payType: PayType             // 付款方式
   prints: number               // 打印次数
   date: string                 // 下单时间
+  lineItems: OrderItem[]       // 聚合订单下的商品明细
+  customFieldValues?: Record<string, string> // 模板动态映射的自定义字段
   voided: boolean              // 是否已作废（防物理删除）
   voidReason?: string          // 作废原因
   voidedAt?: string            // 作废时间
@@ -185,9 +190,10 @@ interface TenantOrder {
 {
   page?: number                // 默认 1
   pageSize?: number            // 默认 200
-  keyword?: string             // 搜索订单号、客户名
+  keyword?: string             // 检索范围新增：ERP 源订单号 (sourceOrderNo)
   status?: OrderStatus         // 状态筛选
   payType?: PayType            // 付款方式筛选
+  templateId?: string          // 新增：按导入模板类型过滤订单
   dateFrom?: string            // 开始日期 YYYY-MM-DD
   dateTo?: string              // 结束日期 YYYY-MM-DD
 }
@@ -197,8 +203,8 @@ interface TenantOrder {
 
 ```typescript
 {
-  list: TenantOrder[]
-  total: number
+  list: TenantOrder[]          // 注意：此处必须返回以 sourceOrderNo 聚合后的列表结构
+  total: number                // 聚合订单的总数（非商品行明细总数）
   page: number
   pageSize: number
 }
@@ -264,12 +270,49 @@ interface TenantOrder {
 - **描述**：纯内存试算校验字段与格式合法性，不下发单据。
 - **关联表**：无
 
+**请求参数：**
+
+```typescript
+{
+  file: File                   // Excel 文件
+  templateId?: string          // 选定的模板 ID
+}
+```
+
+**响应 data：**
+
+```typescript
+{
+  previewId: string            // 预检批次标识
+  summary: {
+    totalRows: number
+    validRows: number
+    aggregatedOrders: number   // 按 sourceOrderNo 聚合的有效订单数
+    duplicateCount: number     // 查出的重复数
+    errorCount: number         // 查出的错误行数
+  }
+  aggregatedOrders: TenantOrder[] // 预览用的聚合结果
+  duplicateOrders: { sourceOrderNo: string, existId: string }[]
+  invalidRows: { row: number, reason: string }[]
+  requiredFieldMissing: string[]
+}
+```
+
 ### 3.7 异步正式导入
 
 - **POST** `/orders/import`
 - **角色**：owner, clerk
 - **描述**：提交完整合法的数据推向后端处理队列
 - **关联表**：orders
+
+**请求参数：**
+
+```typescript
+{
+  previewId: string            // 来源于 preview 接口返回的标识
+  conflictStrategy: 'SKIP' | 'FAIL' | 'OVERWRITE'  // 针对 duplicateOrders 采取的策略
+}
+```
 
 **响应 data：**
 
@@ -287,6 +330,21 @@ interface TenantOrder {
 - **角色**：owner, clerk
 - **描述**：用于轮询长耗时任务的执行成功率与返回报告
 - **关联表**：import_jobs
+
+**响应 data：**
+
+```typescript
+{
+  jobId: string
+  status: 'PENDING' | 'PROCESSING' | 'COMPLETED' | 'FAILED'
+  submittedCount: number
+  processedCount: number
+  successCount: number
+  skippedCount: number
+  failedCount: number
+  failedRows: { row: number, sourceOrderNo: string, error: string }[]
+}
+```
 
 
 ### 3.9 标记已打印
@@ -358,17 +416,65 @@ interface TenantOrder {
 - **描述**：获取当前租户可用的 Excel 导入模板
 - **关联表**：import_templates
 
+**响应 data：**
+
+```typescript
+interface OrderImportTemplate {
+  id: string
+  name: string
+  isDefault: boolean
+  updatedAt: string
+
+  // 1. Excel 原始列头快照（用于前端在配置页回显预览）
+  sourceColumns: { 
+    key: string         // 列唯一标识
+    title: string       // Excel 里的真实表头，如 "买家旺旺"
+    index: number       // 所在列索引
+    sampleValue: string // 示例数据，方便排查与预览
+  }[]
+
+  // 2. 当前模板支持的目标字段靶点骨架（定义了系统可用字段）
+  fields: {
+    key: string         // 内部键名，如 "sourceOrderNo", "custom_truck_no"
+    label: string       // 中文展示名，如 "源订单号", "车牌号"
+    fieldType: 'TEXT' | 'NUMBER' | 'MONEY' | 'DATE'
+    required: boolean   // 是否必填项
+    visible: boolean    // 是否在列表页的列中展示
+    order: number       // 显示序号
+    builtin?: boolean   // 是否是底层表原生自带的字段（原生字段不可删除）
+  }[]
+
+  // 3. 纯粹的映射连线关系（分离后极度解耦）
+  mappings: { 
+    sourceColumn: string  // 对应 sourceColumns 的 title
+    targetField: string   // 对应 fields 的 key
+    sampleValue: string   // 连线后的数据样例直观展示
+  }[]
+}
+
+// 返回模板数组
+Array<OrderImportTemplate>
+```
+
 ### 3.13 导入-创建模板
 
 - **POST** `/import/templates`
 - **角色**：owner, clerk
 - **关联表**：import_templates
 
+**请求参数：** `Omit<OrderImportTemplate, 'id' | 'updatedAt'>`
+
+**响应 data：** `OrderImportTemplate`
+
 ### 3.14 导入-更新模板
 
 - **PUT** `/import/templates/{id}`
 - **角色**：owner, clerk
 - **关联表**：import_templates
+
+**请求参数：** `Partial<OrderImportTemplate>`
+
+**响应 data：** `OrderImportTemplate`
 
 ---
 

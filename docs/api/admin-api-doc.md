@@ -661,8 +661,12 @@ type OrderStatus = 'paid' | 'partial' | 'pending' | 'expired' | 'credit'
 interface AdminOrder {
   id: string                   // 如 "ORD-20260330-001"
   tenant: string               // 所属租户
+  sourceOrderNo?: string       // 由 Excel 导入的原始 ERP 订单号
+  groupKey?: string            // 用于防重的辅键
+  mappingTemplateId?: string   // 关联的导入模板
   customer: string             // 客户名称
-  items: string                // 商品明细
+  lineItems: any[]             // 商品明细 (对应 OrderItem 结构)
+  customFieldValues?: Record<string, string> // 模板动态映射的自定义字段
   amount: number               // 订单金额（元）
   paid: number                 // 已收金额（元）
   status: OrderStatus
@@ -735,6 +739,8 @@ interface AdminOrder {
 - **描述**：获取当前系统设置可用的 Excel 导入模板
 - **关联表**：import_templates
 
+**响应 data：** (包含 ColumnMapping 等信息，同 Tenant 端 3.12)
+
 ### 7.4 导入-创建模板
 
 - **POST** `/import/templates`
@@ -751,11 +757,15 @@ interface AdminOrder {
 - **描述**：纯内存试算校验字段与格式合法性，不下发单据
 - **关联表**：无
 
+**请求参数与响应 data：** (同 Tenant 端 3.6 的 Preview 结构)
+
 ### 7.7 异步正式导入
 
 - **POST** `/orders/import`
 - **描述**：前端复用 Tenant 端的主链路，拉取预检后在此接口提交合法 json，启动队列打入数据库。
 - **关联表**：orders
+
+**请求参数：** (同 Tenant 端 3.7 的冲突处理策略结构)
 
 **响应 data：**
 
@@ -772,6 +782,8 @@ interface AdminOrder {
 - **GET** `/orders/import/jobs/{jobId}`
 - **描述**：用于轮询长耗时任务的执行成功率与返回报告
 - **关联表**：import_jobs
+
+**响应 data：** (同 Tenant 端 3.8 的 JobResult 结构)
 
 
 
