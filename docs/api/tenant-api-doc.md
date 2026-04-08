@@ -25,66 +25,9 @@
 
 ## 一、通用约定
 
-### 1.1 基础配置
-
-| 项目 | 说明 |
-|------|------|
-| Base URL | `VITE_API_BASE` 环境变量，默认 `/api` |
-| 认证方式 | 业务接口使用 `Authorization: Bearer {accessToken}`；`/auth/refresh`、`/auth/logout` 依赖 HttpOnly Refresh Cookie |
-| 内容类型 | `application/json`（文件上传除外） |
-| 超时时间 | 15000ms |
-| 开发代理 | 请求头 `X-Proxy-Env: {env}` 路由到不同后端环境（仅 dev） |
-| 数据隔离 | 后端通过 Token 中的 `tenantId` 自动隔离，前端无需传 tenantId |
-
-### 1.2 统一响应格式
-
-```typescript
-interface ApiResponse<T> {
-  code: number       // 0 = 成功，非 0 = 错误
-  message: string    // 人类可读的描述
-  data: T            // 实际数据
-}
-```
-
-### 1.3 分页
-
-**请求参数：**
-
-```typescript
-interface PaginationParams {
-  page?: number      // 默认 1
-  pageSize?: number  // 默认视接口而定
-  keyword?: string   // 关键字搜索
-}
-```
-
-**响应结构：**
-
-```typescript
-interface PaginatedResponse<T> {
-  list: T[]
-  total: number
-  page: number
-  pageSize: number
-}
-```
-
-### 1.4 错误处理
-
-- `code !== 0`：抛出 `RequestError`，包含 code、status、payload
-- HTTP 401/403：先静默刷新一次 accessToken 并重试；仍失败时触发 `auth:unauthorized`，清除本地会话并跳转登录
-
-### 1.5 通用状态码
-
-| code | 含义 |
-|------|------|
-| 0 | 成功 |
-| 400 | 参数校验失败 |
-| 401 | Token 过期 / 未登录 |
-| 403 | 无权限（角色不匹配） |
-| 404 | 资源不存在 |
-| 409 | 数据冲突（如账号重复） |
-| 500 | 服务端内部错误 |
+> [!NOTE]
+> **全局规范指引**
+> 关于统一下发的 `code/data/message` 响应体包装、分页参数的请求与返回体指引、全局 `Http Status` 错误码机制以及环境拦截要求，本档内剔除重复声明，请直接翻阅架构大本营字典 **[api-architecture-overview.md](file:///d:/Sinhe/api/docs/api/api-architecture-overview.md)** 的第二章。
 
 ### 1.6 角色定义
 

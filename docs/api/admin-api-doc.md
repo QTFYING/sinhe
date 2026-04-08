@@ -33,72 +33,9 @@
 
 ## 一、通用约定
 
-### 基础信息
-
-| 项目 | 说明 |
-|------|------|
-| Base URL | `VITE_API_BASE` 环境变量，默认 `/api` |
-| 认证方式 | 业务接口使用 `Authorization: Bearer {accessToken}`；`/auth/refresh`、`/auth/logout` 依赖 HttpOnly Refresh Cookie |
-| 内容类型 | `application/json`（文件上传除外） |
-| 超时时间 | 15000ms |
-| 开发代理 | 请求头 `X-Proxy-Env: {env}` 路由到不同后端环境 |
-| 数据范围 | 平台用户（`tenantId = null`）可跨租户查看和管理数据 |
-
-### 响应信封
-
-```json
-{
-  "code": 0,
-  "message": "success",
-  "data": { ... }
-}
-```
-
-- `code = 0` 表示成功，`code != 0` 表示业务错误
-- `code = 401 / 403` 表示未授权，前端会先静默刷新一次 accessToken 并重试；仍失败才清理本地会话并跳转登录
-
-### 分页约定
-
-**请求参数：**
-
-```typescript
-{
-  page: number           // 页码，默认 1
-  pageSize: number       // 每页条数，默认 10
-}
-```
-
-**响应结构：**
-
-```typescript
-{
-  list: T[]
-  total: number
-  page: number
-  pageSize: number
-  totalPages?: number
-}
-```
-
-> 除明确说明的兼容接口外，分页列表默认返回 `{ list, total, page, pageSize }`，可按需追加 `totalPages`。
-
-### 金额字段约定
-
-- 本项目金额字段传输统一使用字符串，单位为元，如 `"1580.00"`
-- 服务端内部落库使用数据库 `DECIMAL`
-- 前端不得将金额字段转为浮点后参与财务精算
-
-### 通用状态码
-
-| code | 含义 |
-|------|------|
-| 0 | 成功 |
-| 400 | 参数校验失败 |
-| 401 | Token 过期 / 未登录 |
-| 403 | 无权限 |
-| 404 | 资源不存在 |
-| 409 | 数据冲突（如账号重复、角色有关联用户） |
-| 500 | 服务端内部错误 |
+> [!NOTE]
+> **全局规范指引**
+> 关于统一下发的 `code/data/message` 响应体包装、分页参数的详细数据结构、金额传输要求与全局 `Http Status` 错误码等基础要素，在此单据内不再赘言，敬请直接调阅大本营总纲 **[api-architecture-overview.md](file:///d:/Sinhe/api/docs/api/api-architecture-overview.md)** 全局规范板块。
 
 ### 路径前缀规范
 
