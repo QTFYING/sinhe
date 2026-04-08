@@ -9,7 +9,7 @@
 
 1. [通用约定](#一通用约定)
 2. [认证模块 Auth](#二认证模块-auth4-个端点)
-3. [订单模块 Orders](#三订单模块-orders15-个端点)
+3. [订单模块 Orders](#三订单模块-orders14-个端点)
 4. [支付与核销 Payment](#四支付与核销-payment3-个端点)
 5. [财务对账 Finance](#五财务对账-finance3-个端点)
 6. [账期管理 Credit](#六账期管理-credit2-个端点)
@@ -147,7 +147,7 @@ type Role = 'TENANT_OWNER' | 'TENANT_OPERATOR' | 'TENANT_FINANCE' | 'TENANT_VIEW
 
 ---
 
-## 三、订单模块 Orders（15 个端点）
+## 三、订单模块 Orders（14 个端点）
 
 > 源码：`features/orders/` + `@sinhe/shared/api/modules/order`
 > 后端自动按当前用户的 tenantId 过滤，仅返回本租户数据。
@@ -288,25 +288,8 @@ interface TenantOrder {
 - **描述**：用于轮询长耗时任务的执行成功率与返回报告
 - **关联表**：import_jobs
 
-### 3.9 导出订单
 
-- **GET** `/orders/export`
-- **角色**：owner, finance
-- **Content-Type**：`application/octet-stream`
-
-**请求参数（Query）：**
-
-```typescript
-{
-  ids?: string[]               // 指定导出的订单 ID（可选，为空导出全部）
-  keyword?: string             // 按搜索条件导出
-  status?: OrderStatus         // 按状态导出
-}
-```
-
-**响应**：Excel 文件流
-
-### 3.10 标记已打印
+### 3.9 标记已打印
 
 - **POST** `/orders/{id}/print`
 - **角色**：owner, clerk
@@ -323,7 +306,7 @@ interface TenantOrder {
 }
 ```
 
-### 3.11 批量打印标记
+### 3.10 批量打印标记
 
 - **POST** `/orders/batch/print`
 - **角色**：owner, clerk
@@ -345,7 +328,7 @@ interface TenantOrder {
 }
 ```
 
-### 3.12 发送催款提醒
+### 3.11 发送催款提醒
 
 - **POST** `/orders/{id}/remind`
 - **角色**：owner, finance
@@ -368,20 +351,20 @@ interface TenantOrder {
 }
 ```
 
-### 3.13 导入-获取模板列表
+### 3.12 导入-获取模板列表
 
 - **GET** `/import/templates`
 - **角色**：owner, clerk
 - **描述**：获取当前租户可用的 Excel 导入模板
 - **关联表**：import_templates
 
-### 3.14 导入-创建模板
+### 3.13 导入-创建模板
 
 - **POST** `/import/templates`
 - **角色**：owner, clerk
 - **关联表**：import_templates
 
-### 3.15 导入-更新模板
+### 3.14 导入-更新模板
 
 - **PUT** `/import/templates/{id}`
 - **角色**：owner, clerk
@@ -1154,7 +1137,7 @@ interface QualificationStatusResult {
 | 模块 | 接口数 | 方法分布 |
 |------|--------|---------|
 | 认证 Auth | 4 | POST ×3, GET ×1 |
-| 订单 Orders | 15 | GET ×5, POST ×8, PUT ×2 |
+| 订单 Orders | 14 | GET ×4, POST ×8, PUT ×2 |
 | 支付与核销 Payment | 3 | GET ×2, POST ×1 |
 | 财务对账 Finance | 3 | GET ×3 |
 | 账期管理 Credit | 2 | GET ×1, POST ×1 |
@@ -1162,7 +1145,7 @@ interface QualificationStatusResult {
 | 系统设置 Settings | 12 | GET ×6, POST ×1, PUT ×4, DELETE ×1 |
 | 通知 Notifications | 2 | GET ×1, POST ×1 |
 | 资质提交 Certification | 2 | GET ×1, POST ×1 |
-| **合计** | **47** | GET ×24, POST ×16, PUT ×6, DELETE ×1 |
+| **合计** | **46** | GET ×23, POST ×16, PUT ×6, DELETE ×1 |
 
 | 关联数据库表 | 说明 |
 |-------------|------|

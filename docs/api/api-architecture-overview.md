@@ -21,7 +21,7 @@
 │       ▼                  ▼                 ▼                    │
 │  ┌─────────────────────────────────────────────────────────┐    │
 │  │                   统一后端服务                            │    │
-│  │  Auth · Tenant · User · Order · Payment · Agent         │    │
+│  │  Auth · Tenant · User · Order · Payment                 │    │
 │  │  Analytics · Billing · Security · Notification · Ticket │    │
 │  └─────────────────────────────────────────────────────────┘    │
 └─────────────────────────────────────────────────────────────────┘
@@ -102,7 +102,6 @@ https://api.platform.com/api/v1
 | **User** | 跨租户管理所有用户 | 仅管理本租户下用户 | — |
 | **Order** | 跨租户查看/审计所有订单 | 本租户订单 CRUD + 导入导出 + 打印 + 账期管理 | 单个订单只读 |
 | **Payment** | 跨租户收款流水汇总 | 本租户收款 + 现金核销 + 财务对账 | 发起支付 |
-| **Agent** | 平台级服务商接入监管 | 本租户服务商管理 + 结算 | — |
 | **Analytics** | 平台级聚合指标 | 本租户经营数据 | — |
 | **Billing** | 套餐 / 合同 / 发票管理（运营） | —（当前版本未开放独立计费页） | — |
 | **Security** | 角色模板 + 审计日志 + 安全策略 | — | — |
@@ -651,7 +650,7 @@ H5 前端                    后端                     支付网关
 | B4 | PUT | `/orders/{id}` | 更新订单 | owner, operator | orders |
 | B5 | POST | `/orders/:id/void` | 作废订单 | owner | orders |
 | B6 | POST | `/orders/import` | 异步正式导入 | owner, operator | orders |
-| B7 | GET | `/orders/export` | 导出 Excel | owner, finance | orders |
+
 | B8 | POST | `/orders/{id}/print` | 标记已打印 + 递增计数 | owner, operator | orders |
 | B9 | POST | `/orders/batch/print` | 批量打印标记 | owner, operator | orders |
 | B10 | POST | `/orders/{id}/remind` | 发送催款提醒 | owner, finance | orders |
@@ -715,7 +714,7 @@ H5 前端                    后端                     支付网关
 | G1 | GET | `/analytics/daily-trend` | 日趋势 | all | orders + payments |
 | G2 | GET | `/analytics/monthly-trend` | 月趋势 | all | orders + payments |
 | G3 | GET | `/analytics/payments/live` | 实时收款动态 | all | payments |
-| G4 | GET | `/analytics/dashboard` | 仪表盘聚合数据 | all | orders + payments + agents |
+| G4 | GET | `/analytics/dashboard` | 仪表盘聚合数据 | all | orders + payments |
 
 #### 模块 H：系统设置（Settings）— 15 个端点
 
@@ -753,7 +752,7 @@ H5 前端                    后端                     支付网关
 | 模块 | 端点数 | 主要关联表 |
 |------|--------|-----------|
 | Auth | 4 | users |
-| Orders | 15 | orders, order_items |
+| Orders | 14 | orders, order_items |
 | Payment & 核销 | 3 | payments, payment_orders |
 | Finance | 3 | orders, payments |
 | Credit | 2 | orders, payments |
@@ -761,7 +760,7 @@ H5 前端                    后端                     支付网关
 | Settings | 12 | roles, permissions, users, system_configs, printer_templates, audit_logs |
 | Notifications | 2 | notices |
 | Certification | 2 | tenant_certifications |
-| **合计** | **47** | — |
+| **合计** | **46** | — |
 
 ---
 
@@ -828,7 +827,7 @@ H5 前端                    后端                     支付网关
 | 6.1 | GET | `/orders` | 订单列表（跨租户） | orders |
 | 6.2 | POST | `/orders` | 手动创建 | orders |
 | 6.3 | POST | `/orders/import` | Excel 导入（一步完成，同 Tenant） | orders |
-| 6.4 | GET | `/orders/export` | 导出 Excel | orders |
+
 | 6.5 | POST | `/orders/{id}/remind` | 催款通知 | orders |
 
 > 已确认决策：移除原文档的 `/orders/import/confirm`，Admin 与 Tenant 统一一步导入。
@@ -964,7 +963,7 @@ H5 前端                    后端                     支付网关
 | Dashboard | 5 | tenants, orders, payments, audit_logs |
 | Tenant Center | 10 | tenants, tenant_certifications |
 | Users | 6 | users |
-| Orders | 5 | orders |
+| Orders | 4 | orders |
 | Payments | 2 | payments |
 | Reconciliation | 3 | orders, payments |
 | Billing (Packages) | 4 | packages |
@@ -978,7 +977,7 @@ H5 前端                    后端                     支付网关
 | Security (Settings) | 8 | security_policies, ip_whitelist, period_policies |
 | Ops (Alert Rules) | 5 | alert_rules |
 | Ops (System Config) | 5 | system_configs, service_configs |
-| **合计** | **84** | — |
+| **合计** | **83** | — |
 
 ---
 
@@ -989,9 +988,9 @@ H5 前端                    后端                     支付网关
 | 项目 | 端点数 | 鉴权方式 |
 |------|--------|---------|
 | H5 | 4 | qrCodeToken （免登录） |
-| Tenant | 47 | Bearer Token（tenantId 自动隔离） |
-| Admin | 84 | Bearer Token（tenantId=null，跨租户） |
-| **合计** | **135** | — |
+| Tenant | 46 | Bearer Token（tenantId 自动隔离） |
+| Admin | 83 | Bearer Token（tenantId=null，跨租户） |
+| **合计** | **133** | — |
 
 ### 建表统计
 
@@ -1002,14 +1001,13 @@ H5 前端                    后端                     支付网关
 | 租户设置 | 1 | printer_templates |
 | 订单 | 2 | orders, order_items |
 | 支付 | 2 | payments, payment_orders |
-| 服务商 | 2 | agents, agent_settlements |
 | 计费 | 3 | packages, contracts, invoices |
 | 通知 | 2 | notices, notice_reads |
 | 工单 | 2 | tickets, ticket_replies |
 | 审计与安全 | 5 | audit_logs, alert_rules, security_policies, ip_whitelist, period_policies |
 | 系统配置 | 2 | system_configs, service_configs |
 | 外部服务 | 1 | service_providers |
-| **合计** | **27** | — |
+| **合计** | **25** | — |
 
 ### 已确认的关键设计决策
 
