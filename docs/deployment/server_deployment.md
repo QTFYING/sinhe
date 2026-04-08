@@ -8,10 +8,10 @@
 
 | 服务 | 容器名 | 说明 |
 | --- | --- | --- |
-| PostgreSQL | `distributor-pay-db` | 主业务数据库 |
-| Redis | `distributor-pay-redis` | 缓存与分布式锁 |
-| API | `distributor-pay-api` | NestJS 后端服务，容器内端口 `3000` |
-| Nginx | `distributor-pay-nginx` | 托管三个前端并反向代理 `/api` |
+| PostgreSQL | `shou-db` | 主业务数据库 |
+| Redis | `shou-redis` | 缓存与分布式锁 |
+| API | `shou-api` | NestJS 后端服务，容器内端口 `3000` |
+| Nginx | `shou-nginx` | 托管三个前端并反向代理 `/api` |
 
 对外访问入口以 `docker-compose.yml` 为准，当前端口如下：
 
@@ -95,7 +95,7 @@ cd /data/www/sinhe
 cat > .env <<'EOF'
 POSTGRES_USER=postgres
 POSTGRES_PASSWORD=<请替换为强密码>
-POSTGRES_DB=distributor_pay
+POSTGRES_DB=shou
 JWT_SECRET=<请替换为长度至少 64 位的随机密钥>
 EOF
 ```
@@ -195,7 +195,7 @@ sudo systemctl status docker
 如果希望项目级别也由 `systemd` 显式托管，可额外创建一个服务单元：
 
 ```bash
-sudo tee /etc/systemd/system/distributor-pay.service <<'EOF'
+sudo tee /etc/systemd/system/shou.service <<'EOF'
 [Unit]
 Description=Distributor Pay Platform
 Requires=docker.service
@@ -214,15 +214,15 @@ WantedBy=multi-user.target
 EOF
 
 sudo systemctl daemon-reload
-sudo systemctl enable distributor-pay
-sudo systemctl start distributor-pay
-sudo systemctl status distributor-pay
+sudo systemctl enable shou
+sudo systemctl start shou
+sudo systemctl status shou
 ```
 
 说明：
 
 - 对当前项目而言，通常先启用 `docker.service` 开机自启就够了。
-- 只有在你希望用 `systemd` 明确管理项目启动顺序、状态查看、统一运维入口时，才需要额外增加 `distributor-pay.service`。
+- 只有在你希望用 `systemd` 明确管理项目启动顺序、状态查看、统一运维入口时，才需要额外增加 `shou.service`。
 
 ## 6. 生产初始化
 
@@ -308,17 +308,17 @@ docker compose logs -f api
 ```bash
 mkdir -p /data/backup/postgres
 
-docker exec distributor-pay-db \
+docker exec shou-db \
   pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" \
-  > /data/backup/postgres/distributor_pay_$(date +%F_%H%M%S).sql
+  > /data/backup/postgres/shou_$(date +%F_%H%M%S).sql
 ```
 
 如果宿主机环境变量未导出，可直接写明用户名和库名：
 
 ```bash
-docker exec distributor-pay-db \
-  pg_dump -U postgres -d distributor_pay \
-  > /data/backup/postgres/distributor_pay_$(date +%F_%H%M%S).sql
+docker exec shou-db \
+  pg_dump -U postgres -d shou \
+  > /data/backup/postgres/shou_$(date +%F_%H%M%S).sql
 ```
 
 ### 8.2 PostgreSQL 恢复
@@ -326,7 +326,7 @@ docker exec distributor-pay-db \
 恢复前请先停业务并确认目标库是否允许覆盖：
 
 ```bash
-cat /data/backup/postgres/<备份文件>.sql | docker exec -i distributor-pay-db psql -U postgres -d distributor_pay
+cat /data/backup/postgres/<备份文件>.sql | docker exec -i shou-db psql -U postgres -d shou
 ```
 
 ### 8.3 Redis 备份
@@ -419,7 +419,7 @@ docker compose up -d --build
 
 ```bash
 docker compose logs -f db
-docker exec -it distributor-pay-db psql -U postgres -d distributor_pay
+docker exec -it shou-db psql -U postgres -d shou
 ```
 
 常见原因：

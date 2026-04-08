@@ -32,7 +32,7 @@ docker-compose up -d
 
 **方案 B：无 Docker 裸机运行 (适合纯 Windows 用户)**
 如果电脑无法运行 Docker/WSL，可以直接在本机安装并裸跑环境：
-1. **安装 PostgreSQL**：下载 Windows 安装包。超级权限用户与密码统一配置为 `postgres`，默认端口 `5432` 保持不变。安装完成后，打开自带的 pgAdmin 新建一个名叫 `distributor_pay` 空白数据库。
+1. **安装 PostgreSQL**：下载 Windows 安装包。超级权限用户与密码统一配置为 `postgres`，默认端口 `5432` 保持不变。安装完成后，打开自带的 pgAdmin 新建一个名叫 `shou` 空白数据库。
 2. **安装 Redis**：Windows 官方无纯净版，可下载微软的 [Memurai](https://www.memurai.com/) 或各类一键运行绿色包。双击启动即可，默认无密码，端口 `6379`。
 *(注：`apps/api/.env` 文件已默认配置好适配裸机直连环境的连接串，无需任何修改)*
 
