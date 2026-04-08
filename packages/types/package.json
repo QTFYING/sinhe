@@ -1,0 +1,21 @@
+{
+  "name": "@shou/types",
+  "version": "1.0.0",
+  "private": true,
+  "exports": {
+    "./contracts": "./src/contracts/index.ts",
+    "./types": "./src/types/index.ts"
+  },
+  "typesVersions": {
+    "*": {
+      "contracts": ["./src/contracts/index.ts"],
+      "types": ["./src/types/index.ts"]
+    }
+  },
+  "scripts": {
+    "lint": "eslint \"src/**/*.ts\""
+  },
+  "devDependencies": {
+    "typescript": "^5.4.0"
+  }
+}

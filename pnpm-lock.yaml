@@ -41,6 +41,12 @@ importers:
       '@prisma/client':
         specifier: ^5.10.0
         version: 5.22.0(prisma@5.22.0)
+      '@shou/types':
+        specifier: workspace:*
+        version: link:../../packages/types
+      '@shou/utils':
+        specifier: workspace:*
+        version: link:../../packages/utils
       bcrypt:
         specifier: ^6.0.0
         version: 6.0.0
@@ -74,12 +80,6 @@ importers:
       rxjs:
         specifier: ^7.8.1
         version: 7.8.2
-      shared-types:
-        specifier: workspace:*
-        version: link:../../packages/shared-types
-      shared-utils:
-        specifier: workspace:*
-        version: link:../../packages/shared-utils
       swagger-ui-express:
         specifier: ^5.0.0
         version: 5.0.1(express@4.22.1)
@@ -106,13 +106,13 @@ importers:
         specifier: ^5.4.0
         version: 5.9.3
 
-  packages/shared-types:
+  packages/types:
     devDependencies:
       typescript:
         specifier: ^5.4.0
         version: 5.9.3
 
-  packages/shared-utils:
+  packages/utils:
     dependencies:
       bignumber.js:
         specifier: ^9.1.2

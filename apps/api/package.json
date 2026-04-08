@@ -35,8 +35,8 @@
     "redis": "^5.11.0",
     "reflect-metadata": "^0.2.0",
     "rxjs": "^7.8.1",
-    "shared-types": "workspace:*",
-    "shared-utils": "workspace:*"
+    "@shou/types": "workspace:*",
+    "@shou/utils": "workspace:*"
   },
   "devDependencies": {
     "@nestjs/cli": "^10.0.0",
