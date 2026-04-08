@@ -40,7 +40,58 @@
 
 ---
 
-## 二、三端 API 关联矩阵
+## 二、全局统一约定
+
+### 2.1 Base URL
+
+```text
+https://api.platform.com/api/v1
+```
+
+### 2.2 鉴权方式
+
+| 接口类型 | 鉴权方式 |
+|---|---|
+| 后台接口（Admin / Tenant） | `Authorization: Bearer <access_token>`（JWT） |
+| C端收款页接口 | 无 JWT，凭 URL 中的 `qrCodeToken` 作为访问凭证 |
+| Lakala Webhook 回调 | 无 JWT，后端校验拉卡拉签名 |
+
+### 2.3 统一响应格式
+
+```json
+{
+  "code": 0,
+  "message": "ok",
+  "data": {}
+}
+```
+
+### 2.4 分页约定（Query 参数）
+
+| 参数 | 类型 | 默认值 | 说明 |
+|---|---|---|---|
+| `page` | `number` | `1` | 页码，从 1 开始 |
+| `pageSize` | `number` | `20` | 每页条数，最大 100 |
+
+### 2.5 业务错误码表
+
+| code | 含义 |
+|---|---|
+| `0` | 成功 |
+| `1001` | 订单已支付，禁止重复操作 |
+| `1002` | 二维码已过期 |
+| `1003` | 支付中，禁止并发发起 |
+| `4001` | 未登录或 Token 已失效 |
+| `4003` | 无权限访问该资源 |
+| `4004` | 资源不存在 |
+
+### 2.6 时区约定
+
+所有时间均以 **ISO 8601 UTC 格式** 传输（含 `Z` 后缀），前端展示统一转换为当地时区。
+
+---
+
+## 三、三端 API 关联矩阵
 
 三个前端共享同一个后端，很多**资源是同一张表**，只是**视角和权限不同**：
 
@@ -68,7 +119,7 @@
 
 ---
 
-## 三、数据模型（服务端建表参考）
+## 四、数据模型（服务端建表参考）
 
 ### 3.1 用户与权限域
 
@@ -205,6 +256,9 @@
   creditDays: number | null // 账期天数
   creditDueDate: string | null
   date: string              // 订单日期
+  voided: boolean
+  voidReason: string | null
+  voidedAt: string | null
   createdAt: string
   updatedAt: string
 }
@@ -269,40 +323,9 @@
 }
 ```
 
-### 3.5 服务商域
 
-**agents 表**
 
-```typescript
-{
-  id: string
-  tenantId: string
-  name: string              // 服务商名称
-  region: string            // 所属区域
-  merchants: number         // 名下商户数
-  gmv: number               // 流水金额
-  rate: number              // 佣金率（%）
-  commission: number        // 佣金金额
-  status: 'active' | 'pending' | 'paused'
-  createdAt: string
-  updatedAt: string
-}
-```
-
-**agent_settlements 表**（结算记录）
-
-```typescript
-{
-  id: string
-  agentId: string
-  tenantId: string
-  amount: number            // 结算金额
-  period: string            // 结算周期
-  settledAt: string
-}
-```
-
-### 3.6 计费域
+### 4.6 计费域
 
 **packages 表**（套餐定义）
 
@@ -363,7 +386,7 @@
 }
 ```
 
-### 3.7 运维域
+### 4.7 运维域
 
 **notices 表**（系统公告）
 
@@ -539,47 +562,45 @@
 | 8 | order_items | 订单行项目 | Tenant + H5 |
 | 9 | payments | 收款流水 | Admin + Tenant |
 | 10 | payment_orders | H5 支付单 | H5 + Tenant（核销） |
-| 11 | agents | 服务商 | Tenant |
-| 12 | agent_settlements | 结算记录 | Tenant |
-| 13 | packages | 套餐定义 | Admin |
-| 14 | contracts | 合同 | Admin |
-| 15 | invoices | 账单 | Admin |
-| 16 | notices | 系统公告 | Admin（写）+ Tenant（读） |
-| 17 | notice_reads | 公告已读状态 | Tenant |
-| 18 | tickets | 工单 | Admin |
-| 19 | ticket_replies | 工单回复 | Admin |
-| 20 | audit_logs | 操作日志 | Admin + Tenant |
-| 21 | alert_rules | 告警规则 | Admin |
-| 22 | security_policies | 安全策略 | Admin |
-| 23 | ip_whitelist | IP 白名单 | Admin |
-| 24 | period_policies | 周期策略 | Admin |
-| 25 | system_configs | 系统配置 | Admin |
-| 26 | service_configs | 服务接入配置 | Admin |
-| 27 | service_providers | 外部服务商 | Admin |
-| — | **合计** | **27 张表** | — |
+| 11 | packages | 套餐定义 | Admin |
+| 12 | contracts | 合同 | Admin |
+| 13 | invoices | 账单 | Admin |
+| 14 | notices | 系统公告 | Admin（写）+ Tenant（读） |
+| 15 | notice_reads | 公告已读状态 | Tenant |
+| 16 | tickets | 工单 | Admin |
+| 17 | ticket_replies | 工单回复 | Admin |
+| 18 | audit_logs | 操作日志 | Admin + Tenant |
+| 19 | alert_rules | 告警规则 | Admin |
+| 20 | security_policies | 安全策略 | Admin |
+| 21 | ip_whitelist | IP 白名单 | Admin |
+| 22 | period_policies | 周期策略 | Admin |
+| 23 | system_configs | 系统配置 | Admin |
+| 24 | service_configs | 服务接入配置 | Admin |
+| 25 | service_providers | 外部服务商 | Admin |
+| — | **合计** | **25 张表** | — |
 
 ---
 
-## 四、端点清单
+## 五、端点清单
 
-### 4.1 H5 端（客户支付）— 5 个端点
+### 5.1 H5 端（客户支付）— 4 个端点
 
-> 鉴权方式：无需登录，通过 orderNo 做资源级鉴权
+> 鉴权方式：无需登录，凭 URL 中的 qrCodeToken 访问
 > 路径前缀：`/pay`
 
 | # | Method | Path | 说明 | 关联表 |
 |---|--------|------|------|--------|
-| 1 | GET | `/pay/orders/{orderNo}` | 获取订单支付详情 | payment_orders + orders + order_items |
-| 2 | POST | `/pay/orders/{orderNo}/confirm` | 发起在线支付（返回支付渠道参数） | payment_orders |
-| 3 | POST | `/pay/orders/{orderNo}/offline-payment` | 线下支付登记（现金/其他已付） | payment_orders |
-| 4 | GET | `/pay/orders/{orderNo}/status` | 轮询支付状态 | payment_orders |
-| 5 | POST | `/pay/orders/{orderNo}/wx-jsapi` | 获取微信 JSAPI 支付参数（可选） | payment_orders |
+| 1 | GET | `/pay/:token` | 获取订单支付详情 | payment_orders + orders + order_items |
+| 2 | POST | `/pay/:token/initiate` | 发起在线支付（跳转收银台） | payment_orders |
+| 3 | POST | `/pay/:token/offline-payment` | 线下支付登记（现金待核销） | payment_orders |
+| 4 | GET | `/pay/:token/status` | 轮询支付状态 | payment_orders |
 
 **已确认的设计决策：**
-- 路径统一 RESTful 风格 `/pay/orders/{orderNo}`
-- `cash_verify`（现金核销）已移至 Tenant 端
-- 在线支付拆分多步：confirm 返回支付渠道参数 → 前端唤起 SDK → status 轮询等待回调
-- mock 环境下 confirm 返回 `channel: 'direct'` 直接完成，兼容测试
+- 路径统一使用 `:token` (即 `qrCodeToken`) 短串防爆破
+- 采用 5 态状态机：`UNPAID / PAYING / PENDING_VERIFICATION / PAID / EXPIRED`
+- 现金链路闭环：H5 `offline-payment` 登记待核销，Tenant 侧 `verify-cash` 财务核销
+- 在线支付跳往拉卡拉收银台，依赖后端的 `initiate` 与轮询 `status`
+- Webhook 依赖系统底层 `POST /payment/webhook/lakala`（不计入前端直接可见端点）
 
 **支付时序：**
 
@@ -603,10 +624,10 @@ H5 前端                    后端                     支付网关
 
 ---
 
-### 4.2 Tenant 端（商户 SaaS）— 52 个端点
+### 5.2 Tenant 端（商户 SaaS）— 48 个端点
 
 > 鉴权方式：业务请求走 Bearer Access Token；Refresh Token 存于 HttpOnly Cookie，后端通过 token 中的 tenantId 自动隔离数据
-> 角色：owner（老板）/ clerk（打单员）/ finance（财务）/ agent（服务商）
+> 角色（固定枚举）：TENANT_OWNER / TENANT_OPERATOR / TENANT_FINANCE / TENANT_VIEWER
 
 #### 模块 A：认证（Auth）— 4 个端点
 
@@ -626,21 +647,26 @@ H5 前端                    后端                     支付网关
 |---|--------|------|------|------|--------|
 | B1 | GET | `/orders` | 订单列表（分页+筛选） | all | orders |
 | B2 | GET | `/orders/{id}` | 订单详情 | all | orders + order_items |
-| B3 | POST | `/orders` | 创建订单 | owner, clerk | orders |
-| B4 | PUT | `/orders/{id}` | 更新订单 | owner, clerk | orders |
-| B5 | DELETE | `/orders/{id}` | 删除订单 | owner | orders |
-| B6 | POST | `/orders/import` | Excel 导入（一步完成） | owner, clerk | orders |
+| B3 | POST | `/orders` | 创建订单 | owner, operator | orders |
+| B4 | PUT | `/orders/{id}` | 更新订单 | owner, operator | orders |
+| B5 | POST | `/orders/:id/void` | 作废订单 | owner | orders |
+| B6 | POST | `/orders/import` | 异步正式导入 | owner, operator | orders |
 | B7 | GET | `/orders/export` | 导出 Excel | owner, finance | orders |
-| B8 | POST | `/orders/{id}/print` | 标记已打印 + 递增计数 | owner, clerk | orders |
-| B9 | POST | `/orders/batch/print` | 批量打印标记 | owner, clerk | orders |
+| B8 | POST | `/orders/{id}/print` | 标记已打印 + 递增计数 | owner, operator | orders |
+| B9 | POST | `/orders/batch/print` | 批量打印标记 | owner, operator | orders |
 | B10 | POST | `/orders/{id}/remind` | 发送催款提醒 | owner, finance | orders |
-| B11 | GET | `/orders/import/templates` | 获取导入模板列表 | owner, clerk | — (前端 localStorage) |
+| B11 | GET | `/import/templates` | 导入-获取模板列表 | owner, operator | — |
+| B12 | POST | `/import/templates` | 导入-创建模板 | owner, operator | — |
+| B13 | PATCH | `/import/templates/:id` | 导入-更新模板 | owner, operator | — |
+| B14 | POST | `/import/preview` | 导入-数据预检校验 | owner, operator | — |
+| B15 | GET | `/orders/import/jobs/:jobId` | 查询导入任务进度 | owner, operator | — |
 
-**B6 导入接口详细说明（已确认决策）：**
-- Content-Type: `multipart/form-data`
-- 字段映射由前端本地处理（XLSX.js 解析 + localStorage 模板）
-- 请求参数：`file`（Excel）+ `mappings`（JSON 字段映射）+ `duplicateStrategy`（skip/overwrite）
-- 响应：`{ importedCount, skippedCount, errorCount, errors[] }`
+**导入接口详细说明（已确认决策）：**
+- 完整链路使用基于服务端的模板：模板持久化在 DB
+- 前端 SheetJS 解析提取数据后，调用 `/import/preview` 进行有效性试算
+- 调用 `/orders/import` 提交 JSON Payload，后端放进异步队列处理
+- 请求参数支持包含：`customFieldDefs` 和实列值映射
+- 使用 `/orders/import/jobs/:jobId` 轮询导入进度
 
 **订单列表筛选参数：**
 
@@ -662,9 +688,9 @@ H5 前端                    后端                     支付网关
 |---|--------|------|------|------|--------|
 | C1 | GET | `/payments` | 本租户收款流水列表 | owner, finance | payments |
 | C2 | GET | `/payments/summary` | 收款汇总统计 | owner, finance | payments |
-| C3 | POST | `/orders/{id}/verify-cash` | 现金核销 | finance | payment_orders |
+| C3 | POST | `/orders/:id/verify-cash` | 现金财务核销 | finance | payment_orders |
 
-> C3 是从 H5 Payment 模块移过来的（已确认决策），由 Tenant 财务角色调用。
+> 引入 5 态状态机后，H5 扫码离线支付变为 `PENDING_VERIFICATION`。C3 用于财务手动确认资金到账。
 
 #### 模块 D：财务对账（Finance）— 3 个端点
 
@@ -681,16 +707,6 @@ H5 前端                    后端                     支付网关
 | E1 | GET | `/orders/credit` | 账期订单列表 | owner, finance | orders |
 | E2 | POST | `/orders/{id}/mark-received` | 标记回款 | owner, finance | orders + payments |
 
-#### 模块 F：服务商管理（Agents）— 6 个端点
-
-| # | Method | Path | 说明 | 角色 | 关联表 |
-|---|--------|------|------|------|--------|
-| F1 | GET | `/agents` | 服务商列表 | owner, agent | agents |
-| F2 | GET | `/agents/{id}` | 服务商详情 | owner, agent | agents |
-| F3 | POST | `/agents` | 创建服务商 | owner | agents |
-| F4 | PUT | `/agents/{id}` | 更新服务商 | owner | agents |
-| F5 | POST | `/agents/{id}/settle` | 结算佣金 | owner | agents + agent_settlements |
-| F6 | GET | `/agents/{id}/settlements` | 结算历史记录 | owner, agent | agent_settlements |
 
 #### 模块 G：数据分析（Analytics）— 4 个端点
 
@@ -705,21 +721,18 @@ H5 前端                    后端                     支付网关
 
 | # | Method | Path | 说明 | 角色 | 关联表 |
 |---|--------|------|------|------|--------|
-| H1 | GET | `/settings/roles` | 角色列表 | owner | roles |
-| H2 | POST | `/settings/roles` | 创建自定义角色 | owner | roles |
-| H3 | PUT | `/settings/roles/{id}` | 更新角色权限 | owner | roles |
-| H4 | DELETE | `/settings/roles/{id}` | 删除自定义角色 | owner | roles |
-| H5 | GET | `/settings/permissions` | 权限树 | owner | permissions |
-| H6 | GET | `/settings/users` | 用户列表 | owner | users |
-| H7 | POST | `/settings/users` | 创建用户 | owner | users |
-| H8 | PUT | `/settings/users/{id}` | 更新用户 | owner | users |
-| H9 | DELETE | `/settings/users/{id}` | 删除用户 | owner | users |
-| H10 | PUT | `/settings/users/{id}/status` | 启用/禁用用户 | owner | users |
-| H11 | GET | `/settings/general` | 获取通用配置（企业信息+通知） | owner | system_configs |
-| H12 | PUT | `/settings/general` | 保存通用配置 | owner | system_configs |
-| H13 | GET | `/settings/printer` | 获取打印配置 | owner | printer_templates |
-| H14 | PUT | `/settings/printer` | 保存打印配置 | owner | printer_templates |
-| H15 | GET | `/settings/audit-logs` | 获取本租户操作日志 | owner | audit_logs |
+| H1 | GET | `/settings/roles` | 角色只读占位 | owner | roles |
+| H2 | GET | `/settings/permissions` | 权限树只读占位 | owner | permissions |
+| H3 | GET | `/settings/users` | 用户列表 | owner | users |
+| H4 | POST | `/settings/users` | 创建用户 | owner | users |
+| H5 | PUT | `/settings/users/{id}` | 更新用户 | owner | users |
+| H6 | DELETE | `/settings/users/{id}` | 删除用户 | owner | users |
+| H7 | PUT | `/settings/users/{id}/status` | 启用/禁用用户 | owner | users |
+| H8 | GET | `/settings/general` | 获取通用配置（企业信息+通知） | owner | system_configs |
+| H9 | PUT | `/settings/general` | 保存通用配置 | owner | system_configs |
+| H10 | GET | `/settings/printer` | 获取打印配置 | owner | printer_templates |
+| H11 | PUT | `/settings/printer` | 保存打印配置 | owner | printer_templates |
+| H12 | GET | `/settings/audit-logs` | 获取本租户操作日志 | owner | audit_logs |
 
 #### 模块 I：通知（Notifications）— 2 个端点
 
@@ -740,20 +753,19 @@ H5 前端                    后端                     支付网关
 | 模块 | 端点数 | 主要关联表 |
 |------|--------|-----------|
 | Auth | 4 | users |
-| Orders | 11 | orders, order_items |
+| Orders | 15 | orders, order_items |
 | Payment & 核销 | 3 | payments, payment_orders |
 | Finance | 3 | orders, payments |
 | Credit | 2 | orders, payments |
-| Agents | 6 | agents, agent_settlements |
 | Analytics | 4 | orders, payments |
-| Settings | 15 | roles, permissions, users, system_configs, printer_templates, audit_logs |
+| Settings | 12 | roles, permissions, users, system_configs, printer_templates, audit_logs |
 | Notifications | 2 | notices |
 | Certification | 2 | tenant_certifications |
-| **合计** | **52** | — |
+| **合计** | **47** | — |
 
 ---
 
-### 4.3 Admin 端（平台运营）— 84 个端点
+### 5.3 Admin 端（平台运营）— 84 个端点
 
 > 鉴权方式：业务请求走 Bearer Access Token；Refresh Token 存于 HttpOnly Cookie；tenantId = null 表示平台用户
 > 平台用户可跨租户查看和管理数据
@@ -970,16 +982,16 @@ H5 前端                    后端                     支付网关
 
 ---
 
-## 五、全局汇总
+## 六、全局汇总
 
 ### 端点统计
 
 | 项目 | 端点数 | 鉴权方式 |
 |------|--------|---------|
-| H5 | 5 | orderNo 资源鉴权（免登录） |
-| Tenant | 52 | Bearer Token（tenantId 自动隔离） |
+| H5 | 4 | qrCodeToken （免登录） |
+| Tenant | 47 | Bearer Token（tenantId 自动隔离） |
 | Admin | 84 | Bearer Token（tenantId=null，跨租户） |
-| **合计** | **141** | — |
+| **合计** | **135** | — |
 
 ### 建表统计
 
@@ -1003,9 +1015,9 @@ H5 前端                    后端                     支付网关
 
 | # | 决策 | 结论 |
 |---|------|------|
-| 1 | H5 路径风格 | 统一 RESTful `/pay/orders/{orderNo}` |
-| 2 | 现金核销归属 | 移到 Tenant 端 `POST /orders/{id}/verify-cash` |
-| 3 | 在线支付流程 | 多步：confirm 返回渠道参数 → status 轮询 → wx-jsapi/ali-trade 可选端点 |
-| 4 | 订单导入 | 一步完成 `POST /orders/import`，字段映射前端处理 |
+| 1 | H5 访问凭证 | 统一且强制使用 `qrCodeToken` 短串令牌拼接路由 `/pay/:token` |
+| 2 | H5 状态机 | 五态流转 `UNPAID -> PAYING -> PENDING_VERIFICATION -> PAID / EXPIRED` |
+| 3 | 物理删除防范 | 以 `POST /orders/:id/void` 替代 `DELETE` 软作废，保留历史日志。 |
+| 4 | 订单导入机制 | 使用服务器管理模板 + 预览步骤 + 异步导入，不直接传接实体 Excel 文件 |
+| 5 | Tenant 安全权限 | 所有角色以固定代码写死。`settings/roles` 等全部为只读配置接口 |
 
-> 详细决策背景见 `docs/api-design-decisions.md`

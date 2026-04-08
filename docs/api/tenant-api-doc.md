@@ -9,7 +9,7 @@
 
 1. [通用约定](#一通用约定)
 2. [认证模块 Auth](#二认证模块-auth4-个端点)
-3. [订单模块 Orders](#三订单模块-orders11-个端点)
+3. [订单模块 Orders](#三订单模块-orders15-个端点)
 4. [支付与核销 Payment](#四支付与核销-payment3-个端点)
 5. [财务对账 Finance](#五财务对账-finance3-个端点)
 6. [账期管理 Credit](#六账期管理-credit2-个端点)
@@ -89,15 +89,15 @@ interface PaginatedResponse<T> {
 ### 1.6 角色定义
 
 ```typescript
-type Role = 'owner' | 'clerk' | 'finance' | 'agent'
+type Role = 'TENANT_OWNER' | 'TENANT_OPERATOR' | 'TENANT_FINANCE' | 'TENANT_VIEWER'
 ```
 
 | 角色 | 中文名 | 说明 |
 |------|--------|------|
-| owner | 老板 | 全部权限，含账户配置、财务报表、员工管理 |
-| clerk | 打单员 | 订单导入、打印、查看本人操作的订单状态 |
-| finance | 财务 | 查看收款报表、对账单、发起回款提醒、现金核销 |
-| agent | 服务商 | 查看商户流水、佣金与服务范围 |
+| `TENANT_OWNER` | 老板 | 全部权限，包含员工配置与财务全览 |
+| `TENANT_OPERATOR` | 打单员 | 处理订单导入、打印、发货及催款操作 |
+| `TENANT_FINANCE` | 财务 | 负责现金线下核销、对账单审计处理 |
+| `TENANT_VIEWER` | 访客 | 只读，用于审计与只读查看流水 |
 
 ---
 
@@ -204,7 +204,7 @@ type Role = 'owner' | 'clerk' | 'finance' | 'agent'
 
 ---
 
-## 三、订单模块 Orders（11 个端点）
+## 三、订单模块 Orders（15 个端点）
 
 > 源码：`features/orders/` + `@sinhe/shared/api/modules/order`
 > 后端自动按当前用户的 tenantId 过滤，仅返回本租户数据。
@@ -225,6 +225,9 @@ interface TenantOrder {
   payType: PayType             // 付款方式
   prints: number               // 打印次数
   date: string                 // 下单时间
+  voided: boolean              // 是否已作废（防物理删除）
+  voidReason?: string          // 作废原因
+  voidedAt?: string            // 作废时间
 }
 ```
 
@@ -295,63 +298,54 @@ interface TenantOrder {
 
 **响应 data：** `TenantOrder`
 
-### 3.5 删除订单
+### 3.5 作废订单
 
-- **DELETE** `/orders/{id}`
-- **角色**：owner
-
-**响应 data：** `null`
-
-### 3.6 导入订单（一步完成）
-
-- **POST** `/orders/import`
+- **POST** `/orders/{id}/void`
 - **角色**：owner, clerk
-- **Content-Type**：`multipart/form-data`
-- **描述**：上传 Excel 文件 + 字段映射配置，一步完成导入。字段映射由前端本地处理（XLSX.js 解析 + localStorage 模板管理）。
+- **描述**：通过提供作废原因安全终结订单生命周期。一旦作废全链路生效不可逆。
 
 **请求参数：**
 
-| 字段 | 类型 | 说明 |
-|------|------|------|
-| `file` | File | Excel 文件（.xlsx / .xls / .csv），最多 1000 行 |
-| `mappings` | JSON string | 字段映射配置 |
-| `duplicateStrategy` | string | 重复处理策略：`skip`（默认）/ `overwrite` |
-
-**mappings 结构：**
-
 ```typescript
-Array<{
-  sourceColumn: string       // Excel 列名，如 "A列 日期"
-  targetField: string        // 系统字段名，如 "date"
-}>
+{
+  voidReason: string // 作废理由（必填）
+}
 ```
 
-**系统字段清单：**
+**响应 data：** `TenantOrder`
 
-| 字段名 | 中文 | 必填 |
-|--------|------|------|
-| id | 订单号 | 是 |
-| customer | 客户名称 | 是 |
-| amount | 订单金额 | 是 |
-| summary | 商品明细 | 否 |
-| date | 下单日期 | 否 |
-| payType | 付款方式 | 否 |
+### 3.6 导入-数据预检校验
+
+- **POST** `/import/preview`
+- **角色**：owner, clerk
+- **描述**：纯内存试算校验字段与格式合法性，不下发单据。
+- **关联表**：无
+
+### 3.7 异步正式导入
+
+- **POST** `/orders/import`
+- **角色**：owner, clerk
+- **描述**：提交完整合法的数据推向后端处理队列
+- **关联表**：orders
 
 **响应 data：**
 
 ```typescript
 {
-  importedCount: number        // 成功导入条数
-  skippedCount: number         // 跳过条数（重复）
-  errorCount: number           // 失败条数（格式错误）
-  errors: Array<{
-    row: number                // Excel 行号
-    reason: string             // 错误原因
-  }>
+  jobId: string
+  submittedCount: number
+  status: 'PENDING' | 'PROCESSING' | 'COMPLETED' | 'FAILED'
 }
 ```
 
-### 3.7 导出订单
+### 3.8 轮询导入进度
+
+- **GET** `/orders/import/jobs/{jobId}`
+- **角色**：owner, clerk
+- **描述**：用于轮询长耗时任务的执行成功率与返回报告
+- **关联表**：import_jobs
+
+### 3.9 导出订单
 
 - **GET** `/orders/export`
 - **角色**：owner, finance
@@ -369,7 +363,7 @@ Array<{
 
 **响应**：Excel 文件流
 
-### 3.8 标记已打印
+### 3.10 标记已打印
 
 - **POST** `/orders/{id}/print`
 - **角色**：owner, clerk
@@ -386,7 +380,7 @@ Array<{
 }
 ```
 
-### 3.9 批量打印标记
+### 3.11 批量打印标记
 
 - **POST** `/orders/batch/print`
 - **角色**：owner, clerk
@@ -408,7 +402,7 @@ Array<{
 }
 ```
 
-### 3.10 发送催款提醒
+### 3.12 发送催款提醒
 
 - **POST** `/orders/{id}/remind`
 - **角色**：owner, finance
@@ -431,26 +425,24 @@ Array<{
 }
 ```
 
-### 3.11 获取导入模板列表
+### 3.13 导入-获取模板列表
 
-- **GET** `/orders/import/templates`
+- **GET** `/import/templates`
 - **角色**：owner, clerk
-- **描述**：获取服务端预置的导入模板列表（如管家婆模板、金蝶 ERP 模板等）
+- **描述**：获取当前租户可用的 Excel 导入模板
+- **关联表**：import_templates
 
-**响应 data：**
+### 3.14 导入-创建模板
 
-```typescript
-Array<{
-  id: string
-  name: string                 // 模板名称，如 "管家婆模板"
-  mappings: Array<{
-    sourceColumn: string
-    targetField: string
-  }>
-}>
-```
+- **POST** `/import/templates`
+- **角色**：owner, clerk
+- **关联表**：import_templates
 
-> 注：用户自定义模板存储在前端 localStorage，不走此接口。
+### 3.15 导入-更新模板
+
+- **PUT** `/import/templates/{id}`
+- **角色**：owner, clerk
+- **关联表**：import_templates
 
 ---
 
@@ -697,138 +689,11 @@ Tenant 财务 POST /orders/{id}/verify-cash
 
 ---
 
-## 七、服务商模块 Agents（6 个端点）
 
-> 源码：`features/agents/` + `@sinhe/shared/api/modules/agent`
-
-### 类型定义
-
-```typescript
-type AgentStatus = 'active' | 'pending' | 'paused'
-
-interface TenantAgent {
-  id: string
-  name: string                 // 服务商名称
-  region: string               // 所属区域
-  merchants: number            // 名下商户数
-  gmv: number                  // 流水金额（元）
-  rate: number                 // 佣金率（%）
-  commission: number           // 佣金金额（元）
-  status: AgentStatus
-}
-```
-
-### 7.1 获取服务商列表
-
-- **GET** `/agents`
-- **角色**：owner, agent
-
-**请求参数（Query）：**
-
-```typescript
-{
-  page?: number                // 默认 1
-  pageSize?: number            // 默认 100
-  keyword?: string             // 搜索服务商名称
-}
-```
-
-**响应 data：**
-
-```typescript
-{
-  list: TenantAgent[]
-  total: number
-  page: number
-  pageSize: number
-}
-```
-
-### 7.2 获取单个服务商
-
-- **GET** `/agents/{id}`
-- **角色**：owner, agent
-
-**响应 data：** `TenantAgent`
-
-### 7.3 创建服务商
-
-- **POST** `/agents`
-- **角色**：owner
-
-**请求参数：**
-
-```typescript
-{
-  name: string                 // 服务商名称（必填）
-  region: string               // 所属区域（必填）
-  rate: number                 // 佣金率（必填）
-  status?: AgentStatus         // 默认 'pending'
-}
-```
-
-**响应 data：** `TenantAgent`
-
-### 7.4 更新服务商
-
-- **PUT** `/agents/{id}`
-- **角色**：owner
-
-**请求参数：** `Partial<TenantAgent>`
-
-**响应 data：** `TenantAgent`
-
-### 7.5 结算佣金
-
-- **POST** `/agents/{id}/settle`
-- **角色**：owner
-- **描述**：按当前 commission 金额发起结算
-
-**请求参数：** 无
-
-**响应 data：**
-
-```typescript
-{
-  settlementId: string         // 结算记录 ID
-  amount: number               // 结算金额
-  settledAt: string            // 结算时间
-}
-```
-
-### 7.6 获取结算历史
-
-- **GET** `/agents/{id}/settlements`
-- **角色**：owner, agent
-
-**请求参数（Query）：**
-
-```typescript
-{
-  page?: number
-  pageSize?: number
-}
-```
-
-**响应 data：**
-
-```typescript
-{
-  list: Array<{
-    id: string
-    amount: number             // 结算金额（元）
-    period: string             // 结算周期，如 "2026-03"
-    settledAt: string          // 结算时间
-  }>
-  total: number
-  page: number
-  pageSize: number
-}
-```
 
 ---
 
-## 八、数据分析 Analytics（4 个端点）
+## 七、数据分析 Analytics（4 个端点）
 
 > 源码：`features/analytics/` + `@sinhe/shared/api/modules/analytics`
 > 全部数据自动按当前租户过滤。
@@ -912,7 +777,7 @@ interface LiveFeedEntry {
 
 ---
 
-## 九、系统设置 Settings（15 个端点）
+## 八、系统设置 Settings（12 个端点）
 
 > 源码：`features/settings/` + `@sinhe/shared/api/modules/settings`
 > 仅 owner 角色可访问（系统设置页面整体受角色控制）。
@@ -963,72 +828,19 @@ interface TenantGeneralSettings {
 }
 ```
 
-### 9.1 获取角色列表
+### 8.1 获取角色列表
 
 - **GET** `/settings/roles`
 - **角色**：owner
+- **描述**：一期使用固化角色，本接口仅提供供UI展示的基础配置字典。
 
 **响应 data：** `TenantRoleAccount[]`
 
-### 9.2 创建自定义角色
-
-- **POST** `/settings/roles`
-- **角色**：owner
-
-**请求参数：**
-
-```typescript
-{
-  name: string                 // 角色名称（必填，租户内唯一）
-  description?: string         // 角色描述
-  permissions: string[]        // 权限 ID 列表（至少一项）
-}
-```
-
-**响应 data：** `TenantRoleAccount`
-
-**校验规则：**
-- `name` 不可与本租户已有角色重名
-- `permissions` 至少包含一项
-- 系统内置角色（owner/clerk/finance/agent）不可通过此接口创建
-
-### 9.3 更新角色权限
-
-- **PUT** `/settings/roles/{id}`
-- **角色**：owner
-
-**请求参数：**
-
-```typescript
-{
-  name?: string
-  description?: string
-  permissions?: string[]
-}
-```
-
-**响应 data：** `TenantRoleAccount`
-
-**校验规则：**
-- 系统内置角色禁止修改
-- 角色名变更时需校验唯一性
-
-### 9.4 删除自定义角色
-
-- **DELETE** `/settings/roles/{id}`
-- **角色**：owner
-
-**响应 data：** `null`
-
-**校验规则：**
-- 系统内置角色禁止删除
-- 如有用户关联此角色，禁止删除，返回 code=409
-
-### 9.5 获取权限树
+### 8.2 获取权限树
 
 - **GET** `/settings/permissions`
 - **角色**：owner
-- **描述**：返回完整权限树结构，用于角色编辑时的权限勾选
+- **描述**：返回完整硬编码的权限树结构，仅供展示使用，一期无动态分配权。
 
 **响应 data：** `PermissionNode[]`
 
@@ -1042,14 +854,14 @@ interface TenantGeneralSettings {
 - 系统设置（基础设置、打印机设置、角色管理、用户管理）
 ```
 
-### 9.6 获取用户列表
+### 8.3 获取用户列表
 
 - **GET** `/settings/users`
 - **角色**：owner
 
 **响应 data：** `TenantSettingsUser[]`
 
-### 9.7 创建用户
+### 8.4 创建用户
 
 - **POST** `/settings/users`
 - **角色**：owner
@@ -1071,7 +883,7 @@ interface TenantGeneralSettings {
 - `phone` 在本租户内唯一（作为登录账号）
 - 新建用户初始状态为 `active`
 
-### 9.8 更新用户
+### 8.5 更新用户
 
 - **PUT** `/settings/users/{id}`
 - **角色**：owner
@@ -1080,7 +892,7 @@ interface TenantGeneralSettings {
 
 **响应 data：** `TenantSettingsUser`
 
-### 9.9 删除用户
+### 8.6 删除用户
 
 - **DELETE** `/settings/users/{id}`
 - **角色**：owner
@@ -1091,7 +903,7 @@ interface TenantGeneralSettings {
 - owner 角色用户不可删除自己
 - 实际为软删除
 
-### 9.10 启用/禁用用户
+### 8.7 启用/禁用用户
 
 - **PUT** `/settings/users/{id}/status`
 - **角色**：owner
@@ -1107,7 +919,7 @@ interface TenantGeneralSettings {
 
 **响应 data：** `TenantSettingsUser`
 
-### 9.11 获取通用配置
+### 8.8 获取通用配置
 
 - **GET** `/settings/general`
 - **角色**：owner
@@ -1115,7 +927,7 @@ interface TenantGeneralSettings {
 
 **响应 data：** `TenantGeneralSettings`
 
-### 9.12 保存通用配置
+### 8.9 保存通用配置
 
 - **PUT** `/settings/general`
 - **角色**：owner
@@ -1124,7 +936,7 @@ interface TenantGeneralSettings {
 
 **响应 data：** `TenantGeneralSettings`
 
-### 9.13 获取打印配置
+### 8.10 获取打印配置
 
 - **GET** `/settings/printer`
 - **角色**：owner
@@ -1162,17 +974,17 @@ interface PrintFieldConfig {
 }
 ```
 
-### 9.14 保存打印配置
+### 8.11 保存打印配置
 
 - **PUT** `/settings/printer`
 - **角色**：owner
 - **描述**：保存完整打印配置（模板、字段布局、纸张规格）
 
-**请求参数：** 同 9.13 响应 data 结构
+**请求参数：** 同 8.10 响应 data 结构
 
-**响应 data：** 同 9.13 响应 data 结构
+**响应 data：** 同 8.10 响应 data 结构
 
-### 9.15 获取操作日志
+### 8.12 获取操作日志
 
 - **GET** `/settings/audit-logs`
 - **角色**：owner
@@ -1211,7 +1023,7 @@ interface AuditLogRecord {
 
 ---
 
-## 十、通知 Notifications（2 个端点）
+## 九、通知 Notifications（2 个端点）
 
 > Tenant 是公告的**接收方**，Admin 是发布方。
 
@@ -1227,7 +1039,7 @@ interface NotificationRecord {
 }
 ```
 
-### 10.1 获取平台公告列表
+### 9.1 获取平台公告列表
 
 - **GET** `/notifications`
 - **角色**：all
@@ -1253,7 +1065,7 @@ interface NotificationRecord {
 }
 ```
 
-### 10.2 标记公告已读
+### 9.2 标记公告已读
 
 - **POST** `/notifications/{id}/read`
 - **角色**：all
@@ -1264,7 +1076,7 @@ interface NotificationRecord {
 
 ---
 
-## 十一、资质提交 Certification（2 个端点）
+## 十、资质提交 Certification（2 个端点）
 
 > Tenant 提交资质材料，Admin 在 `/tenants/certifications/{id}/review` 进行审核。
 
@@ -1291,7 +1103,7 @@ interface QualificationStatusResult {
 }
 ```
 
-### 11.1 提交资质材料
+### 10.1 提交资质材料
 
 - **POST** `/tenants/certification`
 - **描述**：提交当前租户的资质认证材料
@@ -1309,7 +1121,7 @@ interface QualificationStatusResult {
 }
 ```
 
-### 11.2 查询资质状态
+### 10.2 查询资质状态
 
 - **GET** `/tenants/certification`
 - **描述**：查询当前租户的资质认证状态
@@ -1321,7 +1133,7 @@ interface QualificationStatusResult {
 
 ---
 
-## 十二、数据流转架构
+## 十一、数据流转架构
 
 ```
 ┌─────────────┐
@@ -1372,13 +1184,13 @@ interface QualificationStatusResult {
 
 ---
 
-## 十三、跨项目关联
+## 十二、跨项目关联
 
 ### 与 H5 端的关联
 
 | Tenant 操作 | 关联的 H5 端行为 |
 |-------------|-----------------|
-| 创建订单 → 生成收款码链接 | H5 通过 orderNo 打开支付页面 |
+| 创建订单 → 生成收款码链接 | H5 通过 qrCodeToken 打开支付页面 |
 | 财务核销 `POST /orders/{id}/verify-cash` | H5 端现金支付订单状态从 `pending_verification` → `paid` |
 | 收款流水 `GET /payments` | 包含 H5 在线支付成功后生成的记录 |
 
@@ -1399,16 +1211,15 @@ interface QualificationStatusResult {
 | 模块 | 接口数 | 方法分布 |
 |------|--------|---------|
 | 认证 Auth | 4 | POST ×3, GET ×1 |
-| 订单 Orders | 11 | GET ×4, POST ×5, PUT ×1, DELETE ×1 |
+| 订单 Orders | 15 | GET ×5, POST ×8, PUT ×2 |
 | 支付与核销 Payment | 3 | GET ×2, POST ×1 |
 | 财务对账 Finance | 3 | GET ×3 |
 | 账期管理 Credit | 2 | GET ×1, POST ×1 |
-| 服务商 Agents | 6 | GET ×3, POST ×2, PUT ×1 |
 | 数据分析 Analytics | 4 | GET ×4 |
-| 系统设置 Settings | 15 | GET ×6, POST ×2, PUT ×5, DELETE ×2 |
+| 系统设置 Settings | 12 | GET ×6, POST ×1, PUT ×4, DELETE ×1 |
 | 通知 Notifications | 2 | GET ×1, POST ×1 |
 | 资质提交 Certification | 2 | GET ×1, POST ×1 |
-| **合计** | **52** | GET ×26, POST ×16, PUT ×7, DELETE ×3 |
+| **合计** | **47** | GET ×24, POST ×16, PUT ×6, DELETE ×1 |
 
 | 关联数据库表 | 说明 |
 |-------------|------|
@@ -1419,8 +1230,6 @@ interface QualificationStatusResult {
 | order_items | 订单行项目 |
 | payments | 收款流水（本租户） |
 | payment_orders | H5 支付单（核销关联） |
-| agents | 服务商（本租户） |
-| agent_settlements | 结算记录 |
 | system_configs | 通用配置 |
 | notices | 平台公告（读取） |
 | tenant_certifications | 资质认证记录 |
