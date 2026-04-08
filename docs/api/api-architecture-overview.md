@@ -290,7 +290,9 @@ https://api.platform.com/api/v1
   tenantId: string
   name: string
   isDefault: boolean
-  mappings: any             // JSON: ColumnMapping[]
+  sourceColumns: any        // JSON: Excel 表头读取快照数组
+  fields: any               // JSON: 靶点骨架定义数组
+  mappings: any             // JSON: 映射连线关系数组
   createdAt: string
   updatedAt: string
 }
@@ -309,6 +311,7 @@ https://api.platform.com/api/v1
   skippedCount: number
   failedCount: number
   failedRows: any           // JSON: 行级报错日志
+  conflictDetails: any      // JSON: 重复冲突判定策略与结果追溯
   createdAt: string
   updatedAt: string
 }
@@ -711,9 +714,10 @@ H5 前端                    后端                     支付网关
 {
   page: number
   pageSize: number
-  keyword?: string         // 搜索订单号、客户名
+  keyword?: string         // 搜索订单号、ERP源单号、客户名
   status?: OrderStatus     // pending | partial | paid | expired | credit
   payType?: '现款' | '账期'
+  templateId?: string      // 按导入模板类型过滤订单
   dateFrom?: string        // YYYY-MM-DD
   dateTo?: string          // YYYY-MM-DD
 }

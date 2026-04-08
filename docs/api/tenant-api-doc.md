@@ -220,7 +220,7 @@ interface TenantOrder {
 ### 3.3 创建订单
 
 - **POST** `/orders`
-- **角色**：owner, clerk
+- **角色**：TENANT_OWNER, TENANT_OPERATOR
 
 **请求参数：**
 
@@ -241,7 +241,7 @@ interface TenantOrder {
 ### 3.4 更新订单
 
 - **PUT** `/orders/{id}`
-- **角色**：owner, clerk
+- **角色**：TENANT_OWNER, TENANT_OPERATOR
 
 **请求参数：** `Partial<TenantOrder>`
 
@@ -250,7 +250,7 @@ interface TenantOrder {
 ### 3.5 作废订单
 
 - **POST** `/orders/{id}/void`
-- **角色**：owner, clerk
+- **角色**：TENANT_OWNER, TENANT_OPERATOR
 - **描述**：通过提供作废原因安全终结订单生命周期。一旦作废全链路生效不可逆。
 
 **请求参数：**
@@ -266,7 +266,7 @@ interface TenantOrder {
 ### 3.6 导入-数据预检校验
 
 - **POST** `/import/preview`
-- **角色**：owner, clerk
+- **角色**：TENANT_OWNER, TENANT_OPERATOR
 - **描述**：纯内存试算校验字段与格式合法性，不下发单据。
 - **关联表**：无
 
@@ -301,7 +301,7 @@ interface TenantOrder {
 ### 3.7 异步正式导入
 
 - **POST** `/orders/import`
-- **角色**：owner, clerk
+- **角色**：TENANT_OWNER, TENANT_OPERATOR
 - **描述**：提交完整合法的数据推向后端处理队列
 - **关联表**：orders
 
@@ -327,7 +327,7 @@ interface TenantOrder {
 ### 3.8 轮询导入进度
 
 - **GET** `/orders/import/jobs/{jobId}`
-- **角色**：owner, clerk
+- **角色**：TENANT_OWNER, TENANT_OPERATOR
 - **描述**：用于轮询长耗时任务的执行成功率与返回报告
 - **关联表**：import_jobs
 
@@ -350,7 +350,7 @@ interface TenantOrder {
 ### 3.9 标记已打印
 
 - **POST** `/orders/{id}/print`
-- **角色**：owner, clerk
+- **角色**：TENANT_OWNER, TENANT_OPERATOR
 - **描述**：标记单个订单为已打印，递增 prints 计数
 
 **请求参数：** 无
@@ -367,7 +367,7 @@ interface TenantOrder {
 ### 3.10 批量打印标记
 
 - **POST** `/orders/batch/print`
-- **角色**：owner, clerk
+- **角色**：TENANT_OWNER, TENANT_OPERATOR
 - **描述**：批量标记多个订单为已打印
 
 **请求参数：**
@@ -389,7 +389,7 @@ interface TenantOrder {
 ### 3.11 发送催款提醒
 
 - **POST** `/orders/{id}/remind`
-- **角色**：owner, finance
+- **角色**：TENANT_OWNER, TENANT_FINANCE
 - **描述**：对待收款/已逾期订单发送催款通知
 
 **请求参数：**
@@ -412,7 +412,7 @@ interface TenantOrder {
 ### 3.12 导入-获取模板列表
 
 - **GET** `/import/templates`
-- **角色**：owner, clerk
+- **角色**：TENANT_OWNER, TENANT_OPERATOR
 - **描述**：获取当前租户可用的 Excel 导入模板
 - **关联表**：import_templates
 
@@ -426,7 +426,7 @@ interface OrderImportTemplate {
   updatedAt: string
 
   // 1. Excel 原始列头快照（用于前端在配置页回显预览）
-  sourceColumns: { 
+  sourceColumns: {
     key: string         // 列唯一标识
     title: string       // Excel 里的真实表头，如 "买家旺旺"
     index: number       // 所在列索引
@@ -445,7 +445,7 @@ interface OrderImportTemplate {
   }[]
 
   // 3. 纯粹的映射连线关系（分离后极度解耦）
-  mappings: { 
+  mappings: {
     sourceColumn: string  // 对应 sourceColumns 的 title
     targetField: string   // 对应 fields 的 key
     sampleValue: string   // 连线后的数据样例直观展示
@@ -459,7 +459,7 @@ Array<OrderImportTemplate>
 ### 3.13 导入-创建模板
 
 - **POST** `/import/templates`
-- **角色**：owner, clerk
+- **角色**：TENANT_OWNER, TENANT_OPERATOR
 - **关联表**：import_templates
 
 **请求参数：** `Omit<OrderImportTemplate, 'id' | 'updatedAt'>`
@@ -469,7 +469,7 @@ Array<OrderImportTemplate>
 ### 3.14 导入-更新模板
 
 - **PUT** `/import/templates/{id}`
-- **角色**：owner, clerk
+- **角色**：TENANT_OWNER, TENANT_OPERATOR
 - **关联表**：import_templates
 
 **请求参数：** `Partial<OrderImportTemplate>`
@@ -501,7 +501,7 @@ interface PaymentRecord {
 ### 4.1 获取收款流水列表
 
 - **GET** `/payments`
-- **角色**：owner, finance
+- **角色**：TENANT_OWNER, TENANT_FINANCE
 
 **请求参数（Query）：**
 
@@ -528,7 +528,7 @@ interface PaymentRecord {
 ### 4.2 获取收款汇总统计
 
 - **GET** `/payments/summary`
-- **角色**：owner, finance
+- **角色**：TENANT_OWNER, TENANT_FINANCE
 
 **响应 data：**
 
@@ -545,7 +545,7 @@ interface PaymentRecord {
 ### 4.3 现金核销
 
 - **POST** `/orders/{id}/verify-cash`
-- **角色**：finance
+- **角色**：TENANT_FINANCE
 - **描述**：对 H5 端提交的现金支付订单进行核销确认，状态从 `pending_verification` 变为 `paid`
 
 **请求参数：** 无
@@ -587,7 +587,7 @@ Tenant 财务 POST /orders/{id}/verify-cash
 ### 5.1 获取财务汇总
 
 - **GET** `/finance/summary`
-- **角色**：owner, finance
+- **角色**：TENANT_OWNER, TENANT_FINANCE
 
 **响应 data：**
 
@@ -606,7 +606,7 @@ Tenant 财务 POST /orders/{id}/verify-cash
 ### 5.2 获取对账明细
 
 - **GET** `/finance/reconciliation`
-- **角色**：owner, finance
+- **角色**：TENANT_OWNER, TENANT_FINANCE
 
 **请求参数（Query）：**
 
@@ -640,7 +640,7 @@ Tenant 财务 POST /orders/{id}/verify-cash
 ### 5.3 导出对账单
 
 - **GET** `/finance/reconciliation/export`
-- **角色**：owner, finance
+- **角色**：TENANT_OWNER, TENANT_FINANCE
 - **Content-Type**：`application/octet-stream`
 
 **响应**：Excel 文件流
@@ -655,7 +655,7 @@ Tenant 财务 POST /orders/{id}/verify-cash
 ### 6.1 获取账期订单列表
 
 - **GET** `/orders/credit`
-- **角色**：owner, finance
+- **角色**：TENANT_OWNER, TENANT_FINANCE
 
 **请求参数（Query）：**
 
@@ -697,7 +697,7 @@ Tenant 财务 POST /orders/{id}/verify-cash
 ### 6.2 标记回款
 
 - **POST** `/orders/{id}/mark-received`
-- **角色**：owner, finance
+- **角色**：TENANT_OWNER, TENANT_FINANCE
 - **描述**：将账期订单标记为已收款
 
 **请求参数：**
@@ -800,10 +800,10 @@ interface LiveFeedEntry {
 
   // 角色定制标题
   roleTitle: string            // 根据角色返回不同标题
-  // owner → "今日收款总览"
-  // clerk → "今日打单任务"
-  // finance → "财务对账中心"
-  // agent → "我的业绩总览"
+  // TENANT_OWNER → "今日收款总览"
+  // TENANT_OPERATOR → "今日打单任务"
+  // TENANT_FINANCE → "财务对账中心"
+  // TENANT_VIEWER → "审计只读视图"
 }
 ```
 
@@ -812,7 +812,7 @@ interface LiveFeedEntry {
 ## 八、系统设置 Settings（12 个端点）
 
 > 源码：`features/settings/` + `@sinhe/shared/api/modules/settings`
-> 仅 owner 角色可访问（系统设置页面整体受角色控制）。
+> 仅 TENANT_OWNER 角色可访问（系统设置页面整体受角色控制）。
 
 ### 类型定义
 
@@ -863,7 +863,7 @@ interface TenantGeneralSettings {
 ### 8.1 获取角色列表
 
 - **GET** `/settings/roles`
-- **角色**：owner
+- **角色**：TENANT_OWNER
 - **描述**：一期使用固化角色，本接口仅提供供UI展示的基础配置字典。
 
 **响应 data：** `TenantRoleAccount[]`
@@ -871,7 +871,7 @@ interface TenantGeneralSettings {
 ### 8.2 获取权限树
 
 - **GET** `/settings/permissions`
-- **角色**：owner
+- **角色**：TENANT_OWNER
 - **描述**：返回完整硬编码的权限树结构，仅供展示使用，一期无动态分配权。
 
 **响应 data：** `PermissionNode[]`
@@ -889,14 +889,14 @@ interface TenantGeneralSettings {
 ### 8.3 获取用户列表
 
 - **GET** `/settings/users`
-- **角色**：owner
+- **角色**：TENANT_OWNER
 
 **响应 data：** `TenantSettingsUser[]`
 
 ### 8.4 创建用户
 
 - **POST** `/settings/users`
-- **角色**：owner
+- **角色**：TENANT_OWNER
 
 **请求参数：**
 
@@ -918,7 +918,7 @@ interface TenantGeneralSettings {
 ### 8.5 更新用户
 
 - **PUT** `/settings/users/{id}`
-- **角色**：owner
+- **角色**：TENANT_OWNER
 
 **请求参数：** `Partial<TenantSettingsUser>`
 
@@ -927,18 +927,18 @@ interface TenantGeneralSettings {
 ### 8.6 删除用户
 
 - **DELETE** `/settings/users/{id}`
-- **角色**：owner
+- **角色**：TENANT_OWNER
 
 **响应 data：** `null`
 
 **校验规则：**
-- owner 角色用户不可删除自己
+- TENANT_OWNER 角色用户不可删除自己
 - 实际为软删除
 
 ### 8.7 启用/禁用用户
 
 - **PUT** `/settings/users/{id}/status`
-- **角色**：owner
+- **角色**：TENANT_OWNER
 - **描述**：切换用户的启用/禁用状态
 
 **请求参数：**
@@ -954,7 +954,7 @@ interface TenantGeneralSettings {
 ### 8.8 获取通用配置
 
 - **GET** `/settings/general`
-- **角色**：owner
+- **角色**：TENANT_OWNER
 - **描述**：获取企业信息 + 通知设置
 
 **响应 data：** `TenantGeneralSettings`
@@ -962,7 +962,7 @@ interface TenantGeneralSettings {
 ### 8.9 保存通用配置
 
 - **PUT** `/settings/general`
-- **角色**：owner
+- **角色**：TENANT_OWNER
 
 **请求参数：** `Partial<TenantGeneralSettings>`
 
@@ -971,7 +971,7 @@ interface TenantGeneralSettings {
 ### 8.10 获取打印配置
 
 - **GET** `/settings/printer`
-- **角色**：owner
+- **角色**：TENANT_OWNER
 - **描述**：获取打印模板、纸张规格、字段布局等配置
 
 **响应 data：**
@@ -1009,7 +1009,7 @@ interface PrintFieldConfig {
 ### 8.11 保存打印配置
 
 - **PUT** `/settings/printer`
-- **角色**：owner
+- **角色**：TENANT_OWNER
 - **描述**：保存完整打印配置（模板、字段布局、纸张规格）
 
 **请求参数：** 同 8.10 响应 data 结构
@@ -1019,7 +1019,7 @@ interface PrintFieldConfig {
 ### 8.12 获取操作日志
 
 - **GET** `/settings/audit-logs`
-- **角色**：owner
+- **角色**：TENANT_OWNER
 - **描述**：查看本租户操作日志（tenantId 自动隔离）
 
 **请求参数（Query）：**
