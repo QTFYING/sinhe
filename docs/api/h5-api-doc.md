@@ -9,7 +9,7 @@
 
 > [!NOTE]
 > **全局规范指引**
-> 关于统一下发的 `code/data/message` 响应体包装、全局 `Http Status` 说明、环境变量指引以及 UTC 时区要求，在此文档内不再赘述，请统一参阅大本营 **[api-architecture-overview.md](file:///d:/Sinhe/api/docs/api/api-architecture-overview.md)** 的第二章。
+> 关于统一下发的 `code/data/message` 响应体包装、全局 `Http Status` 说明、环境变量指引以及 UTC 时区要求，在此文档内不再赘述，请统一参阅大本营 **[api-architecture-overview.md]** 的第二章。
 
 ---
 

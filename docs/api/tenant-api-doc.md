@@ -27,7 +27,7 @@
 
 > [!NOTE]
 > **全局规范指引**
-> 关于统一下发的 `code/data/message` 响应体包装、分页参数的请求与返回体指引、全局 `Http Status` 错误码机制以及环境拦截要求，本档内剔除重复声明，请直接翻阅架构大本营字典 **[api-architecture-overview.md](file:///d:/Sinhe/api/docs/api/api-architecture-overview.md)** 的第二章。
+> 关于统一下发的 `code/data/message` 响应体包装、分页参数的请求与返回体指引、全局 `Http Status` 错误码机制以及环境拦截要求，本档内剔除重复声明，请直接翻阅架构大本营字典 **[api-architecture-overview.md]** 的第二章。
 
 ### 1.6 角色定义
 
@@ -46,7 +46,7 @@ type Role = 'TENANT_OWNER' | 'TENANT_OPERATOR' | 'TENANT_FINANCE' | 'TENANT_VIEW
 
 ## 二、认证模块 Auth（4 个端点）
 
-> 源码：`features/auth/` + `@sinhe/shared/api/modules/auth`
+> 源码：`features/auth/` + `@shou/shared/api/modules/auth`
 > 三端（Admin / Tenant / H5）共用同一套 Auth，后端通过 `user.tenantId` 区分身份。
 
 ### 2.1 登录
@@ -149,7 +149,7 @@ type Role = 'TENANT_OWNER' | 'TENANT_OPERATOR' | 'TENANT_FINANCE' | 'TENANT_VIEW
 
 ## 三、订单模块 Orders（14 个端点）
 
-> 源码：`features/orders/` + `@sinhe/shared/api/modules/order`
+> 源码：`features/orders/` + `@shou/shared/api/modules/order`
 > 后端自动按当前用户的 tenantId 过滤，仅返回本租户数据。
 
 ### 类型定义
@@ -267,15 +267,15 @@ interface TenantOrder {
 
 - **POST** `/import/preview`
 - **角色**：TENANT_OWNER, TENANT_OPERATOR
-- **描述**：纯内存试算校验字段与格式合法性，不下发单据。
+- **描述**：前端完成 Excel 解析后，提交结构化行数据做字段映射、格式校验、聚合试算与重复检查，不下发单据。
 - **关联表**：无
 
 **请求参数：**
 
 ```typescript
 {
-  file: File                   // Excel 文件
-  templateId?: string          // 选定的模板 ID
+  templateId?: string                    // 选定的模板 ID；不传时允许服务端按列头尝试匹配
+  rows: Array<Record<string, unknown>>   // 浏览器端解析后的原始行数据
 }
 ```
 
@@ -283,18 +283,33 @@ interface TenantOrder {
 
 ```typescript
 {
-  previewId: string            // 预检批次标识
+  previewId: string            // 预检批次标识，用于后续正式导入复用本次校验结果
+  templateId?: string          // 最终命中的模板 ID；可能是前端传入值，也可能是服务端自动识别结果
+  matchedFieldCount?: number   // 成功匹配的目标字段数量
+  requiredFieldMissing: string[] // 当前批次缺失的必填字段 key 列表
   summary: {
-    totalRows: number
-    validRows: number
-    aggregatedOrders: number   // 按 sourceOrderNo 聚合的有效订单数
-    duplicateCount: number     // 查出的重复数
-    errorCount: number         // 查出的错误行数
+    totalRows: number               // 上传并参与预检的总行数
+    validRows: number               // 通过字段与格式校验的行数
+    invalidRows: number             // 未通过校验的行数
+    aggregatedOrderCount: number    // 按 sourceOrderNo 聚合后的有效订单数
+    duplicateOrderCount: number     // 与库内已存在订单发生重复的聚合订单数
+    errorCount: number              // 错误明细总数；通常与 invalidRows 接近，但允许一行多错
   }
   aggregatedOrders: TenantOrder[] // 预览用的聚合结果
-  duplicateOrders: { sourceOrderNo: string, existId: string }[]
-  invalidRows: { row: number, reason: string }[]
-  requiredFieldMissing: string[]
+  duplicateOrders: {
+    sourceOrderNo: string           // 检测到重复的源订单号
+    existingOrderId?: string        // 系统内已存在的订单 ID
+    customer?: string               // 重复订单对应的客户名称
+    amount?: number                 // 重复订单对应的金额
+    existingStatus?: OrderStatus    // 已存在订单当前状态
+    incomingRowCount: number        // 当前导入批次中该源订单号对应的原始行数
+  }[]
+  invalidRows: {
+    row: number                     // 出错的原始 Excel 行号或解析后行号
+    field?: string                  // 出错字段 key；无法定位字段时可不返回
+    sourceOrderNo?: string          // 若已解析出源订单号，则返回该值方便定位
+    reason: string                  // 中文错误原因
+  }[]
 }
 ```
 
@@ -302,15 +317,17 @@ interface TenantOrder {
 
 - **POST** `/orders/import`
 - **角色**：TENANT_OWNER, TENANT_OPERATOR
-- **描述**：提交完整合法的数据推向后端处理队列
+- **描述**：提交预检结果或前端已整理完成的合法数据，推入后端异步处理队列
 - **关联表**：orders
 
 **请求参数：**
 
 ```typescript
 {
-  previewId: string            // 来源于 preview 接口返回的标识
-  conflictStrategy: 'SKIP' | 'FAIL' | 'OVERWRITE'  // 针对 duplicateOrders 采取的策略
+  previewId?: string                      // 若已完成预检，优先传该标识，服务端按该批次结果正式导入
+  templateId?: string                     // 未传 previewId 时，用于说明本次导入使用的模板
+  conflictPolicy?: 'skip' | 'overwrite'  // 针对 duplicateOrders 采取的策略，默认 'skip'
+  rows?: Array<Record<string, unknown>>   // 未传 previewId 时，可直接提交前端解析后的原始行数据
 }
 ```
 
@@ -318,9 +335,9 @@ interface TenantOrder {
 
 ```typescript
 {
-  jobId: string
-  submittedCount: number
-  status: 'PENDING' | 'PROCESSING' | 'COMPLETED' | 'FAILED'
+  jobId: string                           // 异步导入任务 ID
+  submittedCount: number                 // 本次进入队列处理的聚合订单数
+  status: 'PENDING' | 'PROCESSING' | 'COMPLETED' | 'FAILED' // 任务初始状态
 }
 ```
 
@@ -335,14 +352,22 @@ interface TenantOrder {
 
 ```typescript
 {
-  jobId: string
-  status: 'PENDING' | 'PROCESSING' | 'COMPLETED' | 'FAILED'
-  submittedCount: number
-  processedCount: number
-  successCount: number
-  skippedCount: number
-  failedCount: number
-  failedRows: { row: number, sourceOrderNo: string, error: string }[]
+  jobId: string                          // 异步导入任务 ID
+  status: 'PENDING' | 'PROCESSING' | 'COMPLETED' | 'FAILED' // 当前任务状态
+  submittedCount: number                // 提交入队的聚合订单数
+  processedCount: number                // 当前已处理完成的聚合订单数
+  successCount: number                  // 成功新增入库的订单数
+  skippedCount: number                  // 因冲突策略或校验拦截而被跳过的订单数
+  overwrittenCount: number              // 覆盖已有订单成功的数量
+  failedCount: number                   // 最终导入失败的订单数
+  failedRows: { row: number, sourceOrderNo?: string, reason: string }[] // 行级失败明细
+  conflictDetails: {
+    sourceOrderNo: string               // 触发冲突的源订单号
+    existingOrderId?: string            // 系统内已存在的订单 ID
+    action: 'skip' | 'overwrite'        // 本次对该冲突订单采取的处理动作
+    reason: string                      // 处理原因或结果说明
+  }[]
+  completedAt?: string                  // 任务完成时间；未完成时可为空
 }
 ```
 
@@ -437,7 +462,7 @@ interface OrderImportTemplate {
   fields: {
     key: string         // 内部键名，如 "sourceOrderNo", "custom_truck_no"
     label: string       // 中文展示名，如 "源订单号", "车牌号"
-    fieldType: 'TEXT' | 'NUMBER' | 'MONEY' | 'DATE'
+    fieldType: 'text' | 'number' | 'money' | 'date' | 'enum'
     required: boolean   // 是否必填项
     visible: boolean    // 是否在列表页的列中展示
     order: number       // 显示序号
@@ -727,7 +752,7 @@ Tenant 财务 POST /orders/{id}/verify-cash
 
 ## 七、数据分析 Analytics（4 个端点）
 
-> 源码：`features/analytics/` + `@sinhe/shared/api/modules/analytics`
+> 源码：`features/analytics/` + `@shou/shared/api/modules/analytics`
 > 全部数据自动按当前租户过滤。
 
 ### 类型定义
@@ -811,7 +836,7 @@ interface LiveFeedEntry {
 
 ## 八、系统设置 Settings（12 个端点）
 
-> 源码：`features/settings/` + `@sinhe/shared/api/modules/settings`
+> 源码：`features/settings/` + `@shou/shared/api/modules/settings`
 > 仅 TENANT_OWNER 角色可访问（系统设置页面整体受角色控制）。
 
 ### 类型定义
@@ -1188,12 +1213,12 @@ interface QualificationStatusResult {
 └──────┬──────┘
        │
 ┌──────▼──────┐
-│  API Module │  @sinhe/shared/api/modules/*
+│  API Module │  @shou/shared/api/modules/*
 │             │  axios 请求封装，统一拦截器
 └──────┬──────┘
        │
 ┌──────▼──────┐
-│  Request    │  @sinhe/shared/api/request
+│  Request    │  @shou/shared/api/request
 │  拦截器     │  ├─ 请求：注入 Authorization / X-Proxy-Env
 │             │  └─ 响应：校验 code === 0，处理 401/403
 └─────────────┘

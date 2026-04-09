@@ -1,20 +1,20 @@
 import {
-  OrderImportConflictPolicy,
-  OrderImportJobStatus,
-  OrderStatus,
-  OrderTemplateFieldType,
-  PayType,
-} from '@sinhe/shared/contracts'
+    OrderImportConflictPolicy,
+    OrderImportJobStatus,
+    OrderStatus,
+    OrderTemplateFieldType,
+    PayType,
+} from '@shou/shared/contracts'
 import type {
-  MarkOrderReceivedPayload,
-  Order,
-  OrderImportJobResult,
-  OrderImportPreviewPayload,
-  OrderImportPreviewResult,
-  OrderImportSubmitPayload,
-  OrderImportTemplate,
-  OrderRemindPayload,
-} from '@sinhe/shared/types'
+    MarkOrderReceivedPayload,
+    Order,
+    OrderImportJobResult,
+    OrderImportPreviewPayload,
+    OrderImportPreviewResult,
+    OrderImportSubmitPayload,
+    OrderImportTemplate,
+    OrderRemindPayload,
+} from '@shou/shared/types'
 import { defineMock } from 'vite-plugin-mock-dev-server'
 
 const DEFAULT_PAGE_SIZE = 20
