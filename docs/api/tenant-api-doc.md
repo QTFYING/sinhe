@@ -9,13 +9,13 @@
 
 1. [通用约定](#一通用约定)
 2. [认证模块 Auth](#二认证模块-auth4-个端点)
-3. [订单模块 Orders](#三订单模块-orders14-个端点)
+3. [订单模块 Orders](#三订单模块-orders13-个端点)
 4. [支付与核销 Payment](#四支付与核销-payment3-个端点)
 5. [财务对账 Finance](#五财务对账-finance3-个端点)
 6. [账期管理 Credit](#六账期管理-credit2-个端点)
 7. [服务商模块 Agents](#七服务商模块-agents6-个端点)
 8. [数据分析 Analytics](#八数据分析-analytics4-个端点)
-9. [系统设置 Settings](#九系统设置-settings15-个端点)
+9. [系统设置 Settings](#九系统设置-settings13-个端点)
 10. [通知 Notifications](#十通知-notifications2-个端点)
 11. [资质提交 Certification](#十一资质提交-certification2-个端点)
 12. [数据流转架构](#十二数据流转架构)
@@ -147,7 +147,7 @@ type Role = 'TENANT_OWNER' | 'TENANT_OPERATOR' | 'TENANT_FINANCE' | 'TENANT_VIEW
 
 ---
 
-## 三、订单模块 Orders（14 个端点）
+## 三、订单模块 Orders（13 个端点）
 
 > 源码：`features/orders/` + `@shou/shared/api/modules/order`
 > 后端自动按当前用户的 tenantId 过滤，仅返回本租户数据。
@@ -374,46 +374,40 @@ interface TenantOrder {
 ```
 
 
-### 3.9 标记已打印
+### 3.9 提交打印记录
 
-- **POST** `/orders/{id}/print`
+- **POST** `/orders/print-records`
 - **角色**：TENANT_OWNER, TENANT_OPERATOR
-- **描述**：标记单个订单为已打印，递增 prints 计数
-
-**请求参数：** 无
-
-**响应 data：**
-
-```typescript
-{
-  id: string
-  prints: number               // 更新后的打印次数
-}
-```
-
-### 3.10 批量打印标记
-
-- **POST** `/orders/batch/print`
-- **角色**：TENANT_OWNER, TENANT_OPERATOR
-- **描述**：批量标记多个订单为已打印
+- **描述**：前端在本机实际打印成功后，提交本次打印成功的订单 ID 列表；服务端据此累计订单 `prints` 次数并记录打印结果。
 
 **请求参数：**
 
 ```typescript
-{
-  ids: string[]                // 订单 ID 列表
+interface CreatePrintRecordsRequest {
+  orderIds: string[]           // 本次实际打印成功的订单 ID 列表；单张打印时数组长度为 1
+  requestId?: string           // 请求唯一标识，预留后续幂等控制
+  remark?: string              // 备注信息，预留扩展
 }
 ```
 
 **响应 data：**
 
 ```typescript
-{
-  successCount: number
+interface CreatePrintRecordsResponse {
+  totalCount: number           // 本次请求提交的订单总数（服务端去重后参与统计）
+  successCount: number         // 成功累计打印次数的订单数
+  confirmedAt: string          // 服务端确认时间
+  remark?: string              // 原样回传的备注信息，预留扩展
 }
 ```
 
-### 3.11 发送催款提醒
+**业务规则：**
+
+- 该接口是打印成功回执接口，不承担实际打印动作
+- `orderIds` 必须来自本次实际打印成功的订单，不应直接提交“用户选中的全部订单”
+- 服务端应按当前租户作用域校验订单归属，并对 `orderIds` 做去重处理
+
+### 3.10 发送催款提醒
 
 - **POST** `/orders/{id}/remind`
 - **角色**：TENANT_OWNER, TENANT_FINANCE
@@ -436,7 +430,7 @@ interface TenantOrder {
 }
 ```
 
-### 3.12 导入-获取模板列表
+### 3.11 导入-获取模板列表
 
 - **GET** `/import/templates`
 - **角色**：TENANT_OWNER, TENANT_OPERATOR
@@ -483,7 +477,7 @@ interface OrderImportTemplate {
 Array<OrderImportTemplate>
 ```
 
-### 3.13 导入-创建模板
+### 3.12 导入-创建模板
 
 - **POST** `/import/templates`
 - **角色**：TENANT_OWNER, TENANT_OPERATOR
@@ -493,7 +487,7 @@ Array<OrderImportTemplate>
 
 **响应 data：** `OrderImportTemplate`
 
-### 3.14 导入-更新模板
+### 3.13 导入-更新模板
 
 - **PUT** `/import/templates/{id}`
 - **角色**：TENANT_OWNER, TENANT_OPERATOR
@@ -836,7 +830,7 @@ interface LiveFeedEntry {
 
 ---
 
-## 八、系统设置 Settings（12 个端点）
+## 八、系统设置 Settings（13 个端点）
 
 > 源码：`features/settings/` + `@shou/shared/api/modules/settings`
 > 仅 TENANT_OWNER 角色可访问（系统设置页面整体受角色控制）。
@@ -885,6 +879,46 @@ interface TenantGeneralSettings {
   creditRemindDays: number     // 账期到期提醒提前天数：1 | 3 | 5 | 7 | 14
   dailyReportPush: boolean     // 每日收款日报推送（18:00）
 }
+
+interface PrintingConfigListItem {
+  importTemplateId: string     // 绑定的导入映射模板 ID
+  importTemplateName: string   // 映射模板名称，供前端列表展示
+  hasCustomConfig: boolean     // 是否已维护自定义打印配置；false 时前端回退本地默认模板
+  configVersion?: number       // 配置版本号；仅在 hasCustomConfig=true 时返回
+  updatedAt?: string           // 最近更新时间；仅在 hasCustomConfig=true 时返回
+  updatedBy?: string           // 最近更新人，预留审计能力
+  remark?: string              // 备注信息，预留扩展
+}
+
+interface GetPrintingConfigListResponse {
+  items: PrintingConfigListItem[] // 当前租户下所有映射模板对应的打印配置摘要视图
+}
+
+interface GetPrintingConfigDetailResponse {
+  importTemplateId: string     // 绑定的导入映射模板 ID
+  importTemplateName?: string  // 映射模板名称
+  hasCustomConfig: boolean     // 是否存在自定义打印配置
+  configVersion?: number       // 配置版本号；未配置时可为空
+  config?: Record<string, unknown> // 打印配置 JSON；服务端不解析其内部模板结构
+  updatedAt?: string           // 最近更新时间
+  updatedBy?: string           // 最近更新人，预留审计能力
+  remark?: string              // 备注信息，预留扩展
+}
+
+interface UpdatePrintingConfigRequest {
+  configVersion?: number       // 前端提交时携带的配置版本号，预留并发保护
+  config: Record<string, unknown> // 打印配置 JSON，服务端按黑盒配置整包保存
+  remark?: string              // 备注信息，预留扩展
+}
+
+interface UpdatePrintingConfigResponse {
+  importTemplateId: string     // 绑定的导入映射模板 ID
+  configVersion: number        // 保存成功后的最新配置版本号
+  config: Record<string, unknown> // 当前生效的打印配置 JSON
+  updatedAt: string            // 保存时间
+  updatedBy?: string           // 保存人，预留审计能力
+  remark?: string              // 备注信息，预留扩展
+}
 ```
 
 ### 8.1 获取角色列表
@@ -908,9 +942,9 @@ interface TenantGeneralSettings {
 ```
 - 首页（查看收款总览、实时收款动态）
 - 订单管理（查看订单列表、导入订单、打印订单）
-- 打印中心（查看打印队列、执行打印）
+- 打印设置（查看打印配置、维护映射模板对应的打印模板）
 - 财务报表（查看收款报表、对账明细、账期管理、导出报表）
-- 系统设置（基础设置、打印机设置、角色管理、用户管理）
+- 系统设置（基础设置、打印配置、角色管理、用户管理）
 ```
 
 ### 8.3 获取用户列表
@@ -995,55 +1029,72 @@ interface TenantGeneralSettings {
 
 **响应 data：** `TenantGeneralSettings`
 
-### 8.10 获取打印配置
+### 8.10 获取打印配置列表
 
-- **GET** `/settings/printer`
+- **GET** `/settings/printing`
 - **角色**：TENANT_OWNER
-- **描述**：获取打印模板、纸张规格、字段布局等配置
+- **描述**：返回当前租户下所有导入映射模板对应的打印配置摘要视图。若某张映射模板尚未配置，则 `hasCustomConfig=false`，前端回退本地默认模板。
 
 **响应 data：**
 
+`GetPrintingConfigListResponse`
+
+**关键说明：**
+
+- 服务端只返回打印配置外围元信息，不解析 `config` 内部模板结构
+- 列表页用于告诉前端“哪些映射模板已有自定义配置，哪些仍使用默认模板”
+
+### 8.11 获取单张映射模板的打印配置
+
+- **GET** `/settings/printing/{importTemplateId}`
+- **角色**：TENANT_OWNER
+- **描述**：获取指定导入映射模板对应的完整打印配置。若未配置，则返回 `hasCustomConfig=false`，前端自行回退本地默认模板。
+
+**路径参数：**
+
 ```typescript
 {
-  templates: Array<{
-    id: number
-    name: string               // 模板名称
-    paperWidth: number         // 纸张宽度 (mm)
-    paperHeight: number        // 纸张高度 (mm)
-    fields: PrintFieldConfig[] // 字段布局列表
-    isDefault: boolean         // 是否为默认模板
-  }>
-  activeTemplateId: number     // 当前激活模板 ID
+  importTemplateId: string      // 导入映射模板 ID
 }
 ```
+
+**响应 data：**
+
+`GetPrintingConfigDetailResponse`
+
+**关键说明：**
+
+- `config` 为前端维护的完整打印配置快照
+- 服务端只负责按租户和 `importTemplateId` 维度持久化与回传
+
+### 8.12 保存单张映射模板的打印配置
+
+- **PUT** `/settings/printing/{importTemplateId}`
+- **角色**：TENANT_OWNER
+- **描述**：按 `importTemplateId` 保存单张映射模板的打印配置；若此前未配置，则本次保存即创建该模板的覆盖配置。
+
+**路径参数：**
 
 ```typescript
-interface PrintFieldConfig {
-  id: string
-  key: string                  // 字段标识（如 "orderNo", "customerName"）
-  label: string                // 字段显示名
-  x: number                   // X 坐标 (mm)
-  y: number                   // Y 坐标 (mm)
-  w: number                   // 宽度 (mm)
-  h: number                   // 高度 (mm)
-  fontSize: number             // 字号
-  bold: boolean
-  align: 'left' | 'center' | 'right'
-  showLabel: boolean           // 是否显示字段标签
+{
+  importTemplateId: string      // 导入映射模板 ID
 }
 ```
 
-### 8.11 保存打印配置
+**请求参数：**
 
-- **PUT** `/settings/printer`
-- **角色**：TENANT_OWNER
-- **描述**：保存完整打印配置（模板、字段布局、纸张规格）
+`UpdatePrintingConfigRequest`
 
-**请求参数：** 同 8.10 响应 data 结构
+**响应 data：**
 
-**响应 data：** 同 8.10 响应 data 结构
+`UpdatePrintingConfigResponse`
 
-### 8.12 获取操作日志
+**关键说明：**
+
+- 不支持删除打印配置；未配置时由前端回退默认模板
+- 服务端不承担模板字段级语义校验，也不负责实际打印动作
+
+### 8.13 获取操作日志
 
 - **GET** `/settings/audit-logs`
 - **角色**：TENANT_OWNER
@@ -1270,15 +1321,15 @@ interface QualificationStatusResult {
 | 模块 | 接口数 | 方法分布 |
 |------|--------|---------|
 | 认证 Auth | 4 | POST ×3, GET ×1 |
-| 订单 Orders | 14 | GET ×4, POST ×8, PUT ×2 |
+| 订单 Orders | 13 | GET ×4, POST ×7, PUT ×2 |
 | 支付与核销 Payment | 3 | GET ×2, POST ×1 |
 | 财务对账 Finance | 3 | GET ×3 |
 | 账期管理 Credit | 2 | GET ×1, POST ×1 |
 | 数据分析 Analytics | 4 | GET ×4 |
-| 系统设置 Settings | 12 | GET ×6, POST ×1, PUT ×4, DELETE ×1 |
+| 系统设置 Settings | 13 | GET ×7, POST ×1, PUT ×4, DELETE ×1 |
 | 通知 Notifications | 2 | GET ×1, POST ×1 |
 | 资质提交 Certification | 2 | GET ×1, POST ×1 |
-| **合计** | **46** | GET ×23, POST ×16, PUT ×6, DELETE ×1 |
+| **合计** | **46** | GET ×24, POST ×15, PUT ×6, DELETE ×1 |
 
 | 关联数据库表 | 说明 |
 |-------------|------|

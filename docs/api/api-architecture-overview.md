@@ -184,7 +184,7 @@ H5 前端                    后端                     支付网关
 > 三端共用同一套 Auth，后端通过 user.tenantId 区分平台用户 / 租户用户。
 > 登录仅返回 accessToken + user；`/auth/refresh` 与 `/auth/logout` 从 HttpOnly Refresh Cookie 读取会话。
 
-#### 模块 B：订单管理（Orders）— 11 个端点
+#### 模块 B：订单管理（Orders）— 13 个端点
 
 | # | Method | Path | 说明 | 角色 | 关联表 |
 |---|--------|------|------|------|--------|
@@ -194,15 +194,13 @@ H5 前端                    后端                     支付网关
 | B4 | PUT | `/orders/{id}` | 更新订单 | TENANT_OWNER, TENANT_OPERATOR | orders |
 | B5 | POST | `/orders/:id/void` | 作废订单 | TENANT_OWNER | orders |
 | B6 | POST | `/orders/import` | 异步正式导入 | TENANT_OWNER, TENANT_OPERATOR | orders |
-
-| B8 | POST | `/orders/{id}/print` | 标记已打印 + 递增计数 | TENANT_OWNER, TENANT_OPERATOR | orders |
-| B9 | POST | `/orders/batch/print` | 批量打印标记 | TENANT_OWNER, TENANT_OPERATOR | orders |
-| B10 | POST | `/orders/{id}/remind` | 发送催款提醒 | TENANT_OWNER, TENANT_FINANCE | orders |
-| B11 | GET | `/import/templates` | 导入-获取模板列表 | TENANT_OWNER, TENANT_OPERATOR | — |
-| B12 | POST | `/import/templates` | 导入-创建模板 | TENANT_OWNER, TENANT_OPERATOR | — |
-| B13 | PUT | `/import/templates/:id` | 导入-更新模板 | TENANT_OWNER, TENANT_OPERATOR | — |
-| B14 | POST | `/import/preview` | 导入-数据预检校验 | TENANT_OWNER, TENANT_OPERATOR | — |
-| B15 | GET | `/orders/import/jobs/:jobId` | 查询导入任务进度 | TENANT_OWNER, TENANT_OPERATOR | — |
+| B7 | POST | `/orders/print-records` | 打印成功回执（单个/批量） | TENANT_OWNER, TENANT_OPERATOR | orders |
+| B8 | POST | `/orders/{id}/remind` | 发送催款提醒 | TENANT_OWNER, TENANT_FINANCE | orders |
+| B9 | GET | `/import/templates` | 导入-获取模板列表 | TENANT_OWNER, TENANT_OPERATOR | — |
+| B10 | POST | `/import/templates` | 导入-创建模板 | TENANT_OWNER, TENANT_OPERATOR | — |
+| B11 | PUT | `/import/templates/:id` | 导入-更新模板 | TENANT_OWNER, TENANT_OPERATOR | — |
+| B12 | POST | `/import/preview` | 导入-数据预检校验 | TENANT_OWNER, TENANT_OPERATOR | — |
+| B13 | GET | `/orders/import/jobs/:jobId` | 查询导入任务进度 | TENANT_OWNER, TENANT_OPERATOR | — |
 
 **导入接口详细说明（已确认决策）：**
 - 完整链路使用基于服务端的模板：模板持久化在 DB
@@ -261,7 +259,7 @@ H5 前端                    后端                     支付网关
 | G3 | GET | `/analytics/payments/live` | 实时收款动态 | all | payments |
 | G4 | GET | `/analytics/dashboard` | 仪表盘聚合数据 | all | orders + payments |
 
-#### 模块 H：系统设置（Settings）— 15 个端点
+#### 模块 H：系统设置（Settings）— 13 个端点
 
 | # | Method | Path | 说明 | 角色 | 关联表 |
 |---|--------|------|------|------|--------|
@@ -274,9 +272,10 @@ H5 前端                    后端                     支付网关
 | H7 | PUT | `/settings/users/{id}/status` | 启用/禁用用户 | TENANT_OWNER | users |
 | H8 | GET | `/settings/general` | 获取通用配置（企业信息+通知） | TENANT_OWNER | system_configs |
 | H9 | PUT | `/settings/general` | 保存通用配置 | TENANT_OWNER | system_configs |
-| H10 | GET | `/settings/printer` | 获取打印配置 | TENANT_OWNER | printer_templates |
-| H11 | PUT | `/settings/printer` | 保存打印配置 | TENANT_OWNER | printer_templates |
-| H12 | GET | `/settings/audit-logs` | 获取本租户操作日志 | TENANT_OWNER | audit_logs |
+| H10 | GET | `/settings/printing` | 获取打印配置列表 | TENANT_OWNER | printer_templates, import_templates |
+| H11 | GET | `/settings/printing/{importTemplateId}` | 获取单张映射模板的打印配置 | TENANT_OWNER | printer_templates, import_templates |
+| H12 | PUT | `/settings/printing/{importTemplateId}` | 保存单张映射模板的打印配置 | TENANT_OWNER | printer_templates |
+| H13 | GET | `/settings/audit-logs` | 获取本租户操作日志 | TENANT_OWNER | audit_logs |
 
 #### 模块 I：通知（Notifications）— 2 个端点
 
@@ -297,12 +296,12 @@ H5 前端                    后端                     支付网关
 | 模块 | 端点数 | 主要关联表 |
 |------|--------|-----------|
 | Auth | 4 | users |
-| Orders | 14 | orders, order_items |
+| Orders | 13 | orders, order_items |
 | Payment & 核销 | 3 | payments, payment_orders |
 | Finance | 3 | orders, payments |
 | Credit | 2 | orders, payments |
 | Analytics | 4 | orders, payments |
-| Settings | 12 | roles, permissions, users, system_configs, printer_templates, audit_logs |
+| Settings | 13 | roles, permissions, users, system_configs, printer_templates, import_templates, audit_logs |
 | Notifications | 2 | notices |
 | Certification | 2 | tenant_certifications |
 | **合计** | **46** | — |
