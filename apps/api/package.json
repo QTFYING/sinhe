@@ -13,7 +13,7 @@
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\"",
     "prisma:generate": "prisma generate",
     "prisma:push": "prisma db push",
-    "prisma:init-prod": "node prisma/init-prod.js"
+    "prisma:init-prod": "node ../../scripts/db-init.js"
   },
   "dependencies": {
     "@nestjs/common": "^10.0.0",

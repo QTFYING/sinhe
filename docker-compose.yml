@@ -50,7 +50,7 @@ services:
       - ./dist/admin:/usr/share/nginx/admin
       - ./dist/tenant:/usr/share/nginx/tenant
       - ./dist/h5:/usr/share/nginx/pay-h5
-      - ./deploy/nginx.conf:/etc/nginx/conf.d/default.conf
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf
     depends_on:
       - api
     restart: always

@@ -8,7 +8,7 @@
 
 ```bash
 pnpm --filter api prisma:push
-node apps/api/prisma/seed.js
+pnpm db:seed
 ```
 
 典型报错如下：
@@ -100,7 +100,7 @@ createdb shou
 
 ```bash
 pnpm --filter api prisma:push
-node apps/api/prisma/seed.js
+pnpm db:seed
 ```
 
 结果说明：

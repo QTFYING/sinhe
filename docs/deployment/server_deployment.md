@@ -231,7 +231,7 @@ sudo systemctl status shou
 以下脚本仅适用于本地开发或演示环境：
 
 ```bash
-node apps/api/prisma/seed.js
+pnpm db:seed
 ```
 
 原因：
@@ -244,7 +244,7 @@ node apps/api/prisma/seed.js
 
 ### 6.2 正式环境初始化脚本
 
-仓库已提供生产初始化脚本 `apps/api/prisma/init-prod.js`，用于安全创建：
+仓库已提供生产初始化脚本 `scripts/db-init.js`，用于安全创建：
 
 - 首个 OS 超级管理员
 - 可选的首个租户
@@ -264,7 +264,7 @@ docker compose run --rm \
   -e INIT_TENANT_OWNER_REAL_NAME='租户老板' \
   -e INIT_TENANT_MAX_CREDIT_DAYS=45 \
   -e INIT_TENANT_CREDIT_REMINDER_DAYS=7 \
-  api node prisma/init-prod.js
+docker-compose exec api node ../../scripts/db-init.js
 ```
 
 执行规则：
