@@ -163,6 +163,7 @@ interface TenantOrder {
   sourceOrderNo?: string       // 由 Excel 导入的原始 ERP 订单号
   groupKey?: string            // 用于防重的辅键
   mappingTemplateId?: string   // 关联的导入模板
+  qrCodeToken?: string         // 订单级公开路由标识，前端据此生成 /pay/:token 二维码
   customer: string             // 客户名称
   summary: string              // 商品摘要
   amount: number               // 订单金额（元）
@@ -214,6 +215,7 @@ interface TenantOrder {
 
 - **GET** `/orders/{id}`
 - **角色**：all
+- **说明**：响应中应显式包含 `qrCodeToken`，用于前端生成送货单二维码并打开对应订单 H5 页面。
 
 **响应 data：** `TenantOrder`
 
@@ -1247,7 +1249,7 @@ interface QualificationStatusResult {
 
 | Tenant 操作 | 关联的 H5 端行为 |
 |-------------|-----------------|
-| 创建订单 → 生成收款码链接 | H5 通过 qrCodeToken 打开支付页面 |
+| 创建订单 / 导入订单 → 生成订单二维码 | H5 通过 `qrCodeToken` 打开对应订单页面，是否展示支付按钮由订单状态决定 |
 | 财务核销 `POST /orders/{id}/verify-cash` | H5 端现金支付订单状态从 `pending_verification` → `paid` |
 | 收款流水 `GET /payments` | 包含 H5 在线支付成功后生成的记录 |
 

@@ -1,6 +1,6 @@
 # 收单吧 SaaS 平台 — API 架构总览
 
-> 本文档面向服务端团队，梳理三端（Admin / Tenant / H5）的完整 API 需求、跨项目关联、数据模型和端点清单。
+> 本文档面向前端团队，梳理三端（Admin / Tenant / H5）的 API 能力、跨项目关联和端点清单。
 > 确认日期：2026-04-07
 
 ---
@@ -48,12 +48,12 @@
 https://api.platform.com/api/v1
 ```
 
-### 2.2 鉴权方式
+### 2.2 访问方式
 
-| 接口类型 | 鉴权方式 |
+| 接口类型 | 访问方式 |
 |---|---|
 | 后台接口（Admin / Tenant） | `Authorization: Bearer <access_token>`（JWT） |
-| C端收款页接口 | 无 JWT，凭 URL 中的 `qrCodeToken` 作为访问凭证 |
+| C端收款页接口 | 无 JWT，通过 URL 中的 `qrCodeToken` 路由到对应订单 H5 页面 |
 | Lakala Webhook 回调 | 无 JWT，后端校验拉卡拉签名 |
 
 ### 2.3 统一响应格式
@@ -103,7 +103,7 @@ https://api.platform.com/api/v1
 
 | 后端资源 | Admin 视角 | Tenant 视角 | H5 视角 |
 |---------|-----------|------------|---------|
-| **Auth** | 平台账号登录 + 会话刷新 + 当前用户信息 | 租户账号登录 + 会话刷新 + 当前用户信息 | 无需登录（orderNo 鉴权） |
+| **Auth** | 平台账号登录 + 会话刷新 + 当前用户信息 | 租户账号登录 + 会话刷新 + 当前用户信息 | 无需登录（通过 `qrCodeToken` 打开订单 H5 页面） |
 | **Tenant** | CRUD + 审核 + 冻结 + 续费（全量） | 提交资质材料 + 查询资质状态 | — |
 | **User** | 跨租户管理所有用户 | 仅管理本租户下用户 | — |
 | **Order** | 跨租户查看/审计所有订单，不承担导入、打印和催款动作 | 本租户订单 CRUD + 导入导出 + 打印 + 账期管理 | 单个订单只读 |
@@ -120,519 +120,15 @@ https://api.platform.com/api/v1
 
 1. **同一资源、不同前缀**：Admin 走 `/platform/*` 或直接走资源路径获取跨租户数据；Tenant 走相同资源路径但后端自动按 tenantId 过滤；H5 走 `/pay/*` 获取单个订单
 2. **后端通过 Token 中的 `tenantId` 自动隔离数据**：Tenant 端不需要传 tenantId，后端自动注入
-3. **H5 无需登录**：通过 orderNo 做资源级鉴权（订单链接即凭证）
+3. **H5 页面公开访问**：`qrCodeToken` 仅作为订单级公开路由标识，用于打开 `/pay/:token` 对应页面，不承载收货人身份鉴权
 
 ---
 
-## 四、数据模型（服务端建表参考）
+## 四、端点清单
 
-### 3.1 用户与权限域
+### 4.1 H5 端（客户支付）— 4 个端点
 
-**users 表**
-
-```typescript
-{
-  id: string                // 主键，如 "USR-001"
-  account: string           // 登录账号（全局唯一）
-  name: string              // 姓名
-  phone: string             // 手机号
-  password: string          // 密码（加密存储）
-  tenantId: string | null   // 所属租户 ID，平台用户为 null
-  tenantType: '平台' | '租户'
-  role: string              // 角色名称
-  scope: string             // 数据范围描述
-  status: 'active' | 'invited' | 'locked' | 'disabled'
-  requiresPasswordReset: boolean
-  loginAt: string           // 最后登录时间
-  createdAt: string
-  updatedAt: string
-}
-```
-
-**roles 表**
-
-```typescript
-{
-  id: string
-  name: string              // 角色名称（同 side 内唯一）
-  side: '平台角色' | '租户角色'
-  permissions: string[]     // 权限项列表
-  isSystem: boolean         // 是否系统内置
-  tenantId: string | null   // 租户自定义角色时关联租户
-  createdAt: string
-  updatedAt: string
-}
-```
-
-**permissions 表**（权限树）
-
-```typescript
-{
-  id: string
-  label: string
-  parentId: string | null
-  sort: number
-}
-```
-
-### 3.2 租户域
-
-**tenants 表**
-
-```typescript
-{
-  id: string                // 如 "TEN-001"
-  name: string              // 租户名称
-  packageName: string       // 套餐名称
-  admin: string             // 管理员姓名
-  region: string            // 地区
-  channels: string[]        // 支付通道
-  merchants: number         // 商户数
-  users: number             // 账号数
-  monthlyFlow: number       // 本月流水（元）
-  dueInDays: number         // 距到期天数
-  lastActiveAt: string      // 最近活跃时间
-  status: 'active' | 'onboarding' | 'attention' | 'paused'
-  rejectReason: string | null
-  freezeReason: string | null
-  createdAt: string
-  updatedAt: string
-}
-```
-
-**tenant_certifications 表**（资质审核）
-
-```typescript
-{
-  id: string
-  tenantId: string
-  type: string              // "企业实名认证" | "经营资质补充" | "法人身份证更新"
-  submitAt: string
-  status: '待初审' | '待复核' | '待确认' | '已通过' | '已驳回'
-  comment: string | null
-  rejectReason: string | null
-  reviewedAt: string | null
-}
-```
-
-**printer_templates 表**（租户打印配置）
-
-```typescript
-{
-  id: number
-  tenantId: string
-  name: string              // 模板名称
-  paperWidth: number        // 纸张宽度 mm
-  paperHeight: number       // 纸张高度 mm
-  fields: Array<{
-    id: string
-    key: string
-    label: string
-    x: number
-    y: number
-    w: number
-    h: number
-    fontSize: number
-    bold: boolean
-    align: 'left' | 'center' | 'right'
-    showLabel: boolean
-  }>
-  isDefault: boolean
-  createdAt: string
-  updatedAt: string
-}
-```
-
-### 3.3 订单域
-
-**orders 表**
-
-```typescript
-{
-  id: string                // 如 "PLT-20260325-001"
-  tenantId: string          // 所属租户
-  sourceOrderNo: string | null // ERP 源订单号（用于聚合）
-  groupKey: string | null   // 防重判定辅键
-  mappingTemplateId: string | null // 绑定的导入模板 ID
-  customer: string          // 客户名称
-  summary: string           // 商品摘要
-  amount: number            // 订单金额（元）
-  paid: number              // 已收金额（元）
-  customFieldValues: any    // JSON: 动态模板映射的自定义字段
-  status: 'pending' | 'partial' | 'paid' | 'expired' | 'credit'
-  payType: '现款' | '账期'
-  prints: number            // 打印次数
-  creditDays: number | null // 账期天数
-  creditDueDate: string | null
-  date: string              // 订单日期
-  voided: boolean
-  voidReason: string | null
-  voidedAt: string | null
-  createdAt: string
-  updatedAt: string
-}
-```
-
-**order_items 表**（订单行项目，H5 展示用）
-
-```typescript
-{
-  id: string
-  orderId: string           // 关联订单
-  skuName: string           // 商品名称
-  skuSpec: string | null    // 规格
-  unit: string              // 单位
-  quantity: number
-  unitPrice: number
-  lineAmount: number
-}
-```
-
-**import_templates 表**（Excel 导入映射模板）
-
-```typescript
-{
-  id: string
-  tenantId: string
-  name: string
-  isDefault: boolean
-  sourceColumns: any        // JSON: Excel 表头读取快照数组
-  fields: any               // JSON: 靶点骨架定义数组
-  mappings: any             // JSON: 映射连线关系数组
-  createdAt: string
-  updatedAt: string
-}
-```
-
-**import_jobs 表**（异步导入任务）
-
-```typescript
-{
-  id: string
-  tenantId: string
-  status: 'PENDING' | 'PROCESSING' | 'COMPLETED' | 'FAILED'
-  submittedCount: number
-  processedCount: number
-  successCount: number
-  skippedCount: number
-  overwrittenCount: number
-  failedCount: number
-  failedRows: any           // JSON: 行级报错日志
-  conflictDetails: any      // JSON: 重复冲突判定策略与结果追溯
-  createdAt: string
-  updatedAt: string
-}
-```
-
-### 3.4 支付域
-
-**payments 表**（收款流水）
-
-```typescript
-{
-  id: string                // 流水号，如 "PAY-20260330-001"
-  tenantId: string
-  orderId: string           // 关联订单号
-  customer: string
-  amount: number            // 收款金额（元）
-  channel: string           // 支付通道：微信支付 | 支付宝 | 现金 | 其他
-  fee: number               // 手续费（元）
-  net: number               // 到账金额（元）
-  status: 'success' | 'partial' | 'pending' | 'failed'
-  paidAt: string            // 支付完成时间
-  createdAt: string
-}
-```
-
-**payment_orders 表**（H5 支付单，对接网关用）
-
-```typescript
-{
-  id: string                // 支付单号
-  orderNo: string           // 关联业务订单号
-  amount: number
-  status: 'pending' | 'pending_verification' | 'paid' | 'failed'
-  paymentMethod: 'online' | 'cash' | 'other_paid' | null
-  channel: 'wx_jsapi' | 'ali_h5' | 'direct' | null
-  statusMessage: string | null
-  // 线下支付信息
-  offlineRemark: string | null
-  cashVerifyStatus: 'pending' | 'verified' | null
-  offlineSubmittedAt: string | null
-  cashVerifiedAt: string | null
-  // 网关信息
-  gatewayTradeNo: string | null  // 第三方支付单号
-  paidAt: string | null
-  createdAt: string
-  updatedAt: string
-}
-```
-
-
-
-### 4.6 计费域
-
-**packages 表**（套餐定义）
-
-```typescript
-{
-  id: string
-  name: string              // "基础版" | "标准版" | "旗舰版"
-  price: string             // 价格描述，如 "¥4,999/年"
-  rate: string              // 费率描述，如 "费率 4‰"
-  strategy: string          // 策略说明
-  features: string[]        // 套餐功能列表
-  tenants: number           // 在用租户数（可计算）
-  status: 'active' | 'draft' | 'archived'
-  createdAt: string
-  updatedAt: string
-}
-```
-
-**contracts 表**
-
-```typescript
-{
-  contractNo: string        // 如 "HT-202603-001"
-  tenantId: string
-  type: '电子签' | '归档件'
-  packageName: string
-  contactName: string
-  phone: string
-  annualFee: string
-  rate: string
-  serviceStart: string
-  serviceEnd: string
-  status: '履约中' | '待续约' | '待签署' | '待归档' | '已终止'
-  signLink: string | null
-  smsSent: boolean
-  remark: string | null
-  terminateReason: string | null
-  approvedAt: string | null
-  createdAt: string
-  updatedAt: string
-}
-```
-
-**invoices 表**
-
-```typescript
-{
-  billNo: string            // 如 "INV-001"
-  tenantId: string
-  amount: string
-  cycle: string             // 结算周期，如 "2026-03"
-  status: '已开票' | '待开票' | '对账中' | '已作废'
-  taxRate: number | null
-  issuedAt: string | null
-  voidReason: string | null
-  voidedAt: string | null
-  createdAt: string
-}
-```
-
-### 4.7 运维域
-
-**notices 表**（系统公告）
-
-```typescript
-{
-  id: string
-  title: string
-  content: string
-  planVersion: string       // 套餐版本范围
-  audience: string          // 发布范围
-  timing: 'immediate' | 'scheduled'
-  scheduledAt: string | null
-  reminder: boolean         // 24小时二次提醒
-  isDraft: boolean
-  status: '已发布' | '草稿' | '已下架'
-  publishAt: string | null
-  createdAt: string
-  updatedAt: string
-}
-```
-
-**notice_reads 表**（公告已读状态）
-
-```typescript
-{
-  id: string
-  noticeId: string
-  tenantId: string
-  userId: string
-  isRead: boolean
-  readAt: string | null
-}
-```
-
-**tickets 表**
-
-```typescript
-{
-  no: string                // 如 "TK-2301"
-  tenantId: string
-  issue: string
-  assignee: string
-  status: '处理中' | '待分派' | '已解决'
-  resolution: string | null
-  createdAt: string
-  updatedAt: string
-}
-```
-
-**ticket_replies 表**
-
-```typescript
-{
-  id: string
-  ticketNo: string
-  content: string
-  attachments: string[]
-  repliedBy: string
-  repliedAt: string
-}
-```
-
-**audit_logs 表**
-
-```typescript
-{
-  id: string
-  actor: string             // 操作人
-  action: string            // 操作名称
-  target: string            // 操作对象
-  targetType: '账号' | '角色' | '租户'
-  tenantId: string | null
-  result: '成功' | '待处理'
-  time: string
-}
-```
-
-**alert_rules 表**
-
-```typescript
-{
-  id: string
-  name: string
-  trigger: string
-  channel: string
-  enabled: boolean
-  createdAt: string
-  updatedAt: string
-}
-```
-
-**security_policies 表**
-
-```typescript
-{
-  id: string
-  title: string
-  detail: string
-  enabled: boolean
-}
-```
-
-**ip_whitelist 表**
-
-```typescript
-{
-  id: string
-  label: string
-  cidr: string
-}
-```
-
-**period_policies 表**（单行配置）
-
-```typescript
-{
-  sessionHours: number      // 会话有效时长，默认 8
-  passwordDays: number      // 密码过期周期，默认 90
-  retentionDays: number     // 审计日志保留天数，默认 180
-}
-```
-
-**system_configs 表**
-
-```typescript
-{
-  group: string             // "全局参数" | "邮件通道" | "短信通道"
-  key: string
-  value: string
-  note: string
-}
-```
-
-**service_configs 表**
-
-```typescript
-{
-  id: string
-  name: string
-  category: string
-  key: string
-  provider: string
-  note: string
-}
-```
-
-**service_providers 表**（外部服务商）
-
-```typescript
-{
-  id: string
-  name: string
-  category: string          // "消息通道" | "资质审核" | "合同管理"
-  contactName: string
-  contactPhone: string
-  status: '已接入' | '试运行'
-  score: string
-  updatedAt: string
-}
-```
-
-### 建表汇总
-
-| # | 表名 | 说明 | 关联的前端 |
-|---|------|------|-----------|
-| 1 | users | 用户账号 | Admin + Tenant |
-| 2 | roles | 角色模板 | Admin + Tenant |
-| 3 | permissions | 权限树 | Admin + Tenant |
-| 4 | tenants | 租户 | Admin + Tenant |
-| 5 | tenant_certifications | 资质审核 | Admin + Tenant |
-| 6 | printer_templates | 打印模板配置 | Tenant |
-| 7 | orders | 订单 | Admin + Tenant + H5 |
-| 8 | order_items | 订单行项目 | Admin + Tenant + H5 |
-| 9 | import_templates | 导入模板 | Tenant |
-| 10 | import_jobs | 异步导入任务 | Tenant |
-| 11 | payments | 收款流水 | Admin + Tenant |
-| 12 | payment_orders | H5 支付单 | H5 + Tenant（核销） |
-| 11 | packages | 套餐定义 | Admin |
-| 12 | contracts | 合同 | Admin |
-| 13 | invoices | 账单 | Admin |
-| 14 | notices | 系统公告 | Admin（写）+ Tenant（读） |
-| 15 | notice_reads | 公告已读状态 | Tenant |
-| 16 | tickets | 工单 | Admin |
-| 17 | ticket_replies | 工单回复 | Admin |
-| 18 | audit_logs | 操作日志 | Admin + Tenant |
-| 19 | alert_rules | 告警规则 | Admin |
-| 20 | security_policies | 安全策略 | Admin |
-| 21 | ip_whitelist | IP 白名单 | Admin |
-| 22 | period_policies | 周期策略 | Admin |
-| 23 | system_configs | 系统配置 | Admin |
-| 24 | service_configs | 服务接入配置 | Admin |
-| 25 | service_providers | 外部服务商 | Admin |
-| — | **合计** | **25 张表** | — |
-
----
-
-## 五、端点清单
-
-### 5.1 H5 端（客户支付）— 4 个端点
-
-> 鉴权方式：无需登录，凭 URL 中的 qrCodeToken 访问
+> 访问方式：无需登录，通过 URL 中的 `qrCodeToken` 打开对应订单 H5 页面
 > 路径前缀：`/pay`
 
 | # | Method | Path | 说明 | 关联表 |
@@ -643,10 +139,10 @@ https://api.platform.com/api/v1
 | 4 | GET | `/pay/:token/status` | 轮询支付状态 | payment_orders |
 
 **已确认的设计决策：**
-- 路径统一使用 `:token` (即 `qrCodeToken`) 短串防爆破
+- `qrCodeToken` 为订单级公开路由标识；前端按固定路由规则 `/pay/:token` 生成送货单二维码
 - 采用 5 态状态机：`UNPAID / PAYING / PENDING_VERIFICATION / PAID / EXPIRED`
 - 现金链路闭环：H5 `offline-payment` 登记待核销，Tenant 侧 `verify-cash` 财务核销
-- 在线支付跳往拉卡拉收银台，依赖后端的 `initiate` 与轮询 `status`
+- 在线支付仅在用户点击支付后触发，依赖后端的 `initiate` 动态返回 `cashierUrl` 与轮询 `status`
 - Webhook 依赖系统底层 `POST /payment/webhook/lakala`（不计入前端直接可见端点）
 
 **支付时序：**
@@ -671,7 +167,7 @@ H5 前端                    后端                     支付网关
 
 ---
 
-### 5.2 Tenant 端（商户 SaaS）— 48 个端点
+### 4.2 Tenant 端（商户 SaaS）— 48 个端点
 
 > 鉴权方式：业务请求走 Bearer Access Token；Refresh Token 存于 HttpOnly Cookie，后端通过 token 中的 tenantId 自动隔离数据
 > 角色（固定枚举）：TENANT_OWNER / TENANT_OPERATOR / TENANT_FINANCE / TENANT_VIEWER
@@ -813,7 +309,7 @@ H5 前端                    后端                     支付网关
 
 ---
 
-### 5.3 Admin 端（平台运营）— 84 个端点
+### 4.3 Admin 端（平台运营）— 84 个端点
 
 > 鉴权方式：业务请求走 Bearer Access Token；Refresh Token 存于 HttpOnly Cookie；tenantId = null 表示平台用户
 > 平台用户可跨租户查看和管理数据
@@ -1027,40 +523,24 @@ H5 前端                    后端                     支付网关
 
 ---
 
-## 六、全局汇总
+## 五、全局汇总
 
 ### 端点统计
 
 | 项目 | 端点数 | 鉴权方式 |
 |------|--------|---------|
-| H5 | 4 | qrCodeToken （免登录） |
+| H5 | 4 | `qrCodeToken` 公开路由 |
 | Tenant | 46 | Bearer Token（tenantId 自动隔离） |
 | Admin | 81 | Bearer Token（tenantId=null，跨租户） |
 | **合计** | **131** | — |
-
-### 建表统计
-
-| 域 | 表数 | 表名 |
-|----|------|------|
-| 用户与权限 | 3 | users, roles, permissions |
-| 租户 | 2 | tenants, tenant_certifications |
-| 租户设置 | 1 | printer_templates |
-| 订单 | 4 | orders, order_items, import_templates, import_jobs |
-| 支付 | 2 | payments, payment_orders |
-| 计费 | 3 | packages, contracts, invoices |
-| 通知 | 2 | notices, notice_reads |
-| 工单 | 2 | tickets, ticket_replies |
-| 审计与安全 | 5 | audit_logs, alert_rules, security_policies, ip_whitelist, period_policies |
-| 系统配置 | 2 | system_configs, service_configs |
-| 外部服务 | 1 | service_providers |
-| **合计** | **27** | — |
 
 ### 已确认的关键设计决策
 
 | # | 决策 | 结论 |
 |---|------|------|
-| 1 | H5 访问凭证 | 统一且强制使用 `qrCodeToken` 短串令牌拼接路由 `/pay/:token` |
+| 1 | H5 路由标识 | `qrCodeToken` 为订单级公开路由标识，前端按固定规则生成 `/pay/:token` 二维码链接 |
 | 2 | H5 状态机 | 五态流转 `UNPAID -> PAYING -> PENDING_VERIFICATION -> PAID / EXPIRED` |
 | 3 | 物理删除防范 | 以 `POST /orders/:id/void` 替代 `DELETE` 软作废，保留历史日志。 |
 | 4 | 订单导入机制 | 使用服务器管理模板 + 预览步骤 + 异步导入，不直接传接实体 Excel 文件 |
 | 5 | Tenant 安全权限 | 所有角色以固定代码写死。`settings/roles` 等全部为只读配置接口 |
+
