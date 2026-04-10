@@ -1,3 +1,7 @@
+import type { BillingPackageStatus, ContractStatus, ContractType, InvoiceStatus } from '../enums'
+
+export type { BillingPackageStatus, ContractStatus, ContractType, InvoiceStatus } from '../enums'
+
 export interface PackagePlan {
   id: string
   name: string
@@ -7,7 +11,7 @@ export interface PackagePlan {
   strategy: string
   orderTrend: string
   features: string[]
-  status?: 'active' | 'draft' | 'archived'
+  status?: BillingPackageStatus
 }
 
 export interface PackagePlanPayload {
@@ -21,9 +25,9 @@ export interface PackagePlanPayload {
 export interface ContractRecord {
   contractNo: string
   tenant: string
-  type: '电子签' | '归档件'
+  type: ContractType
   expireAt: string
-  status: '履约中' | '待续约' | '待签署' | '待归档'
+  status: ContractStatus
 }
 
 export type ContractRow = ContractRecord
@@ -50,7 +54,7 @@ export interface InvoiceRecord {
   tenant: string
   amount: string
   period: string
-  status: '已开票' | '待开票' | '对账中'
+  status: InvoiceStatus
   issuedAt?: string | null
 }
 

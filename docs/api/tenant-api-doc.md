@@ -28,11 +28,11 @@
 > [!NOTE]
 > **全局规范指引**
 > 关于统一下发的 `code/data/message` 响应体包装、分页参数的请求与返回体指引、全局 `Http Status` 错误码机制以及环境拦截要求，本档内剔除重复声明，请直接翻阅架构大本营字典 **[api-architecture-overview.md]** 的第二章。
+> 枚举命名与取值统一参见 **[../enums/enum-manual.md](../enums/enum-manual.md)**，本档仅保留与当前模块直接相关的最小定义。
 
 ### 1.6 角色定义
 
 ```typescript
-type Role = 'TENANT_OWNER' | 'TENANT_OPERATOR' | 'TENANT_FINANCE' | 'TENANT_VIEWER'
 ```
 
 | 角色 | 中文名 | 说明 |
@@ -73,7 +73,7 @@ type Role = 'TENANT_OWNER' | 'TENANT_OPERATOR' | 'TENANT_FINANCE' | 'TENANT_VIEW
     id: string                // 用户 ID
     username: string          // 登录账号
     realName: string          // 用户姓名
-    role: Role                // 当前主角色
+    role: TenantRole          // 当前主角色
     tenantId: string | null  // 租户用户有值，平台用户为 null
   }
 }
@@ -90,9 +90,9 @@ type Role = 'TENANT_OWNER' | 'TENANT_OPERATOR' | 'TENANT_FINANCE' | 'TENANT_VIEW
 ```typescript
 {
   token: string              // accessToken
-  role: Role                 // 校验后的角色
+  role: TenantRole           // 校验后的角色
   name: string               // realName || name || username
-  source: 'mock' | 'remote' // 数据来源标记
+  source: AuthSourceTag      // 数据来源标记
 }
 ```
 
@@ -140,7 +140,7 @@ type Role = 'TENANT_OWNER' | 'TENANT_OPERATOR' | 'TENANT_FINANCE' | 'TENANT_VIEW
   id: string                  // 当前用户 ID
   username: string            // 登录账号
   realName: string            // 用户姓名
-  role: Role                  // 当前主角色
+  role: TenantRole            // 当前主角色
   tenantId: string | null     // 所属租户 ID；平台用户为 null
 }
 ```
@@ -156,8 +156,6 @@ type Role = 'TENANT_OWNER' | 'TENANT_OPERATOR' | 'TENANT_FINANCE' | 'TENANT_VIEW
 ### 类型定义
 
 ```typescript
-type OrderStatus = 'pending' | 'partial' | 'paid' | 'expired' | 'credit'
-type PayType = '现款' | '账期'
 
 interface TenantOrder {
   id: string                   // 如 "PLT-20260325-001"
@@ -170,7 +168,7 @@ interface TenantOrder {
   amount: number               // 订单金额（元）
   paid: number                 // 已收金额（元）
   status: OrderStatus          // 收款状态
-  payType: PayType             // 付款方式
+  payType: OrderPayType        // 付款方式
   prints: number               // 打印次数
   date: string                 // 下单时间
   lineItems: OrderItem[]       // 聚合订单下的商品明细
@@ -194,7 +192,7 @@ interface TenantOrder {
   pageSize?: number            // 默认 200
   keyword?: string             // 检索范围新增：ERP 源订单号 (sourceOrderNo)
   status?: OrderStatus         // 状态筛选
-  payType?: PayType            // 付款方式筛选
+  payType?: OrderPayType       // 付款方式筛选
   templateId?: string          // 新增：按导入模板类型过滤订单
   dateFrom?: string            // 开始日期 YYYY-MM-DD
   dateTo?: string              // 结束日期 YYYY-MM-DD
@@ -216,7 +214,7 @@ interface TenantOrder {
     amount: number             // 订单金额（元）
     paid: number               // 已收金额（元）
     status: OrderStatus        // 收款状态
-    payType: PayType           // 付款方式
+    payType: OrderPayType      // 付款方式
     prints: number             // 打印次数
     date: string               // 下单时间
     lineItems: Array<{
@@ -260,7 +258,7 @@ interface TenantOrder {
   amount: number               // 订单总金额（元）
   paid: number                 // 已收金额（元）
   status: OrderStatus          // 收款状态
-  payType: PayType             // 付款方式
+  payType: OrderPayType        // 付款方式
   prints: number               // 累计打印次数
   date: string                 // 下单时间
   lineItems: Array<{
@@ -295,7 +293,7 @@ interface TenantOrder {
   amount: number               // 订单金额（必填）
   paid?: number                // 已收金额，默认 0
   status?: OrderStatus         // 默认 'pending'
-  payType?: PayType            // 默认 '现款'
+  payType?: OrderPayType       // 默认 '现款'
   date?: string                // 不传则取当前时间
 }
 ```
@@ -314,7 +312,7 @@ interface TenantOrder {
   amount: number               // 订单金额（元）
   paid: number                 // 已收金额（元）
   status: OrderStatus          // 收款状态
-  payType: PayType             // 付款方式
+  payType: OrderPayType        // 付款方式
   prints: number               // 打印次数
   date: string                 // 下单时间
   lineItems: Array<{
@@ -348,7 +346,7 @@ interface TenantOrder {
   amount?: number              // 订单总金额（元）
   paid?: number                // 已收金额（元）
   status?: OrderStatus         // 收款状态
-  payType?: PayType            // 付款方式
+  payType?: OrderPayType       // 付款方式
   date?: string                // 下单时间
   lineItems?: Array<{
     itemId?: string            // 行项目 ID
@@ -378,7 +376,7 @@ interface TenantOrder {
   amount: number               // 订单金额（元）
   paid: number                 // 已收金额（元）
   status: OrderStatus          // 收款状态
-  payType: PayType             // 付款方式
+  payType: OrderPayType        // 付款方式
   prints: number               // 打印次数
   date: string                 // 下单时间
   lineItems: Array<{
@@ -426,7 +424,7 @@ interface TenantOrder {
   amount: number               // 订单金额（元）
   paid: number                 // 已收金额（元）
   status: OrderStatus          // 收款状态
-  payType: PayType             // 付款方式
+  payType: OrderPayType        // 付款方式
   prints: number               // 打印次数
   date: string                 // 下单时间
   lineItems: Array<{
@@ -489,7 +487,7 @@ interface TenantOrder {
     amount: number             // 订单金额（元）
     paid: number               // 已收金额（元）
     status: OrderStatus        // 收款状态
-    payType: PayType           // 付款方式
+    payType: OrderPayType      // 付款方式
     prints: number             // 打印次数
     date: string               // 下单时间
     lineItems: Array<{
@@ -537,7 +535,7 @@ interface TenantOrder {
 {
   previewId?: string                      // 若已完成预检，优先传该标识，服务端按该批次结果正式导入
   templateId?: string                     // 未传 previewId 时，用于说明本次导入使用的模板
-  conflictPolicy?: 'skip' | 'overwrite'  // 针对 duplicateOrders 采取的策略，默认 'skip'
+  conflictPolicy?: OrderImportConflictPolicy // 针对 duplicateOrders 采取的策略，默认 'skip'
   rows?: Array<Record<string, unknown>>   // 未传 previewId 时，可直接提交前端解析后的原始行数据
 }
 ```
@@ -548,7 +546,7 @@ interface TenantOrder {
 {
   jobId: string                           // 异步导入任务 ID
   submittedCount: number                 // 本次进入队列处理的聚合订单数
-  status: 'PENDING' | 'PROCESSING' | 'COMPLETED' | 'FAILED' // 任务初始状态
+  status: OrderImportJobStatus           // 任务初始状态
 }
 ```
 
@@ -564,7 +562,7 @@ interface TenantOrder {
 ```typescript
 {
   jobId: string                          // 异步导入任务 ID
-  status: 'PENDING' | 'PROCESSING' | 'COMPLETED' | 'FAILED' // 当前任务状态
+  status: OrderImportJobStatus          // 当前任务状态
   submittedCount: number                // 提交入队的聚合订单数
   processedCount: number                // 当前已处理完成的聚合订单数
   successCount: number                  // 成功新增入库的订单数
@@ -575,7 +573,7 @@ interface TenantOrder {
   conflictDetails: {
     sourceOrderNo: string               // 触发冲突的源订单号
     existingOrderId?: string            // 系统内已存在的订单 ID
-    action: 'skip' | 'overwrite'        // 本次对该冲突订单采取的处理动作
+    action: OrderImportConflictPolicy   // 本次对该冲突订单采取的处理动作
     reason: string                      // 处理原因或结果说明
   }[]
   completedAt?: string                  // 任务完成时间；未完成时可为空
@@ -667,7 +665,7 @@ Array<{
   fields: Array<{
     key: string                 // 内部字段 key，如 "sourceOrderNo"
     label: string               // 中文展示名
-    fieldType: 'text' | 'number' | 'money' | 'date' | 'enum' // 字段类型
+    fieldType: OrderTemplateFieldType   // 字段类型
     required: boolean           // 是否必填
     visible: boolean            // 是否在列表页展示
     order: number               // 展示顺序
@@ -702,7 +700,7 @@ Array<{
   fields: Array<{
     key: string                 // 目标字段 key
     label: string               // 中文展示名
-    fieldType: 'text' | 'number' | 'money' | 'date' | 'enum' // 字段类型
+    fieldType: OrderTemplateFieldType   // 字段类型
     required: boolean           // 是否必填
     visible: boolean            // 是否在列表页展示
     order: number               // 展示顺序
@@ -733,7 +731,7 @@ Array<{
   fields: Array<{
     key: string                // 目标字段 key
     label: string              // 中文展示名
-    fieldType: 'text' | 'number' | 'money' | 'date' | 'enum' // 字段类型
+    fieldType: OrderTemplateFieldType   // 字段类型
     required: boolean          // 是否必填
     visible: boolean           // 是否展示
     order: number              // 展示顺序
@@ -768,7 +766,7 @@ Array<{
   fields?: Array<{
     key: string                // 目标字段 key
     label: string              // 中文展示名
-    fieldType: 'text' | 'number' | 'money' | 'date' | 'enum' // 字段类型
+    fieldType: OrderTemplateFieldType   // 字段类型
     required: boolean          // 是否必填
     visible: boolean           // 是否展示
     order: number              // 展示顺序
@@ -799,7 +797,7 @@ Array<{
   fields: Array<{
     key: string                // 目标字段 key
     label: string              // 中文展示名
-    fieldType: 'text' | 'number' | 'money' | 'date' | 'enum' // 字段类型
+    fieldType: OrderTemplateFieldType   // 字段类型
     required: boolean          // 是否必填
     visible: boolean           // 是否展示
     order: number              // 展示顺序
@@ -830,7 +828,7 @@ interface PaymentRecord {
   channel: string              // 支付通道：微信支付 | 支付宝 | 现金 | 其他
   fee: number                  // 手续费（元）
   net: number                  // 到账金额（元）= amount - fee
-  status: 'success' | 'partial' | 'pending'
+  status: PaymentRecordStatus
   paidAt: string               // 收款时间
 }
 ```
@@ -863,7 +861,7 @@ interface PaymentRecord {
     channel: string            // 支付通道
     fee: number                // 手续费（元）
     net: number                // 到账金额（元）
-    status: 'success' | 'partial' | 'pending' // 流水状态
+    status: PaymentRecordStatus      // 流水状态
     paidAt: string             // 收款时间
   }>
   total: number                // 流水总数
@@ -978,7 +976,7 @@ Tenant 财务 POST /orders/{id}/verify-cash
     fee: number                // 手续费（元）
     channel: string            // 支付通道，如 "拉卡拉"
     paidAt: string             // 到账时间
-    status: '已核销' | '待核销' | '异常' // 对账状态
+    status: 'VERIFIED' | 'PENDING' | 'EXCEPTION' // 对账状态
   }>
   total: number                // 明细总数
   page: number                 // 当前页码
@@ -1026,7 +1024,7 @@ Tenant 财务 POST /orders/{id}/verify-cash
     date: string               // 下单日期
     creditDays: number         // 账期天数，如 30
     dueDate: string            // 到期日期
-    creditStatus: 'normal' | 'soon' | 'today' | 'overdue' // 账期状态
+    creditStatus: CreditOrderStatus  // 账期状态
   }>
   total: number                // 订单总数
   page: number                 // 当前页码
@@ -1191,13 +1189,14 @@ Array<{
 ### 类型定义
 
 ```typescript
+
 interface TenantSettingsUser {
   id: string                   // 用户 ID
   name: string                 // 姓名
   account: string              // 登录账号
-  role: Role                   // 可多角色时为主角色
+  role: TenantRole             // 可多角色时为主角色
   phone: string                // 手机号
-  status: 'active' | 'disabled' // 用户状态
+  status: TenantUserStatus     // 用户状态
   lastLogin: string            // 最后登录时间，如 "2026-03-25 11:30"
 }
 
@@ -1305,9 +1304,9 @@ Array<{
   id: string                   // 用户 ID
   name: string                 // 姓名
   account: string              // 登录账号
-  role: Role                   // 主角色
+  role: TenantRole             // 主角色
   phone: string                // 手机号
-  status: 'active' | 'disabled' // 用户状态
+  status: TenantUserStatus     // 用户状态
   lastLogin: string            // 最后登录时间
 }>
 ```
@@ -1323,7 +1322,7 @@ Array<{
 {
   name: string                 // 姓名（必填）
   phone: string                // 手机号 / 登录账号（必填）
-  role: Role                   // 角色（必填）
+  role: TenantRole             // 角色（必填）
   password?: string            // 密码，默认 "123456"
 }
 ```
@@ -1335,9 +1334,9 @@ Array<{
   id: string                   // 用户 ID
   name: string                 // 姓名
   account: string              // 登录账号
-  role: Role                   // 主角色
+  role: TenantRole             // 主角色
   phone: string                // 手机号
-  status: 'active' | 'disabled' // 用户状态
+  status: TenantUserStatus     // 用户状态
   lastLogin: string            // 最后登录时间
 }
 ```
@@ -1357,9 +1356,9 @@ Array<{
 {
   name?: string                // 姓名
   account?: string             // 登录账号
-  role?: Role                  // 主角色
+  role?: TenantRole            // 主角色
   phone?: string               // 手机号
-  status?: 'active' | 'disabled' // 用户状态
+  status?: TenantUserStatus    // 用户状态
 }
 ```
 
@@ -1370,9 +1369,9 @@ Array<{
   id: string                   // 用户 ID
   name: string                 // 姓名
   account: string              // 登录账号
-  role: Role                   // 主角色
+  role: TenantRole             // 主角色
   phone: string                // 手机号
-  status: 'active' | 'disabled' // 用户状态
+  status: TenantUserStatus     // 用户状态
   lastLogin: string            // 最后登录时间
 }
 ```
@@ -1398,7 +1397,7 @@ Array<{
 
 ```typescript
 {
-  status: 'active' | 'disabled'
+  status: TenantUserStatus
 }
 ```
 
@@ -1409,9 +1408,9 @@ Array<{
   id: string                   // 用户 ID
   name: string                 // 姓名
   account: string              // 登录账号
-  role: Role                   // 主角色
+  role: TenantRole             // 主角色
   phone: string                // 手机号
-  status: 'active' | 'disabled' // 用户状态
+  status: TenantUserStatus     // 用户状态
   lastLogin: string            // 最后登录时间
 }
 ```
@@ -1701,7 +1700,6 @@ interface NotificationRecord {
 ### 类型定义
 
 ```typescript
-type QualificationStatus = '待初审' | '待复核' | '待确认' | '已通过' | '已驳回'
 
 interface QualificationSubmitRequest {
   licenseUrl: string           // 营业执照或资质文件地址
@@ -1713,7 +1711,7 @@ interface QualificationSubmitRequest {
 
 interface QualificationStatusResult {
   certId: string | null        // 资质记录 ID
-  status: QualificationStatus | null // 当前资质状态
+  status: TenantCertificationStatus | null // 当前资质状态
   submittedAt: string | null   // 提交时间
   reviewedAt: string | null    // 最近审核时间
   reviewComment?: string | null // 审核备注
@@ -1760,7 +1758,7 @@ interface QualificationStatusResult {
 ```typescript
 {
   certId: string | null        // 资质记录 ID
-  status: QualificationStatus | null // 当前资质状态
+  status: TenantCertificationStatus | null // 当前资质状态
   submittedAt: string | null   // 提交时间
   reviewedAt: string | null    // 最近审核时间
   reviewComment?: string | null // 审核备注
@@ -1784,7 +1782,7 @@ interface QualificationStatusResult {
        │
 ┌──────▼──────┐
 │  Repository │  auth.repository / order.repository / agent.repository ...
-│             │  统一返回 { data: T, source: 'mock' | 'remote' }
+│             │  统一返回 { data: T, source: 'MOCK' | 'REMOTE' }
 └──────┬──────┘
        │
 ┌──────▼──────┐
@@ -1817,7 +1815,7 @@ interface QualificationStatusResult {
 - **环境键**: `localStorage['sinhe-proxy-env']`
   - `'me'` → Mock 数据（默认）
   - 其他值 → 远程接口
-- 每个 Hook 返回值均包含 `source: 'mock' | 'remote'` 字段，用于 UI 显示数据来源
+- 每个 Hook 返回值均包含 `source: 'MOCK' | 'REMOTE'` 字段，用于 UI 显示数据来源
 
 ---
 

@@ -2,6 +2,7 @@
 
 > 本文档面向前端团队，梳理三端（Admin / Tenant / H5）的 API 能力、跨项目关联和端点清单。
 > 确认日期：2026-04-07
+> 统一枚举命名与取值参见 **[../enums/enum-manual.md](../enums/enum-manual.md)**。
 
 ---
 
@@ -140,7 +141,7 @@ https://api.platform.com/api/v1
 
 **已确认的设计决策：**
 - `qrCodeToken` 来源于 `orders.qrCodeToken`；前端按固定路由规则 `/pay/:token` 生成送货单二维码
-- 采用 5 态状态机：`UNPAID / PAYING / PENDING_VERIFICATION / PAID / EXPIRED`
+- 采用 5 态状态机：`UNPAID` | `PAYING` | `PENDING_VERIFICATION` | `PAID` | `EXPIRED`
 - `payment_orders` 在 `EXPIRED` 状态下允许重新发起支付
 - 现金链路闭环：H5 `offline-payment` 登记待核销，Tenant 侧 `verify-cash` 财务核销
 - 在线支付仅在用户点击支付后触发，依赖后端的 `initiate` 动态返回 `cashierUrl` 与轮询 `status`
@@ -220,7 +221,7 @@ H5 前端                    后端                     支付网关
   pageSize: number
   keyword?: string         // 搜索订单号、ERP源单号、客户名
   status?: OrderStatus     // pending | partial | paid | expired | credit
-  payType?: '现款' | '账期'
+  payType?: OrderPayType
   templateId?: string      // 按导入模板类型过滤订单
   dateFrom?: string        // YYYY-MM-DD
   dateTo?: string          // YYYY-MM-DD
@@ -545,7 +546,7 @@ H5 前端                    后端                     支付网关
 | # | 决策 | 结论 |
 |---|------|------|
 | 1 | H5 路由标识 | `qrCodeToken` 来源于 `orders.qrCodeToken`，前端按固定规则生成 `/pay/:token` 二维码链接 |
-| 2 | H5 状态机 | 五态流转 `UNPAID -> PAYING -> PENDING_VERIFICATION -> PAID / EXPIRED` |
+| 2 | H5 状态机 | 五态流转 `UNPAID` -> `PAYING` -> `PENDING_VERIFICATION` -> `PAID` / `EXPIRED` |
 | 3 | 物理删除防范 | 以 `POST /orders/:id/void` 替代 `DELETE` 软作废，保留历史日志。 |
 | 4 | 订单导入机制 | 使用服务器管理模板 + 预览步骤 + 异步导入，不直接传接实体 Excel 文件 |
 | 5 | Tenant 安全权限 | 所有角色以固定代码写死。`settings/roles` 等全部为只读配置接口 |

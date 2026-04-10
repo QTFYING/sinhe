@@ -4,12 +4,14 @@
   "private": true,
   "exports": {
     "./contracts": "./src/contracts/index.ts",
-    "./types": "./src/types/index.ts"
+    "./types": "./src/types/index.ts",
+    "./enums": "./src/enums/index.ts"
   },
   "typesVersions": {
     "*": {
       "contracts": ["./src/contracts/index.ts"],
-      "types": ["./src/types/index.ts"]
+      "types": ["./src/types/index.ts"],
+      "enums": ["./src/enums/index.ts"]
     }
   },
   "scripts": {

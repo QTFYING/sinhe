@@ -3,6 +3,7 @@
 > 本文档承接原 docs/api/api-architecture-overview.md 中的“数据模型（服务端建表参考）”章节。
 > 用途：作为 Prisma 建表与服务端数据建模参考，不作为前端 API 联调必读文档。
 > 确认日期：2026-04-09
+> 统一枚举命名与取值参见 **[../enums/enum-manual.md](../enums/enum-manual.md)**。
 
 ---
 
@@ -20,10 +21,10 @@
   phone: string             // 手机号
   password: string          // 密码（加密存储）
   tenantId: string | null   // 所属租户 ID，平台用户为 null
-  tenantType: '平台' | '租户' // 用户所属侧：平台用户或租户用户
+  tenantType: TenantSide   // 用户所属侧：平台用户或租户用户
   role: string              // 角色名称
   scope: string             // 数据范围描述
-  status: 'active' | 'invited' | 'locked' | 'disabled' // 账号状态
+  status: UserStatus       // 账号状态
   requiresPasswordReset: boolean // 是否要求下次登录强制修改密码
   loginAt: string           // 最后登录时间
   createdAt: string         // 创建时间
@@ -163,7 +164,7 @@
   paid: number              // 已收金额（元）
   customFieldValues: any    // JSON: 动态模板映射的自定义字段
   status: 'pending' | 'partial' | 'paid' | 'expired' | 'credit' // 订单收款状态
-  payType: '现款' | '账期' // 付款方式
+  payType: OrderPayType    // 付款方式
   prints: number            // 打印次数
   creditDays: number | null // 账期天数
   creditDueDate: string | null // 账期到期日
@@ -218,7 +219,7 @@
 {
   id: string                // 导入任务 ID
   tenantId: string          // 关联租户 ID
-  status: 'PENDING' | 'PROCESSING' | 'COMPLETED' | 'FAILED' // 任务状态
+  status: OrderImportJobStatus // 任务状态
   submittedCount: number    // 提交处理的订单数
   processedCount: number    // 已处理订单数
   successCount: number      // 成功入库数
@@ -267,7 +268,7 @@
   channel: string           // 支付通道：微信支付 | 支付宝 | 现金 | 其他
   fee: number               // 手续费（元）
   net: number               // 到账金额（元）
-  status: 'success' | 'partial' | 'pending' | 'failed' // 流水状态
+  status: PaymentRecordStatus // 流水状态
   paidAt: string            // 支付完成时间
   createdAt: string         // 创建时间
 }
@@ -281,13 +282,13 @@
   tenantId: string          // 关联租户 ID
   orderId: string           // 关联业务订单 ID
   amount: number            // 本次支付单金额
-  status: 'UNPAID' | 'PAYING' | 'PENDING_VERIFICATION' | 'PAID' | 'EXPIRED' // H5 支付状态
-  paymentMethod: 'online' | 'cash' | 'other_paid' | null // 用户选择的支付方式
-  channel: 'wx_jsapi' | 'ali_h5' | 'direct' | null // 实际支付渠道
+  status: PaymentOrderStatus // H5 支付状态
+  paymentMethod: PaymentMethod | null // 用户选择的支付方式
+  channel: PaymentChannel | null // 实际支付渠道
   statusMessage: string | null // 状态补充说明
   // 线下支付信息
   offlineRemark: string | null // 线下支付备注
-  cashVerifyStatus: 'pending' | 'verified' | null // 现金核销状态
+  cashVerifyStatus: CashVerifyStatus | null // 现金核销状态
   offlineSubmittedAt: string | null // 线下支付提交时间
   cashVerifiedAt: string | null // 现金核销完成时间
   // 网关信息
@@ -319,7 +320,7 @@
   strategy: string          // 策略说明
   features: string[]        // 套餐功能列表
   tenants: number           // 在用租户数（可计算）
-  status: 'active' | 'draft' | 'archived' // 套餐状态
+  status: BillingPackageStatus // 套餐状态
   createdAt: string         // 创建时间
   updatedAt: string         // 更新时间
 }
@@ -331,7 +332,7 @@
 {
   contractNo: string        // 如 "HT-202603-001"
   tenantId: string          // 关联租户 ID
-  type: '电子签' | '归档件' // 合同类型
+  type: ContractType // 合同类型
   packageName: string       // 关联套餐名称
   contactName: string       // 联系人姓名
   phone: string             // 联系电话
@@ -339,7 +340,7 @@
   rate: string              // 费率说明
   serviceStart: string      // 服务开始时间
   serviceEnd: string        // 服务结束时间
-  status: '履约中' | '待续约' | '待签署' | '待归档' | '已终止' // 合同状态
+  status: ContractStatus // 合同状态
   signLink: string | null   // 电子签链接
   smsSent: boolean          // 是否已发送签署短信
   remark: string | null     // 备注信息
@@ -358,7 +359,7 @@
   tenantId: string          // 关联租户 ID
   amount: string            // 开票金额
   cycle: string             // 结算周期，如 "2026-03"
-  status: '已开票' | '待开票' | '对账中' | '已作废' // 发票状态
+  status: InvoiceStatus // 发票状态
   taxRate: number | null    // 税率
   issuedAt: string | null   // 开票时间
   voidReason: string | null // 作废原因
@@ -378,11 +379,11 @@
   content: string           // 公告正文
   planVersion: string       // 套餐版本范围
   audience: string          // 发布范围
-  timing: 'immediate' | 'scheduled' // 发布时间类型
+  timing: PublishTiming // 发布时间类型
   scheduledAt: string | null // 预约发布时间
   reminder: boolean         // 24小时二次提醒
   isDraft: boolean          // 是否草稿
-  status: '已发布' | '草稿' | '已下架' // 公告状态
+  status: NoticeStatus // 公告状态
   publishAt: string | null  // 实际发布时间
   createdAt: string         // 创建时间
   updatedAt: string         // 更新时间
@@ -410,7 +411,7 @@
   tenantId: string          // 提单租户 ID
   issue: string             // 工单问题描述
   assignee: string          // 当前处理人
-  status: '处理中' | '待分派' | '已解决' // 工单状态
+  status: TicketStatus // 工单状态
   resolution: string | null // 处理结论
   createdAt: string         // 创建时间
   updatedAt: string         // 更新时间
@@ -438,9 +439,9 @@
   actor: string             // 操作人
   action: string            // 操作名称
   target: string            // 操作对象
-  targetType: '账号' | '角色' | '租户' // 操作对象类型
+  targetType: AuditTargetType // 操作对象类型
   tenantId: string | null   // 关联租户 ID；平台操作可为空
-  result: '成功' | '待处理' // 执行结果
+  result: AuditResult // 执行结果
   time: string              // 操作时间
 }
 ```
@@ -528,7 +529,7 @@
   category: string          // "消息通道" | "资质审核" | "合同管理"
   contactName: string       // 联系人姓名
   contactPhone: string      // 联系电话
-  status: '已接入' | '试运行' // 接入状态
+  status: ServiceProviderStatus // 接入状态
   score: string             // 综合评分
   updatedAt: string         // 最近更新时间
 }

@@ -1,18 +1,23 @@
 import type {
-  H5PayOrderStatus as PaymentOrderStatusContract,
-  PaymentChannel as PaymentChannelContract,
-  PaymentMethod as PaymentMethodContract,
-} from '../contracts'
+  CashVerifyStatus,
+  OfflinePaymentMethod,
+  PaymentChannel,
+  PaymentMethod,
+  PaymentOrderStatus,
+  PaymentRecordStatus,
+} from '../enums'
 import type { ListParams } from './common'
 
-export type PaymentOrderStatus = `${PaymentOrderStatusContract}`
+export type {
+  CashVerifyStatus,
+  OfflinePaymentMethod,
+  PaymentChannel,
+  PaymentMethod,
+  PaymentOrderStatus,
+  PaymentRecordStatus,
+} from '../enums'
 
-export type PaymentMethodType = `${PaymentMethodContract}`
-export type PaymentChannel = `${PaymentChannelContract}`
-
-export type CashVerifyStatus = 'pending' | 'verified'
-
-export type OfflinePaymentMethod = Extract<PaymentMethodType, 'cash' | 'other_paid'>
+export type PaymentMethodType = PaymentMethod
 
 export interface PaymentOrderItem {
   itemId: string
@@ -44,7 +49,7 @@ export interface PaymentOrderDetail {
   status: PaymentOrderStatus
   statusMessage?: string
   servicePhone?: string
-  selectedPaymentMethod: PaymentMethodType | null
+  selectedPaymentMethod: PaymentMethod | null
   offlinePayment: OfflinePaymentInfo | null
   items: PaymentOrderItem[]
 }
@@ -53,7 +58,7 @@ export interface PaymentOrderActionResult {
   orderNo: string
   status: PaymentOrderStatus
   statusMessage?: string
-  selectedPaymentMethod: PaymentMethodType | null
+  selectedPaymentMethod: PaymentMethod | null
   offlinePayment: OfflinePaymentInfo | null
 }
 
@@ -88,7 +93,7 @@ export interface PaymentStatusResult {
   statusMessage?: string
   paidAmount?: number
   paidAt?: string
-  selectedPaymentMethod?: PaymentMethodType
+  selectedPaymentMethod?: PaymentMethod
 }
 
 export interface WxJsapiPayload {
@@ -112,7 +117,7 @@ export interface PaymentRecord {
   channel: string
   fee: number
   net: number
-  status: 'success' | 'partial' | 'pending'
+  status: PaymentRecordStatus
   tenant?: string
   time?: string
   paidAt?: string

@@ -1,19 +1,35 @@
-export enum PaymentMethod {
-  ONLINE = 'online', // 在线支付
-  CASH = 'cash', // 现金支付
-  OTHER_PAID = 'other_paid', // 其它方式已支付
-}
+import {
+  CashVerifyStatusEnum,
+  OfflinePaymentMethodEnum,
+  PaymentChannelEnum,
+  PaymentMethodEnum,
+  PaymentOrderStatusEnum,
+  PaymentRecordStatusEnum,
+  type CashVerifyStatus as CashVerifyStatusType,
+  type OfflinePaymentMethod as OfflinePaymentMethodType,
+  type PaymentChannel as PaymentChannelType,
+  type PaymentMethod as PaymentMethodType,
+  type PaymentOrderStatus as PaymentOrderStatusType,
+  type PaymentRecordStatus as PaymentRecordStatusType,
+} from '../enums'
 
-export enum PaymentChannel {
-  WX_JSAPI = 'wx_jsapi', // 微信 JSAPI
-  ALI_H5 = 'ali_h5', // 支付宝 H5
-  DIRECT = 'direct', // 直接支付网关
-}
+export const PaymentMethod = PaymentMethodEnum
+export type PaymentMethod = PaymentMethodType
 
-export enum H5PayOrderStatus {
-  UNPAID = 'UNPAID', // 初始化未付
-  PAYING = 'PAYING', // 取码支付中
-  PENDING_VERIFICATION = 'PENDING_VERIFICATION', // 待财务核销
-  PAID = 'PAID', // 彻底完结
-  EXPIRED = 'EXPIRED', // 二维码过期或交易关闭
-}
+export const OfflinePaymentMethod = OfflinePaymentMethodEnum
+export type OfflinePaymentMethod = OfflinePaymentMethodType
+
+export const PaymentChannel = PaymentChannelEnum
+export type PaymentChannel = PaymentChannelType
+
+export const PaymentOrderStatus = PaymentOrderStatusEnum
+export type PaymentOrderStatus = PaymentOrderStatusType
+
+export const H5PayOrderStatus = PaymentOrderStatusEnum
+export type H5PayOrderStatus = PaymentOrderStatusType
+
+export const CashVerifyStatus = CashVerifyStatusEnum
+export type CashVerifyStatus = CashVerifyStatusType
+
+export const PaymentRecordStatus = PaymentRecordStatusEnum
+export type PaymentRecordStatus = PaymentRecordStatusType

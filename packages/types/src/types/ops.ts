@@ -1,3 +1,7 @@
+import type { NoticeStatus, PublishTiming, ServiceProviderStatus, TicketStatus } from '../enums'
+
+export type { NoticeStatus, PublishTiming, ServiceProviderStatus, TicketStatus } from '../enums'
+
 export interface AlertRule {
   id: string
   name: string
@@ -40,11 +44,11 @@ export interface NoticeRecord {
   id: string
   title: string
   audience: string
-  status: '已发布' | '草稿'
+  status: NoticeStatus
   publishAt: string
   content?: string
   planVersion?: string
-  timing?: 'immediate' | 'scheduled'
+  timing?: PublishTiming
   scheduledAt?: string
   reminder?: boolean
   isDraft?: boolean
@@ -55,7 +59,7 @@ export interface NoticePayload {
   content: string
   planVersion: string
   audience: string
-  timing: 'immediate' | 'scheduled'
+  timing: PublishTiming
   scheduledAt?: string
   reminder: boolean
   isDraft: boolean
@@ -66,13 +70,13 @@ export interface TicketRecord {
   tenant: string
   issue: string
   assignee: string
-  status: '处理中' | '待分派' | '已解决'
+  status: TicketStatus
 }
 
 export interface ServiceProviderRecord {
   id: string
   name: string
   category: string
-  status: '已接入' | '试运行'
+  status: ServiceProviderStatus
   score: string
 }

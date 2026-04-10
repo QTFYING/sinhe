@@ -1,8 +1,31 @@
-import type { TenantStatus as TenantStatusContract, UserStatus as UserStatusContract } from '../contracts'
+import type {
+  AuditResult,
+  AuditTargetType,
+  FreezeAction,
+  ReviewAction,
+  SortOrder,
+  TenantCertificationStatus,
+  TenantRenewPaymentMethod,
+  TenantSide,
+  TenantSortField,
+  TenantStatus,
+  UserStatus,
+} from '../enums'
 import type { ListParams } from './common'
 
-export type TenantStatus = `${TenantStatusContract}`
-export type UserStatus = `${UserStatusContract}`
+export type {
+  AuditResult,
+  AuditTargetType,
+  FreezeAction,
+  ReviewAction,
+  SortOrder,
+  TenantCertificationStatus,
+  TenantRenewPaymentMethod,
+  TenantSide,
+  TenantSortField,
+  TenantStatus,
+  UserStatus,
+} from '../enums'
 
 export interface TenantRecord {
   id: string
@@ -26,7 +49,7 @@ export interface UserRecord {
   account: string
   name: string
   tenant: string
-  tenantType: '平台' | '租户'
+  tenantType: TenantSide
   role: string
   scope: string
   phone: string
@@ -44,7 +67,7 @@ export interface UserPayload {
   name: string
   account: string
   phone: string
-  tenantType: '平台' | '租户'
+  tenantType: TenantSide
   tenant: string
   role: string
   scope: string
@@ -68,10 +91,10 @@ export interface AuditRecord {
   actor: string
   action: string
   target: string
-  targetType: '账号' | '角色' | '租户'
+  targetType: AuditTargetType
   tenant: string
   time: string
-  result: '成功' | '待处理'
+  result: AuditResult
 }
 
 export interface DashboardMetric {
@@ -119,9 +142,6 @@ export interface ConsoleInfo {
   currentTenant: string
 }
 
-export type TenantSortField = 'name' | 'packageName' | 'status' | 'dueInDays'
-export type SortOrder = 'asc' | 'desc'
-
 export interface TenantListParams extends ListParams {
   status?: TenantStatus
   sortBy?: TenantSortField
@@ -138,14 +158,14 @@ export interface CreateTenantPayload {
 }
 
 export interface TenantAuditPayload {
-  action: 'approve' | 'reject'
+  action: ReviewAction
   reviewNote?: string
   rejectReason?: string
 }
 
 export interface BatchTenantAuditPayload {
   ids: string[]
-  action: 'approve'
+  action: Extract<ReviewAction, 'approve'>
   reviewNote?: string
 }
 
@@ -153,11 +173,11 @@ export interface TenantRenewPayload {
   packageName: string
   days: 30 | 90 | 180 | 365
   amount: number
-  paymentMethod: '银行转账' | '微信支付' | '支付宝' | '线下打款'
+  paymentMethod: TenantRenewPaymentMethod
 }
 
 export interface TenantFreezePayload {
-  action: 'freeze' | 'unfreeze'
+  action: FreezeAction
   reason?: string
 }
 
@@ -171,7 +191,7 @@ export interface TenantMemberRecord {
   name: string
   account: string
   tenant: string
-  tenantType: '平台' | '租户'
+  tenantType: TenantSide
   role: string
   status: UserStatus
   scope: string
@@ -180,10 +200,8 @@ export interface TenantMemberRecord {
 export interface TenantMemberListParams {
   page?: number
   pageSize?: number
-  tenantType?: '平台' | '租户'
+  tenantType?: TenantSide
 }
-
-export type TenantCertificationStatus = '待初审' | '待复核' | '待确认' | '已通过' | '已驳回'
 
 export interface TenantCertificationRecord {
   id: string
@@ -195,6 +213,6 @@ export interface TenantCertificationRecord {
 }
 
 export interface ReviewTenantCertificationPayload {
-  action: 'approve' | 'reject'
+  action: ReviewAction
   comment?: string
 }

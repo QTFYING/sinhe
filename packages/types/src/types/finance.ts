@@ -1,3 +1,7 @@
+import type { AdminReconciliationStatus, FinanceReconciliationStatus } from '../enums'
+
+export type { AdminReconciliationStatus, FinanceReconciliationStatus } from '../enums'
+
 export interface FinanceSummary {
   totalReceivable: number
   totalReceived: number
@@ -16,7 +20,7 @@ export interface FinanceReconciliationRecord {
   fee: number
   channel: string
   paidAt: string
-  status: '已核销' | '待核销' | '异常'
+  status: FinanceReconciliationStatus
 }
 
 export interface AdminReconciliationSummary {
@@ -34,5 +38,5 @@ export interface AdminReconciliationDailyRecord {
   amount: number
   received: number
   pending: number
-  status: '对账中' | '已核销' | '部分未核' | '逾期未收'
+  status: AdminReconciliationStatus
 }

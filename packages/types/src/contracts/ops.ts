@@ -1,11 +1,25 @@
-export enum TicketStatus {
-  PENDING = '待分派', // 待分派
-  PROCESSING = '处理中', // 处理中
-  RESOLVED = '已解决', // 已解决
-}
+import {
+  BillingPackageStatusEnum,
+  NoticeStatusEnum,
+  ServiceProviderStatusEnum,
+  TicketStatusEnum,
+  type BillingPackageStatus as BillingPackageStatusType,
+  type NoticeStatus as NoticeStatusType,
+  type ServiceProviderStatus as ServiceProviderStatusType,
+  type TicketStatus as TicketStatusType,
+} from '../enums'
 
-export enum PackageStatus {
-  DRAFT = 'draft', // 草稿
-  ACTIVE = 'active', // 售卖中
-  ARCHIVED = 'archived', // 已下架
-}
+export const TicketStatus = TicketStatusEnum
+export type TicketStatus = TicketStatusType
+
+export const NoticeStatus = NoticeStatusEnum
+export type NoticeStatus = NoticeStatusType
+
+export const ServiceProviderStatus = ServiceProviderStatusEnum
+export type ServiceProviderStatus = ServiceProviderStatusType
+
+export const BillingPackageStatus = BillingPackageStatusEnum
+export type BillingPackageStatus = BillingPackageStatusType
+
+export const PackageStatus = BillingPackageStatusEnum
+export type PackageStatus = BillingPackageStatusType

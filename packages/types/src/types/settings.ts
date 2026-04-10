@@ -1,6 +1,6 @@
-import type { TenantRole as TenantRoleContract } from '../contracts'
+import type { TenantRole, UserSimpleStatus } from '../enums'
 
-export type TenantRole = `${TenantRoleContract}`
+export type { TenantRole, UserSimpleStatus } from '../enums'
 
 export interface PermissionNode {
   id: string
@@ -14,7 +14,7 @@ export interface TenantUser {
   account: string
   role: TenantRole
   phone: string
-  status: 'active' | 'disabled'
+  status: UserSimpleStatus
   lastLogin?: string
 }
 
@@ -49,7 +49,7 @@ export interface TenantUserPayload {
 }
 
 export interface TenantUserStatusPayload {
-  status: 'active' | 'disabled'
+  status: UserSimpleStatus
 }
 
 export interface TenantGeneralSettings {

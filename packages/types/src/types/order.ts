@@ -1,17 +1,23 @@
 import type {
-  OrderImportConflictPolicy as OrderImportConflictPolicyContract,
-  OrderImportJobStatus as OrderImportJobStatusContract,
-  OrderStatus as OrderStatusContract,
-  OrderTemplateFieldType as OrderTemplateFieldTypeContract,
-  PayType as PayTypeContract,
-} from '../contracts'
+  CreditOrderStatus,
+  OrderImportConflictPolicy,
+  OrderImportJobStatus,
+  OrderPayType,
+  OrderStatus,
+  OrderTemplateFieldType,
+} from '../enums'
 import type { ListParams } from './common'
 
-export type OrderStatus = `${OrderStatusContract}`
-export type PayType = `${PayTypeContract}`
-export type OrderImportJobStatus = `${OrderImportJobStatusContract}`
-export type OrderImportConflictPolicy = `${OrderImportConflictPolicyContract}`
-export type OrderTemplateFieldType = `${OrderTemplateFieldTypeContract}`
+export type {
+  CreditOrderStatus,
+  OrderImportConflictPolicy,
+  OrderImportJobStatus,
+  OrderPayType,
+  OrderStatus,
+  OrderTemplateFieldType,
+} from '../enums'
+
+export type PayType = OrderPayType
 
 export type OrderCustomFieldValue = string | number | boolean | null
 
@@ -35,7 +41,7 @@ export interface Order {
   amount: number
   paid: number
   status: OrderStatus
-  payType: PayType
+  payType: OrderPayType
   prints: number
   date: string
   sourceOrderNo?: string
@@ -53,7 +59,7 @@ export interface Order {
 
 export interface OrderListParams extends ListParams {
   status?: OrderStatus
-  payType?: PayType
+  payType?: OrderPayType
   dateFrom?: string
   dateTo?: string
   templateId?: string
@@ -205,7 +211,7 @@ export interface CreditOrderRecord {
   date: string
   creditDays: number
   dueDate: string
-  creditStatus: 'normal' | 'soon' | 'today' | 'overdue'
+  creditStatus: CreditOrderStatus
 }
 
 export interface MarkOrderReceivedPayload {
