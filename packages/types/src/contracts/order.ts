@@ -249,11 +249,11 @@ export interface OrderPrintRecordResponse {
   remark?: string
 }
 
-export interface OrderRemindRequest {
+export interface CreateOrderReminderRequest {
   channels?: string[]
 }
 
-export interface OrderRemindResponse {
+export interface CreateOrderReminderResponse {
   sent: boolean
   channels: string[]
 }
@@ -268,12 +268,12 @@ export interface CreditOrderItem {
   creditStatus: CreditOrderStatus
 }
 
-export interface MarkOrderReceivedRequest {
+export interface CreateOrderReceiptRequest {
   amount?: number
   remark?: string
 }
 
-export interface MarkOrderReceivedResponse {
+export interface CreateOrderReceiptResponse {
   orderId: string
   status: OrderStatus
   paid: number

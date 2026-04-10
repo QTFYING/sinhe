@@ -405,11 +405,11 @@ interface TenantOrder {
 }
 ```
 
-### 3.5 作废订单
+### 3.5 更新订单作废状态
 
-- **POST** `/orders/{id}/void`
+- **PATCH** `/orders/{id}`
 - **角色**：TENANT_OWNER, TENANT_OPERATOR
-- **描述**：通过提供作废原因安全终结订单生命周期。一旦作废全链路生效不可逆。
+- **描述**：通过部分更新订单资源的作废字段，安全终结订单生命周期。一旦作废全链路生效不可逆。
 
 **请求参数：**
 
@@ -627,11 +627,11 @@ interface TenantOrder {
 - `totalCount` 以服务端去重后的 `orderIds` 数量为准
 - 同一租户下，相同 `requestId` 的重复提交必须幂等返回首次结果
 
-### 3.10 发送催款提醒
+### 3.10 创建催款提醒记录
 
-- **POST** `/orders/{id}/remind`
+- **POST** `/orders/{id}/reminders`
 - **角色**：TENANT_OWNER, TENANT_FINANCE
-- **描述**：对待收款/已逾期订单发送催款通知
+- **描述**：在指定订单下创建一条催款提醒记录，并触发对应通知渠道
 
 **请求参数：**
 
@@ -899,11 +899,11 @@ interface PaymentRecord {
 }
 ```
 
-### 4.3 现金核销
+### 4.3 创建现金核销记录
 
-- **POST** `/orders/{id}/verify-cash`
+- **POST** `/orders/{id}/cash-verifications`
 - **角色**：TENANT_FINANCE
-- **描述**：对 H5 端提交的现金支付订单进行核销确认；`payment_orders.status` 从 `pending_verification` 变为 `paid`
+- **描述**：在指定订单下创建一条现金核销记录；`payment_orders.status` 从 `pending_verification` 变为 `paid`
 
 **请求参数：** 无
 
@@ -929,7 +929,7 @@ interface PaymentRecord {
 ```
 H5 客户选择"现金支付" → payment_orders.status = pending_verification
                                     ↓
-Tenant 财务 POST /orders/{id}/verify-cash
+Tenant 财务 POST /orders/{id}/cash-verifications
                                     ↓
               payment_orders.status = paid + payments 新增一条记录 + orders 收款状态更新
                                     ↓
@@ -1059,11 +1059,11 @@ type FinanceReconciliationStatus = 'verified' | 'pending' | 'exception'
 | `soon` | 即将到期 | 蓝 | dueDate 在未来 7 天内 |
 | `normal` | 正常 | 灰 | dueDate 在 7 天之后 |
 
-### 6.2 标记回款
+### 6.2 创建回款记录
 
-- **POST** `/orders/{id}/mark-received`
+- **POST** `/orders/{id}/receipts`
 - **角色**：TENANT_OWNER, TENANT_FINANCE
-- **描述**：将账期订单标记为已收款
+- **描述**：在账期订单下创建一条回款记录，并同步回写订单已收金额与收款状态
 
 **请求参数：**
 
@@ -1406,9 +1406,9 @@ Array<{
 - TENANT_OWNER 角色用户不可删除自己
 - 实际为软删除
 
-### 8.7 启用/禁用用户
+### 8.7 更新用户状态
 
-- **PUT** `/settings/users/{id}/status`
+- **PATCH** `/settings/users/{id}`
 - **角色**：TENANT_OWNER
 - **描述**：切换用户的启用/禁用状态
 
@@ -1703,7 +1703,7 @@ interface NotificationRecord {
 
 ### 9.2 标记公告已读
 
-- **POST** `/notifications/{id}/read`
+- **POST** `/notifications/{id}/read-records`
 - **角色**：all
 
 **请求参数：** 无
@@ -1714,7 +1714,7 @@ interface NotificationRecord {
 
 ## 十、资质提交 Certification（2 个端点）
 
-> Tenant 提交资质材料，Admin 在 `/tenants/certifications/{id}/review` 进行审核。
+> Tenant 提交资质材料，Admin 在 `/tenants/certifications/{id}/review-decisions` 创建审核决议。
 
 ### 类型定义
 
@@ -1851,7 +1851,7 @@ interface TenantCertificationStatusResult {
 | Tenant 操作 | 关联的 H5 端行为 |
 |-------------|-----------------|
 | 创建订单 / 导入订单 → 生成订单二维码 | H5 通过 `qrCodeToken` 打开对应订单页面，是否展示支付按钮由订单状态决定 |
-| 财务核销 `POST /orders/{id}/verify-cash` | H5 端现金支付订单状态从 `pending_verification` → `paid` |
+| 财务核销 `POST /orders/{id}/cash-verifications` | H5 端现金支付订单状态从 `pending_verification` → `paid` |
 | 收款流水 `GET /payments` | 包含 H5 在线支付成功后生成的记录 |
 
 ### 与 Admin 端的关联

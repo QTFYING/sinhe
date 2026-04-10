@@ -72,7 +72,7 @@ export interface PaymentStatusResponse {
   selectedPaymentMethod?: PaymentMethod
 }
 
-export interface VerifyCashPaymentResponse {
+export interface CreateCashVerificationResponse {
   orderId: string
   orderStatus: OrderStatus
   paymentStatus: 'paid'

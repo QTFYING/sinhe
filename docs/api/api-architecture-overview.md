@@ -143,7 +143,7 @@ https://api.platform.com/api/v1
 - `qrCodeToken` 来源于 `orders.qrCodeToken`；前端按固定路由规则 `/pay/:token` 生成送货单二维码
 - 采用 5 态状态机：`unpaid` | `paying` | `pending_verification` | `paid` | `expired`
 - `payment_orders` 在 `expired` 状态下允许重新发起支付
-- 现金链路闭环：H5 `offline-payment` 登记待核销，Tenant 侧 `verify-cash` 财务核销
+- 现金链路闭环：H5 `offline-payment` 登记待核销，Tenant 侧 `cash-verifications` 财务核销
 - 在线支付仅在用户点击支付后触发，依赖后端的 `initiate` 动态返回 `cashierUrl` 与轮询 `status`
 - Webhook 依赖系统底层 `POST /payment/webhook/lakala`（不计入前端直接可见端点）
 
@@ -194,10 +194,10 @@ H5 前端                    后端                     支付网关
 | B2 | GET | `/orders/{id}` | 订单详情 | all | orders + order_items |
 | B3 | POST | `/orders` | 创建订单 | TENANT_OWNER, TENANT_OPERATOR | orders |
 | B4 | PUT | `/orders/{id}` | 更新订单 | TENANT_OWNER, TENANT_OPERATOR | orders |
-| B5 | POST | `/orders/:id/void` | 作废订单 | TENANT_OWNER | orders |
+| B5 | PATCH | `/orders/{id}` | 更新订单作废状态 | TENANT_OWNER | orders |
 | B6 | POST | `/orders/import` | 异步正式导入 | TENANT_OWNER, TENANT_OPERATOR | orders |
 | B7 | POST | `/orders/print-records` | 打印成功回执（单个/批量） | TENANT_OWNER, TENANT_OPERATOR | orders + print_record_batches |
-| B8 | POST | `/orders/{id}/remind` | 发送催款提醒 | TENANT_OWNER, TENANT_FINANCE | orders |
+| B8 | POST | `/orders/{id}/reminders` | 创建催款提醒记录 | TENANT_OWNER, TENANT_FINANCE | orders |
 | B9 | GET | `/import/templates` | 导入-获取模板列表 | TENANT_OWNER, TENANT_OPERATOR | — |
 | B10 | POST | `/import/templates` | 导入-创建模板 | TENANT_OWNER, TENANT_OPERATOR | — |
 | B11 | PUT | `/import/templates/:id` | 导入-更新模板 | TENANT_OWNER, TENANT_OPERATOR | — |
@@ -234,7 +234,7 @@ H5 前端                    后端                     支付网关
 |---|--------|------|------|------|--------|
 | C1 | GET | `/payments` | 本租户收款流水列表 | TENANT_OWNER, TENANT_FINANCE | payments |
 | C2 | GET | `/payments/summary` | 收款汇总统计 | TENANT_OWNER, TENANT_FINANCE | payments |
-| C3 | POST | `/orders/:id/verify-cash` | 现金财务核销 | TENANT_FINANCE | payment_orders + payments + orders |
+| C3 | POST | `/orders/{id}/cash-verifications` | 创建现金核销记录 | TENANT_FINANCE | payment_orders + payments + orders |
 
 > 引入 5 态状态机后，H5 扫码离线支付变为 `pending_verification`。C3 用于财务手动确认资金到账。
 
@@ -251,7 +251,7 @@ H5 前端                    后端                     支付网关
 | # | Method | Path | 说明 | 角色 | 关联表 |
 |---|--------|------|------|------|--------|
 | E1 | GET | `/orders/credit` | 账期订单列表 | TENANT_OWNER, TENANT_FINANCE | orders |
-| E2 | POST | `/orders/{id}/mark-received` | 标记回款 | TENANT_OWNER, TENANT_FINANCE | orders + payments |
+| E2 | POST | `/orders/{id}/receipts` | 创建回款记录 | TENANT_OWNER, TENANT_FINANCE | orders + payments |
 
 
 #### 模块 G：数据分析（Analytics）— 4 个端点
@@ -273,7 +273,7 @@ H5 前端                    后端                     支付网关
 | H4 | POST | `/settings/users` | 创建用户 | TENANT_OWNER | users |
 | H5 | PUT | `/settings/users/{id}` | 更新用户 | TENANT_OWNER | users |
 | H6 | DELETE | `/settings/users/{id}` | 删除用户 | TENANT_OWNER | users |
-| H7 | PUT | `/settings/users/{id}/status` | 启用/禁用用户 | TENANT_OWNER | users |
+| H7 | PATCH | `/settings/users/{id}` | 更新用户状态 | TENANT_OWNER | users |
 | H8 | GET | `/settings/general` | 获取通用配置（企业信息+通知） | TENANT_OWNER | system_configs + tenant_general_settings |
 | H9 | PUT | `/settings/general` | 保存通用配置 | TENANT_OWNER | system_configs + tenant_general_settings |
 | H10 | GET | `/settings/printing` | 获取打印配置列表 | TENANT_OWNER | printer_templates, import_templates |
@@ -290,7 +290,7 @@ H5 前端                    后端                     支付网关
 | # | Method | Path | 说明 | 角色 | 关联表 |
 |---|--------|------|------|------|--------|
 | I1 | GET | `/notifications` | 接收的平台公告列表 | all | notices + notice_reads |
-| I2 | POST | `/notifications/{id}/read` | 标记已读 | all | notice_reads |
+| I2 | POST | `/notifications/{id}/read-records` | 创建已读记录 | all | notice_reads |
 
 #### 模块 J：资质提交（Certification）— 2 个端点
 
@@ -352,14 +352,14 @@ H5 前端                    后端                     支付网关
 |---|--------|------|------|--------|
 | 4.1 | GET | `/tenants` | 租户列表（分页+搜索+状态筛选+排序） | tenants |
 | 4.2 | POST | `/tenants` | 创建租户（初始状态 onboarding） | tenants |
-| 4.3 | POST | `/tenants/{id}/audit` | 审核（通过/驳回） | tenants |
-| 4.4 | POST | `/tenants/batch/audit` | 批量审核 | tenants |
-| 4.5 | POST | `/tenants/{id}/renew` | 续费（可变更套餐） | tenants, packages |
-| 4.6 | POST | `/tenants/{id}/freeze` | 冻结/解冻 | tenants |
-| 4.7 | POST | `/tenants/batch/freeze` | 批量冻结 | tenants |
+| 4.3 | POST | `/tenants/{id}/audit-decisions` | 创建审核决议 | tenants |
+| 4.4 | POST | `/tenants/audit-batches` | 创建批量审核批次 | tenants |
+| 4.5 | POST | `/tenants/{id}/renewals` | 创建续费记录 | tenants, packages |
+| 4.6 | PATCH | `/tenants/{id}` | 更新租户状态 | tenants |
+| 4.7 | POST | `/tenants/status-change-batches` | 创建批量状态变更批次 | tenants |
 | 4.8 | GET | `/tenants/members` | 组织架构成员列表（跨租户） | users, tenants |
 | 4.9 | GET | `/tenants/certifications` | 资质审核队列 | tenant_certifications |
-| 4.10 | POST | `/tenants/certifications/{id}/review` | 审核资质材料 | tenant_certifications |
+| 4.10 | POST | `/tenants/certifications/{id}/review-decisions` | 创建资质审核决议 | tenant_certifications |
 
 #### 模块 5：用户管理（Users）— 6 个端点
 
@@ -369,8 +369,8 @@ H5 前端                    后端                     支付网关
 | 5.2 | POST | `/users` | 创建用户 | users |
 | 5.3 | PUT | `/users/{id}` | 更新用户 | users |
 | 5.4 | DELETE | `/users/{id}` | 删除用户 | users |
-| 5.5 | POST | `/users/{id}/status` | 变更状态（启用/禁用/锁定） | users |
-| 5.6 | POST | `/users/{id}/reset-password` | 重置密码 | users |
+| 5.5 | PATCH | `/users/{id}` | 更新用户状态 | users |
+| 5.6 | POST | `/users/{id}/password-resets` | 创建密码重置记录 | users |
 
 #### 模块 6：订单管理（Orders）— 2 个端点
 
@@ -414,8 +414,8 @@ H5 前端                    后端                     支付网关
 | 10.1 | GET | `/billing/contracts` | 合同列表 | contracts |
 | 10.2 | POST | `/billing/contracts` | 发起合同 | contracts |
 | 10.3 | PUT | `/billing/contracts/{id}` | 更新合同 | contracts |
-| 10.4 | POST | `/billing/contracts/{id}/approve` | 审批合同 | contracts |
-| 10.5 | POST | `/billing/contracts/{id}/terminate` | 终止合同 | contracts |
+| 10.4 | POST | `/billing/contracts/{id}/approvals` | 创建合同审批记录 | contracts |
+| 10.5 | POST | `/billing/contracts/{id}/terminations` | 创建合同终止记录 | contracts |
 
 #### 模块 11：账单发票（Billing - Invoices）— 3 个端点
 
@@ -423,7 +423,7 @@ H5 前端                    后端                     支付网关
 |---|--------|------|------|--------|
 | 11.1 | GET | `/billing/invoices` | 账单列表 | invoices |
 | 11.2 | POST | `/billing/invoices` | 开具发票 | invoices |
-| 11.3 | POST | `/billing/invoices/{id}/void` | 作废发票 | invoices |
+| 11.3 | PATCH | `/billing/invoices/{id}` | 更新发票状态（作废） | invoices |
 
 #### 模块 12：服务商管理（Service Providers）— 4 个端点
 
@@ -449,9 +449,9 @@ H5 前端                    后端                     支付网关
 |---|--------|------|------|--------|
 | 14.1 | GET | `/tickets` | 工单列表 | tickets |
 | 14.2 | GET | `/tickets/export` | 导出工单 | tickets |
-| 14.3 | POST | `/tickets/{id}/reply` | 回复工单 | tickets + ticket_replies |
-| 14.4 | PUT | `/tickets/{id}/assign` | 分配工单 | tickets |
-| 14.5 | POST | `/tickets/{id}/close` | 关闭工单 | tickets |
+| 14.3 | POST | `/tickets/{id}/replies` | 创建工单回复 | tickets + ticket_replies |
+| 14.4 | POST | `/tickets/{id}/assignments` | 创建工单分配记录 | tickets |
+| 14.5 | POST | `/tickets/{id}/closures` | 创建工单关闭记录 | tickets |
 
 #### 模块 15：角色管理（Security - Roles）— 4 个端点
 
@@ -488,7 +488,7 @@ H5 前端                    后端                     支付网关
 | 18.1 | GET | `/ops/alert-rules` | 告警规则列表 | alert_rules |
 | 18.2 | POST | `/ops/alert-rules` | 创建规则 | alert_rules |
 | 18.3 | PUT | `/ops/alert-rules/{id}` | 更新规则 | alert_rules |
-| 18.4 | POST | `/ops/alert-rules/{id}/toggle` | 切换启用状态 | alert_rules |
+| 18.4 | PATCH | `/ops/alert-rules/{id}` | 更新规则启用状态 | alert_rules |
 | 18.5 | DELETE | `/ops/alert-rules/{id}` | 删除规则 | alert_rules |
 
 > 路径已从 `/ops-monitor/rules` 统一为 `/ops/alert-rules`。
@@ -547,7 +547,7 @@ H5 前端                    后端                     支付网关
 |---|------|------|
 | 1 | H5 路由标识 | `qrCodeToken` 来源于 `orders.qrCodeToken`，前端按固定规则生成 `/pay/:token` 二维码链接 |
 | 2 | H5 状态机 | 五态流转 `unpaid` -> `paying` -> `pending_verification` -> `paid` / `expired` |
-| 3 | 物理删除防范 | 以 `POST /orders/:id/void` 替代 `DELETE` 软作废，保留历史日志。 |
+| 3 | 物理删除防范 | 以 `PATCH /orders/{id}` 更新作废字段替代 `DELETE` 软作废，保留历史日志。 |
 | 4 | 订单导入机制 | 使用服务器管理模板 + 预览步骤 + 异步导入，不直接传接实体 Excel 文件 |
 | 5 | Tenant 安全权限 | 所有角色以固定代码写死。`settings/roles` 等全部为只读配置接口 |
 | 6 | 通用配置模型 | `/settings/general` 采用“平台默认 + 租户覆盖”两层模型，GET 返回合并结果 |

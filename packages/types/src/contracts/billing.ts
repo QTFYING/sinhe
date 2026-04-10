@@ -64,11 +64,11 @@ export interface CreateContractResponse {
   smsSent: boolean
 }
 
-export interface ApproveContractRequest {
+export interface CreateContractApprovalRequest {
   remark?: string
 }
 
-export interface TerminateContractRequest {
+export interface CreateContractTerminationRequest {
   terminateReason: string
 }
 
@@ -93,6 +93,6 @@ export interface CreateInvoiceResponse {
   status: 'pending_issue'
 }
 
-export interface VoidInvoiceRequest {
+export interface PatchInvoiceStatusRequest {
   voidReason: string
 }

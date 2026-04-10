@@ -20,7 +20,7 @@ export interface UpdateAlertRuleRequest {
   channel?: string
 }
 
-export interface ToggleAlertRuleRequest {
+export interface PatchAlertRuleStatusRequest {
   enabled: boolean
 }
 
@@ -96,16 +96,16 @@ export interface TicketReplyResult {
   repliedAt: string
 }
 
-export interface ReplyTicketRequest {
+export interface CreateTicketReplyRequest {
   content: string
   attachments?: string[]
 }
 
-export interface AssignTicketRequest {
+export interface CreateTicketAssignmentRequest {
   assignee: string
 }
 
-export interface CloseTicketRequest {
+export interface CreateTicketClosureRequest {
   resolution?: string
 }
 

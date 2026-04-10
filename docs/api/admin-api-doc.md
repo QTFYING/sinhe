@@ -382,10 +382,10 @@ interface TenantRecord {
 }
 ```
 
-### 5.3 审核租户
+### 5.3 创建租户审核决议
 
-- **POST** `/tenants/{id}/audit`
-- **描述**：对待审核租户进行审批（通过 / 驳回）
+- **POST** `/tenants/{id}/audit-decisions`
+- **描述**：在指定租户下创建一条审核决议记录（通过 / 驳回）
 - **关联表**：tenants
 
 **请求参数：**
@@ -421,9 +421,9 @@ interface TenantRecord {
 - `approve` → 状态变为 `active`
 - `reject` → 状态保持 `onboarding`，记录驳回原因
 
-### 5.4 批量审核租户
+### 5.4 创建租户批量审核批次
 
-- **POST** `/tenants/batch/audit`
+- **POST** `/tenants/audit-batches`
 - **描述**：批量通过多个待审核租户
 - **关联表**：tenants
 
@@ -446,10 +446,10 @@ interface TenantRecord {
 }
 ```
 
-### 5.5 租户续费
+### 5.5 创建租户续费记录
 
-- **POST** `/tenants/{id}/renew`
-- **描述**：为租户续费，可变更套餐
+- **POST** `/tenants/{id}/renewals`
+- **描述**：在指定租户下创建一条续费记录，可变更套餐
 - **关联表**：tenants, packages
 
 **请求参数：**
@@ -482,9 +482,9 @@ interface TenantRecord {
 }
 ```
 
-### 5.6 冻结 / 解冻租户
+### 5.6 更新租户状态
 
-- **POST** `/tenants/{id}/freeze`
+- **PATCH** `/tenants/{id}`
 - **关联表**：tenants
 
 **请求参数：**
@@ -519,9 +519,9 @@ interface TenantRecord {
 - `freeze` → 状态变为 `paused`
 - `unfreeze` → 状态恢复为 `active`
 
-### 5.7 批量冻结租户
+### 5.7 创建租户批量状态变更批次
 
-- **POST** `/tenants/batch/freeze`
+- **POST** `/tenants/status-change-batches`
 - **关联表**：tenants
 
 **请求参数：**
@@ -594,11 +594,11 @@ Array<{
 }>
 ```
 
-### 5.10 审核资质材料
+### 5.10 创建资质审核决议
 
-- **POST** `/tenants/certifications/{id}/review`
+- **POST** `/tenants/certifications/{id}/review-decisions`
 - **关联表**：tenant_certifications
-- **说明**：该接口推进资质审核状态流转；`approve` 表示推进到下一审核节点或最终通过，`reject` 表示驳回。
+- **说明**：该接口在指定资质记录下创建一条审核决议，并推进资质审核状态流转；`approve` 表示推进到下一审核节点或最终通过，`reject` 表示驳回。
 
 **请求参数：**
 
@@ -789,9 +789,9 @@ interface UserRecord {
 
 **响应 data：** `null`
 
-### 6.5 变更用户状态
+### 6.5 更新用户状态
 
-- **POST** `/users/{id}/status`
+- **PATCH** `/users/{id}`
 - **描述**：启用、禁用、锁定、解锁用户
 - **关联表**：users
 
@@ -821,9 +821,9 @@ interface UserRecord {
 }
 ```
 
-### 6.6 重置用户密码
+### 6.6 创建密码重置记录
 
-- **POST** `/users/{id}/reset-password`
+- **POST** `/users/{id}/password-resets`
 - **描述**：管理员重置用户密码，用户下次登录需修改密码
 - **关联表**：users
 
@@ -1358,10 +1358,10 @@ interface ContractRecord {
 - 仅 `pending_signing` 或 `pending_archive` 状态可修改
 - `active` 状态禁止修改
 
-### 11.4 审批合同
+### 11.4 创建合同审批记录
 
-- **POST** `/billing/contracts/{id}/approve`
-- **描述**：审批通过合同，状态流转为 `active`
+- **POST** `/billing/contracts/{id}/approvals`
+- **描述**：在指定合同下创建一条审批记录，状态流转为 `active`
 - **关联表**：contracts
 
 **请求参数：**
@@ -1387,10 +1387,10 @@ interface ContractRecord {
 
 **状态流转：** `pending_signing` → `active`
 
-### 11.5 终止合同
+### 11.5 创建合同终止记录
 
-- **POST** `/billing/contracts/{id}/terminate`
-- **描述**：提前终止合同
+- **POST** `/billing/contracts/{id}/terminations`
+- **描述**：在指定合同下创建一条终止记录
 - **关联表**：contracts
 
 **请求参数：**
@@ -1494,10 +1494,10 @@ interface InvoiceRecord {
 - 创建开票记录后，初始状态为 `pending_issue`
 - 只有在发票真正开具完成后，状态才会流转为 `issued`
 
-### 12.3 作废发票
+### 12.3 更新发票状态（作废）
 
-- **POST** `/billing/invoices/{id}/void`
-- **描述**：作废已开具的发票
+- **PATCH** `/billing/invoices/{id}`
+- **描述**：通过部分更新发票资源，将已开具发票作废
 - **关联表**：invoices
 
 **请求参数：**
@@ -1831,10 +1831,10 @@ interface TicketReplyResult {
 
 **响应**：Excel 文件流
 
-### 15.3 回复工单
+### 15.3 创建工单回复
 
-- **POST** `/tickets/{id}/reply`
-- **描述**：平台运营人员回复工单
+- **POST** `/tickets/{id}/replies`
+- **描述**：在指定工单下创建一条回复记录
 - **关联表**：tickets
 
 **请求参数：**
@@ -1857,10 +1857,10 @@ interface TicketReplyResult {
 }
 ```
 
-### 15.4 分配工单
+### 15.4 创建工单分配记录
 
-- **PUT** `/tickets/{id}/assign`
-- **描述**：将工单分配给指定处理人或处理组
+- **POST** `/tickets/{id}/assignments`
+- **描述**：在指定工单下创建一条分配记录，将工单分配给指定处理人或处理组
 - **关联表**：tickets
 
 **请求参数：**
@@ -1885,10 +1885,10 @@ interface TicketReplyResult {
 
 **状态流转：** `pending` → `processing`
 
-### 15.5 关闭工单
+### 15.5 创建工单关闭记录
 
-- **POST** `/tickets/{id}/close`
-- **描述**：关闭工单（标记为 `resolved`）
+- **POST** `/tickets/{id}/closures`
+- **描述**：在指定工单下创建一条关闭记录（标记为 `resolved`）
 - **关联表**：tickets
 
 **请求参数：**
@@ -2304,9 +2304,9 @@ Array<{
 }
 ```
 
-### 19.4 切换告警规则状态
+### 19.4 更新告警规则启用状态
 
-- **POST** `/ops/alert-rules/{id}/toggle`
+- **PATCH** `/ops/alert-rules/{id}`
 - **关联表**：alert_rules
 
 **请求参数：**

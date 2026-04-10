@@ -331,7 +331,7 @@ interface OfflinePaymentInfo {
 
 | H5 操作 | 关联的 Tenant 端操作 |
 |---------|---------------------|
-| 线下支付（现金）→ 状态变为 `pending_verification` | Tenant 财务调用 `POST /orders/:id/verify-cash` 核销 → 状态变为 `paid` |
+| 线下支付（现金）→ 状态变为 `pending_verification` | Tenant 财务调用 `POST /orders/{id}/cash-verifications` 核销 → 状态变为 `paid` |
 | 在线支付成功 → 状态变为 `paid` | Tenant 收款流水 `GET /payments` 中新增一条记录 |
 | 订单详情展示商品明细 | Tenant 端创建订单时录入的 order_items |
 

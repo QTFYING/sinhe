@@ -65,11 +65,11 @@ export interface UserStatusUpdateRequest {
   status: UserStatus
 }
 
-export interface ResetUserPasswordRequest {
+export interface CreateUserPasswordResetRequest {
   password?: string
 }
 
-export interface ResetUserPasswordResponse {
+export interface CreateUserPasswordResetResponse {
   requiresPasswordReset: true
 }
 
@@ -145,31 +145,31 @@ export interface CreateTenantRequest {
   dueInDays: number
 }
 
-export interface TenantAuditRequest {
+export interface CreateTenantAuditDecisionRequest {
   action: ReviewAction
   reviewNote?: string
   rejectReason?: string
 }
 
-export interface BatchTenantAuditRequest {
+export interface CreateTenantAuditBatchRequest {
   ids: string[]
   action: 'approve'
   reviewNote?: string
 }
 
-export interface TenantRenewRequest {
+export interface CreateTenantRenewalRequest {
   packageName: string
   days: 30 | 90 | 180 | 365
   amount: number
   paymentMethod: TenantRenewPaymentMethod
 }
 
-export interface TenantFreezeRequest {
+export interface PatchTenantStatusRequest {
   action: FreezeAction
   reason?: string
 }
 
-export interface BatchTenantFreezeRequest {
+export interface CreateTenantStatusChangeBatchRequest {
   ids: string[]
   reason: string
 }
@@ -200,7 +200,7 @@ export interface TenantCertificationRecordItem {
   comment?: string
 }
 
-export interface ReviewTenantCertificationRequest {
+export interface CreateTenantCertificationReviewDecisionRequest {
   action: ReviewAction
   comment?: string
 }
