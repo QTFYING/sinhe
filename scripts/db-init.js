@@ -30,7 +30,7 @@ async function ensureOsAdmin() {
   const existing = await prisma.user.findFirst({
     where: {
       tenantId: null,
-      username,
+      account: username,
       role: UserRoleEnum.OS_SUPER_ADMIN,
       deletedAt: null,
     },
@@ -44,11 +44,11 @@ async function ensureOsAdmin() {
   const passwordHash = await bcrypt.hash(password, 12);
   const admin = await prisma.user.create({
     data: {
-      username,
+      account: username,
       passwordHash,
       realName,
       role: UserRoleEnum.OS_SUPER_ADMIN,
-      status: 1,
+      status: 'active',
     },
   });
 
@@ -118,7 +118,7 @@ async function ensureTenantAndOwner() {
         contactPhone: tenantContactPhone,
         maxCreditDays,
         creditReminderDays,
-        status: 1,
+        status: 'active',
       },
     });
     console.log(`[ok] 已创建租户: ${tenantName}`);
@@ -129,7 +129,7 @@ async function ensureTenantAndOwner() {
   const existingOwner = await prisma.user.findFirst({
     where: {
       tenantId: tenant.id,
-      username: ownerUsername,
+      account: ownerUsername,
       role: UserRoleEnum.TENANT_OWNER,
       deletedAt: null,
     },
@@ -144,11 +144,11 @@ async function ensureTenantAndOwner() {
   await prisma.user.create({
     data: {
       tenantId: tenant.id,
-      username: ownerUsername,
+      account: ownerUsername,
       passwordHash,
       realName: ownerRealName,
       role: UserRoleEnum.TENANT_OWNER,
-      status: 1,
+      status: 'active',
     },
   });
 

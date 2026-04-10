@@ -394,7 +394,7 @@ Swagger 验收标准：
 
 1. 不以兼容旧 MVP 数据结构为第一目标。
 2. 不以“一次性让全仓库 build 全绿”为第一目标。
-3. `docs/prisma/prisma.md` 暂不纳入本轮主线修订。
+3. 已归档的 `docs/archived/prisma-design-v1.md` 不纳入本轮主线修订。
 4. `notification`、`report` 等外围模块不作为第一批交付范围。
 5. 不恢复已放弃的 `/print/jobs` 语义。
 

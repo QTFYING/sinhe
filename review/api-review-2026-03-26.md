@@ -2,7 +2,7 @@
 
 **日期**: 2026-03-26
 **审查范围**: `apps/api/src/` 全部 40 个文件
-**对照文档**: `docs/API.md` (V1.2)、`docs/prisma.md`、`CLAUDE.md`
+**对照文档**: `docs/API.md` (V1.2)、`docs/archived/prisma-design-v1.md`、`AGENTS.md`
 
 ---
 

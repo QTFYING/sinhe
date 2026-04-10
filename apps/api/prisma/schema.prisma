@@ -1,4 +1,3 @@
-// schema.prisma (PostgreSQL)
 generator client {
   provider      = "prisma-client-js"
   binaryTargets = ["native"]
@@ -9,238 +8,392 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// ---------------- GLOBAL ENUMS ----------------
 enum UserRoleEnum {
   OS_SUPER_ADMIN
-  OS_OPERATOR
   TENANT_OWNER
   TENANT_OPERATOR
   TENANT_FINANCE
   TENANT_VIEWER
 }
 
-enum PayStatusEnum {
-  UNPAID
-  PAYING
-  PARTIAL_PAID
-  PAID
-  REFUNDED
+enum TenantStatusEnum {
+  ACTIVE     @map("active")
+  ONBOARDING @map("onboarding")
+  ATTENTION  @map("attention")
+  PAUSED     @map("paused")
 }
 
-enum DeliveryStatusEnum {
-  PENDING
-  IN_TRANSIT
-  DELIVERED
+enum UserStatusEnum {
+  ACTIVE   @map("active")
+  INVITED  @map("invited")
+  LOCKED   @map("locked")
+  DISABLED @map("disabled")
+}
+
+enum OrderStatusEnum {
+  PENDING @map("pending")
+  PARTIAL @map("partial")
+  PAID    @map("paid")
+  EXPIRED @map("expired")
+  CREDIT  @map("credit")
+}
+
+enum OrderPayTypeEnum {
+  CASH   @map("cash")
+  CREDIT @map("credit")
+}
+
+enum OrderImportJobStatusEnum {
+  PENDING    @map("pending")
+  PROCESSING @map("processing")
+  COMPLETED  @map("completed")
+  FAILED     @map("failed")
 }
 
 enum PaymentMethodEnum {
-  ONLINE_PAYMENT
-  MANUAL_MARKUP
+  ONLINE     @map("online")
+  CASH       @map("cash")
+  OTHER_PAID @map("other_paid")
+}
+
+enum PaymentChannelEnum {
+  LAKALA @map("lakala")
+}
+
+enum PaymentOrderStatusEnum {
+  UNPAID               @map("unpaid")
+  PAYING               @map("paying")
+  PENDING_VERIFICATION @map("pending_verification")
+  PAID                 @map("paid")
+  EXPIRED              @map("expired")
+}
+
+enum CashVerifyStatusEnum {
+  PENDING  @map("pending")
+  VERIFIED @map("verified")
 }
 
 enum PaymentRecordStatusEnum {
-  SUCCESS
-  FAILED
-  REFUNDED
+  SUCCESS @map("success")
+  PARTIAL @map("partial")
+  PENDING @map("pending")
+  FAILED  @map("failed")
 }
 
-enum LifecycleEventEnum {
-  ORDER_CREATED
-  ORDER_PRINTED
-  PAYMENT_INITIATED
-  PAYMENT_SUCCESS_WEBHOOK
-  PAYMENT_SUCCESS_POLLING
-  PAYMENT_MANUAL_MARKUP
-  PRICE_ADJUSTED
-  ORDER_REFUNDED
-  QR_CODE_EXPIRED
-  DELIVERY_STATUS_UPDATED
+enum PublishTimingEnum {
+  IMMEDIATE @map("immediate")
+  SCHEDULED @map("scheduled")
 }
 
-enum NotificationTypeEnum {
-  CREDIT_OVERDUE_REMINDER
+enum NoticeStatusEnum {
+  PUBLISHED @map("published")
+  DRAFT     @map("draft")
+  OFFLINE   @map("offline")
 }
-
-// ---------------- MODELS ----------------
 
 model Tenant {
-  id            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  name          String    @db.VarChar(100)
-  contactPhone  String    @db.VarChar(20)
-  status        Int       @default(1)
-  paymentConfig Json?     @default("{}")
-  expireAt      DateTime?
-
+  id                 String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name               String           @db.VarChar(100)
+  contactPhone       String           @db.VarChar(20)
+  packageName        String?          @db.VarChar(100)
+  adminName          String?          @db.VarChar(50)
+  region             String?          @db.VarChar(100)
+  status             TenantStatusEnum @default(ACTIVE)
+  expireAt           DateTime?
   maxCreditDays      Int              @default(30)
   creditReminderDays Int              @default(3)
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+  deletedAt          DateTime?
+
   users              User[]
-  orders             Order[]
+  generalSettings    TenantGeneralSettings?
   importTemplates    ImportTemplate[]
+  printerTemplates   PrinterTemplate[]
+  orders             Order[]
+  importJobs         ImportJob[]
+  payments           Payment[]
+  paymentOrders      PaymentOrder[]
+  printRecordBatches PrintRecordBatch[]
+  noticeReads        NoticeRead[]
 
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-  deletedAt DateTime?
-
-  @@map("sys_tenant")
+  @@map("tenants")
 }
 
 model User {
-  id           String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  tenantId     String?      @db.Uuid
-  username     String       @db.VarChar(50)
-  passwordHash String       @db.VarChar(255)
-  realName     String       @db.VarChar(50)
-  role         UserRoleEnum
-  status       Int          @default(1)
+  id                    String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId              String?        @db.Uuid
+  account               String         @unique @db.VarChar(50)
+  phone                 String?        @db.VarChar(20)
+  passwordHash          String         @db.VarChar(255)
+  realName              String         @db.VarChar(50)
+  role                  UserRoleEnum
+  scope                 String?        @db.VarChar(100)
+  status                UserStatusEnum @default(ACTIVE)
+  requiresPasswordReset Boolean        @default(false)
+  loginAt               DateTime?
+  createdAt             DateTime       @default(now())
+  updatedAt             DateTime       @updatedAt
+  deletedAt             DateTime?
 
-  tenant         Tenant?             @relation(fields: [tenantId], references: [id])
-  lifecycleLogs  OrderLifecycleLog[]
-  manualPayments PaymentRecord[]
+  tenant             Tenant?            @relation(fields: [tenantId], references: [id])
+  printRecordBatches PrintRecordBatch[] @relation("PrintRecordBatchOperator")
+  noticeReads        NoticeRead[]
 
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-  deletedAt DateTime?
+  @@index([tenantId])
+  @@index([status])
+  @@map("users")
+}
 
-  @@unique([tenantId, username])
-  @@map("sys_user")
+model TenantGeneralSettings {
+  id               String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId         String   @unique @db.Uuid
+  companyName      String?  @db.VarChar(100)
+  contactPerson    String?  @db.VarChar(50)
+  contactPhone     String?  @db.VarChar(20)
+  address          String?  @db.VarChar(255)
+  licenseNo        String?  @db.VarChar(100)
+  qrCodeExpiry     Int?
+  notifySeller     Boolean?
+  notifyOwner      Boolean?
+  notifyFinance    Boolean?
+  creditRemindDays Int?
+  dailyReportPush  Boolean?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@map("tenant_general_settings")
+}
+
+model SystemConfig {
+  group String  @db.VarChar(50)
+  key   String  @db.VarChar(100)
+  value String  @db.Text
+  note  String? @db.VarChar(255)
+
+  @@id([group, key])
+  @@map("system_configs")
 }
 
 model ImportTemplate {
-  id           String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  tenantId     String  @db.Uuid
-  templateName String  @db.VarChar(100)
-  isDefault    Boolean @default(false)
+  id            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId      String    @db.Uuid
+  name          String    @db.VarChar(100)
+  isDefault     Boolean   @default(false)
+  sourceColumns Json      @default("[]")
+  fields        Json      @default("[]")
+  mappings      Json      @default("[]")
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  deletedAt     DateTime?
 
-  sourceColumns Json @default("[]")
-  fields        Json @default("[]")
-  mappings      Json @default("[]")
+  tenant          Tenant           @relation(fields: [tenantId], references: [id])
+  printerTemplate PrinterTemplate?
+  orders          Order[]
 
-  tenant Tenant  @relation(fields: [tenantId], references: [id])
-  orders Order[]
+  @@unique([tenantId, name])
+  @@index([tenantId])
+  @@map("import_templates")
+}
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+model PrinterTemplate {
+  id               String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId         String   @db.Uuid
+  importTemplateId String   @unique @db.Uuid
+  config           Json
+  configVersion    Int      @default(1)
+  remark           String?  @db.VarChar(255)
+  updatedBy        String?  @db.VarChar(50)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
 
-  @@map("biz_import_template")
+  tenant         Tenant         @relation(fields: [tenantId], references: [id])
+  importTemplate ImportTemplate @relation(fields: [importTemplateId], references: [id])
+
+  @@unique([tenantId, importTemplateId])
+  @@map("printer_templates")
 }
 
 model ImportJob {
-  id               String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  tenantId         String @db.Uuid
-  status           String @db.VarChar(20) // PENDING, PROCESSING, COMPLETED, FAILED
-  submittedCount   Int    @default(0)
-  processedCount   Int    @default(0)
-  successCount     Int    @default(0)
-  skippedCount     Int    @default(0)
-  failedCount      Int    @default(0)
-  overwrittenCount Int    @default(0)
+  id               String                   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId         String                   @db.Uuid
+  status           OrderImportJobStatusEnum @default(PENDING)
+  submittedCount   Int                      @default(0)
+  processedCount   Int                      @default(0)
+  successCount     Int                      @default(0)
+  skippedCount     Int                      @default(0)
+  overwrittenCount Int                      @default(0)
+  failedCount      Int                      @default(0)
+  failedRows       Json?                    @default("[]")
+  conflictDetails  Json?                    @default("{}")
+  createdAt        DateTime                 @default(now())
+  updatedAt        DateTime                 @updatedAt
 
-  failedRows      Json? @default("[]")
-  conflictDetails Json? @default("[]")
+  tenant Tenant @relation(fields: [tenantId], references: [id])
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@map("biz_import_job")
+  @@index([tenantId, status])
+  @@map("import_jobs")
 }
 
 model Order {
-  id                String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  tenantId          String  @db.Uuid
-  sourceOrderNo     String? @db.VarChar(100)
-  groupKey          String? @db.VarChar(100)
-  mappingTemplateId String? @db.Uuid
+  id                String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId          String           @db.Uuid
+  sourceOrderNo     String?          @db.VarChar(100)
+  groupKey          String?          @db.VarChar(100)
+  mappingTemplateId String?          @db.Uuid
+  qrCodeToken       String           @unique @db.VarChar(64)
+  customer          String           @db.VarChar(100)
+  summary           String           @db.VarChar(255)
+  amount            Decimal          @db.Decimal(12, 2)
+  paid              Decimal          @default(0.00) @db.Decimal(12, 2)
+  customFieldValues Json?            @default("{}")
+  status            OrderStatusEnum  @default(PENDING)
+  payType           OrderPayTypeEnum @default(CASH)
+  prints            Int              @default(0)
+  creditDays        Int?
+  creditDueDate     DateTime?
+  date              DateTime
+  voided            Boolean          @default(false)
+  voidReason        String?          @db.VarChar(255)
+  voidedAt          DateTime?
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+  deletedAt         DateTime?
 
-  customerName       String  @db.VarChar(100)
-  customerPhone      String? @db.VarChar(20)
-  deliveryAddress    String? @db.VarChar(255)
-  deliveryPersonName String? @db.VarChar(50)
-  customFieldValues  Json?   @default("{}")
-
-  totalAmount    Decimal @db.Decimal(10, 2)
-  paidAmount     Decimal @default(0.00) @db.Decimal(10, 2)
-  discountAmount Decimal @default(0.00) @db.Decimal(10, 2)
-
-  payStatus      PayStatusEnum      @default(UNPAID)
-  deliveryStatus DeliveryStatusEnum @default(PENDING)
-
-  qrCodeToken    String   @unique @db.VarChar(64)
-  qrExpireAt     DateTime
-  creditExpireAt DateTime
-
-  tenant   Tenant              @relation(fields: [tenantId], references: [id])
-  template ImportTemplate?     @relation(fields: [mappingTemplateId], references: [id])
-  items    OrderItem[]
-  payments PaymentRecord[]
-  logs     OrderLifecycleLog[]
-
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-  deletedAt DateTime?
+  tenant          Tenant          @relation(fields: [tenantId], references: [id])
+  mappingTemplate ImportTemplate? @relation(fields: [mappingTemplateId], references: [id])
+  lineItems       OrderItem[]
+  payments        Payment[]
+  paymentOrders   PaymentOrder[]
 
   @@unique([tenantId, sourceOrderNo])
-  @@index([tenantId, payStatus])
-  @@map("biz_order")
+  @@index([tenantId, status])
+  @@index([tenantId, payType])
+  @@index([tenantId, date])
+  @@index([mappingTemplateId])
+  @@map("orders")
 }
 
 model OrderItem {
-  id          String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  orderId     String  @db.Uuid
-  productName String  @db.VarChar(200)
-  quantity    Int
-  unitPrice   Decimal @db.Decimal(10, 2)
-  amount      Decimal @db.Decimal(10, 2)
+  id         String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  orderId    String  @db.Uuid
+  skuId      String? @db.VarChar(50)
+  skuName    String  @db.VarChar(200)
+  skuSpec    String? @db.VarChar(100)
+  unit       String  @db.VarChar(20)
+  quantity   Decimal @db.Decimal(12, 3)
+  unitPrice  Decimal @db.Decimal(12, 2)
+  lineAmount Decimal @db.Decimal(12, 2)
 
   order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
 
   @@index([orderId])
-  @@map("biz_order_item")
+  @@map("order_items")
 }
 
-model PaymentRecord {
-  id       String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  orderId  String @db.Uuid
-  tenantId String @db.Uuid
+model Payment {
+  id             String                  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId       String                  @db.Uuid
+  orderId        String                  @db.Uuid
+  customer       String                  @db.VarChar(100)
+  amount         Decimal                 @db.Decimal(12, 2)
+  channel        String                  @db.VarChar(50)
+  fee            Decimal                 @default(0.00) @db.Decimal(12, 2)
+  net            Decimal                 @default(0.00) @db.Decimal(12, 2)
+  status         PaymentRecordStatusEnum @default(SUCCESS)
+  gatewayTradeNo String?                 @unique @db.VarChar(100)
+  paidAt         DateTime
+  createdAt      DateTime                @default(now())
+  updatedAt      DateTime                @updatedAt
 
-  actualAmount  Decimal           @db.Decimal(10, 2)
-  paymentMethod PaymentMethodEnum
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+  order  Order  @relation(fields: [orderId], references: [id])
 
-  channel         String? @db.VarChar(50)
-  channelTradeNo  String? @unique @db.VarChar(100)
-  feeAmount       Decimal @default(0.00) @db.Decimal(10, 2)
-  rawCallbackData Json?
-
-  operatorId String? @db.Uuid
-  markReason String? @db.VarChar(500)
-
-  status   PaymentRecordStatusEnum @default(SUCCESS)
-  paidTime DateTime
-
-  order    Order @relation(fields: [orderId], references: [id])
-  operator User? @relation(fields: [operatorId], references: [id])
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
+  @@index([tenantId, paidAt])
   @@index([orderId])
-  @@map("biz_payment_record")
+  @@map("payments")
 }
 
-model OrderLifecycleLog {
-  id         String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  orderId    String             @db.Uuid
-  tenantId   String             @db.Uuid
-  event      LifecycleEventEnum
-  operatorId String?            @db.Uuid
-  snapshot   Json?
-  remark     String?            @db.VarChar(500)
+model PaymentOrder {
+  id                 String                 @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId           String                 @db.Uuid
+  orderId            String                 @db.Uuid
+  amount             Decimal                @db.Decimal(12, 2)
+  status             PaymentOrderStatusEnum @default(UNPAID)
+  paymentMethod      PaymentMethodEnum?
+  channel            PaymentChannelEnum?
+  statusMessage      String?                @db.VarChar(255)
+  offlineRemark      String?                @db.VarChar(255)
+  cashVerifyStatus   CashVerifyStatusEnum?
+  offlineSubmittedAt DateTime?
+  cashVerifiedAt     DateTime?
+  gatewayTradeNo     String?                @unique @db.VarChar(100)
+  lastInitiatedAt    DateTime?
+  paidAt             DateTime?
+  createdAt          DateTime               @default(now())
+  updatedAt          DateTime               @updatedAt
 
-  order    Order @relation(fields: [orderId], references: [id])
-  operator User? @relation(fields: [operatorId], references: [id])
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+  order  Order  @relation(fields: [orderId], references: [id])
 
-  createdAt DateTime @default(now())
-
+  @@index([tenantId, status])
   @@index([orderId])
-  @@index([tenantId, event])
-  @@map("biz_order_lifecycle_log")
+  @@map("payment_orders")
+}
+
+model PrintRecordBatch {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId     String   @db.Uuid
+  requestId    String   @db.VarChar(100)
+  operatorId   String?  @db.Uuid
+  orderIds     Json     @default("[]")
+  totalCount   Int
+  successCount Int
+  remark       String?  @db.VarChar(255)
+  createdAt    DateTime @default(now())
+
+  tenant   Tenant @relation(fields: [tenantId], references: [id])
+  operator User?  @relation("PrintRecordBatchOperator", fields: [operatorId], references: [id])
+
+  @@unique([tenantId, requestId])
+  @@map("print_record_batches")
+}
+
+model Notice {
+  id          String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  title       String            @db.VarChar(200)
+  content     String            @db.Text
+  planVersion String?           @db.VarChar(100)
+  audience    String?           @db.VarChar(100)
+  timing      PublishTimingEnum @default(IMMEDIATE)
+  scheduledAt DateTime?
+  reminder    Boolean           @default(false)
+  isDraft     Boolean           @default(true)
+  status      NoticeStatusEnum  @default(DRAFT)
+  publishAt   DateTime?
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  reads NoticeRead[]
+
+  @@map("notices")
+}
+
+model NoticeRead {
+  id       String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  noticeId String    @db.Uuid
+  tenantId String    @db.Uuid
+  userId   String    @db.Uuid
+  isRead   Boolean   @default(false)
+  readAt   DateTime?
+
+  notice Notice @relation(fields: [noticeId], references: [id], onDelete: Cascade)
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([noticeId, tenantId, userId])
+  @@index([tenantId, userId, isRead])
+  @@map("notice_reads")
 }

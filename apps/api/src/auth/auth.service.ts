@@ -1,6 +1,6 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
-import { Prisma, UserRoleEnum } from '@prisma/client';
+import { Prisma, TenantStatusEnum, UserRoleEnum, UserStatusEnum } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { RedisService } from '../redis/redis.service';
 import { LoginDto } from './dto/login.dto';
@@ -9,7 +9,6 @@ import { JwtPayload } from './decorators/current-user.decorator';
 import * as bcrypt from 'bcrypt';
 import * as crypto from 'crypto';
 
-const ACTIVE_RECORD_STATUS = 1;
 const INVALID_CREDENTIALS_MESSAGE = '用户名或密码错误';
 const ACCOUNT_UNAVAILABLE_MESSAGE = '账号不可用';
 const TENANT_UNAVAILABLE_MESSAGE = '租户不可用';
@@ -95,7 +94,7 @@ export class AuthService {
   private async findLoginUser(account: string, password: string): Promise<AuthUserRecord> {
     const users = await this.prisma.user.findMany({
       where: {
-        username: account,
+        account,
         deletedAt: null,
       },
       include: {
@@ -159,11 +158,11 @@ export class AuthService {
   }
 
   private assertUserAvailable(user: AuthUserRecord | null): asserts user is AuthUserRecord {
-    if (!user || user.deletedAt || user.status !== ACTIVE_RECORD_STATUS) {
+    if (!user || user.deletedAt || user.status !== UserStatusEnum.ACTIVE) {
       throw new UnauthorizedException(ACCOUNT_UNAVAILABLE_MESSAGE);
     }
 
-    if (user.tenantId && (!user.tenant || user.tenant.deletedAt || user.tenant.status !== ACTIVE_RECORD_STATUS)) {
+    if (user.tenantId && (!user.tenant || user.tenant.deletedAt || user.tenant.status !== TenantStatusEnum.ACTIVE)) {
       throw new UnauthorizedException(TENANT_UNAVAILABLE_MESSAGE);
     }
   }
@@ -180,7 +179,7 @@ export class AuthService {
   private toUserProfile(user: AuthUserRecord) {
     return {
       id: user.id,
-      account: user.username,
+      account: user.account,
       realName: user.realName,
       role: user.role as UserRoleEnum,
       tenantId: user.tenantId,
