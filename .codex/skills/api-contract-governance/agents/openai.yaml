@@ -1,4 +1,4 @@
 interface:
-  display_name: "API Contract Governance"
-  short_description: "Govern enums, contracts, and API docs consistently."
-  default_prompt: "Use $api-contract-governance when changing enums, shared contracts, or API docs so values stay English-only, documented, and consistent across packages/types and docs."
+  display_name: "API 契约治理"
+  short_description: "统一枚举、契约与 API 文档规范。"
+  default_prompt: "当你修改枚举、共享契约或 API 文档时使用 $api-contract-governance，确保枚举只在 packages/types/src/enums 定义、contracts 不重复定义枚举、文档正文可直接阅读，且所有契约值保持英文稳定值。"

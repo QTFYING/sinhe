@@ -1,92 +1,92 @@
 import type { EnumValue } from './common'
 
 /**
- * 订单收款状态。
+ * 订单收款状态
  */
 export const OrderStatusEnum = {
-  /** 待收款。 */
+  /** 待收款 */
   PENDING: 'pending',
-  /** 部分收款。 */
+  /** 部分收款 */
   PARTIAL: 'partial',
-  /** 已结清。 */
+  /** 已结清 */
   PAID: 'paid',
-  /** 已作废或过期。 */
+  /** 已作废或过期 */
   EXPIRED: 'expired',
-  /** 账期单。 */
+  /** 账期单 */
   CREDIT: 'credit',
 } as const
 
 export type OrderStatus = EnumValue<typeof OrderStatusEnum>
 
 /**
- * 订单付款类型。
+ * 订单付款类型
  */
 export const OrderPayTypeEnum = {
-  /** 现款。 */
+  /** 现款 */
   CASH: 'cash',
-  /** 账期。 */
+  /** 账期 */
   CREDIT: 'credit',
 } as const
 
 export type OrderPayType = EnumValue<typeof OrderPayTypeEnum>
 
 /**
- * 导入任务状态。
+ * 导入任务状态
  */
 export const OrderImportJobStatusEnum = {
-  /** 待处理。 */
+  /** 待处理 */
   PENDING: 'pending',
-  /** 处理中。 */
+  /** 处理中 */
   PROCESSING: 'processing',
-  /** 已完成。 */
+  /** 已完成 */
   COMPLETED: 'completed',
-  /** 已失败。 */
+  /** 已失败 */
   FAILED: 'failed',
 } as const
 
 export type OrderImportJobStatus = EnumValue<typeof OrderImportJobStatusEnum>
 
 /**
- * 导入冲突处理策略。
+ * 导入冲突处理策略
  */
 export const OrderImportConflictPolicyEnum = {
-  /** 跳过已有订单。 */
+  /** 跳过已有订单 */
   SKIP: 'skip',
-  /** 覆盖已有订单。 */
+  /** 覆盖已有订单 */
   OVERWRITE: 'overwrite',
 } as const
 
 export type OrderImportConflictPolicy = EnumValue<typeof OrderImportConflictPolicyEnum>
 
 /**
- * 导入模板字段类型。
+ * 导入模板字段类型
  */
 export const OrderTemplateFieldTypeEnum = {
-  /** 文本。 */
+  /** 文本 */
   TEXT: 'text',
-  /** 数字。 */
+  /** 数字 */
   NUMBER: 'number',
-  /** 金额。 */
+  /** 金额 */
   MONEY: 'money',
-  /** 日期。 */
+  /** 日期 */
   DATE: 'date',
-  /** 枚举。 */
+  /** 枚举 */
   ENUM: 'enum',
 } as const
 
 export type OrderTemplateFieldType = EnumValue<typeof OrderTemplateFieldTypeEnum>
 
 /**
- * 账期提醒状态。
+ * 账期提醒状态
  */
 export const CreditOrderStatusEnum = {
-  /** 正常。 */
+  /** 正常 */
   NORMAL: 'normal',
-  /** 即将到期。 */
+  /** 即将到期 */
   SOON: 'soon',
-  /** 今日到期。 */
+  /** 今日到期 */
   TODAY: 'today',
-  /** 已逾期。 */
+  /** 已逾期 */
   OVERDUE: 'overdue',
 } as const
 

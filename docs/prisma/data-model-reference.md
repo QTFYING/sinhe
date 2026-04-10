@@ -2,8 +2,9 @@
 
 > 本文档承接原 docs/api/api-architecture-overview.md 中的“数据模型（服务端建表参考）”章节。
 > 用途：作为 Prisma 建表与服务端数据建模参考，不作为前端 API 联调必读文档。
-> 确认日期：2026-04-09
+> 确认日期：2026-04-10
 > 统一枚举命名与取值参见 **[../enums/enum-manual.md](../enums/enum-manual.md)**。
+> 本文出现的 `TenantStatus`、`OrderStatus`、`PaymentOrderStatus` 等闭集字段，均以 `packages/types/src/enums/*` 为唯一事实源。
 
 ---
 
@@ -75,7 +76,7 @@
   monthlyFlow: number       // 本月流水（元）
   dueInDays: number         // 距到期天数
   lastActiveAt: string      // 最近活跃时间
-  status: 'active' | 'onboarding' | 'attention' | 'paused' // 租户状态
+  status: TenantStatus       // 租户状态
   rejectReason: string | null // 驳回原因
   freezeReason: string | null // 冻结原因
   createdAt: string         // 创建时间

@@ -1,98 +1,98 @@
 import type { EnumValue } from './common'
 
 /**
- * 租户角色。
+ * 租户角色
  */
 export const TenantRoleEnum = {
-  /** 老板。 */
+  /** 老板 */
   OWNER: 'TENANT_OWNER',
-  /** 打单员。 */
+  /** 打单员 */
   OPERATOR: 'TENANT_OPERATOR',
-  /** 财务。 */
+  /** 财务 */
   FINANCE: 'TENANT_FINANCE',
-  /** 访客/只读。 */
+  /** 访客/只读 */
   VIEWER: 'TENANT_VIEWER',
 } as const
 
 export type TenantRole = EnumValue<typeof TenantRoleEnum>
 
 /**
- * 租户状态。
+ * 租户状态
  */
 export const TenantStatusEnum = {
-  /** 正常活跃。 */
+  /** 正常活跃 */
   ACTIVE: 'active',
-  /** 初始化或资料待审。 */
+  /** 初始化或资料待审 */
   ONBOARDING: 'onboarding',
-  /** 临近过期提醒。 */
+  /** 临近过期提醒 */
   ATTENTION: 'attention',
-  /** 冻结或停用。 */
+  /** 冻结或停用 */
   PAUSED: 'paused',
 } as const
 
 export type TenantStatus = EnumValue<typeof TenantStatusEnum>
 
 /**
- * 用户状态。
+ * 用户状态
  */
 export const UserStatusEnum = {
-  /** 正常。 */
+  /** 正常 */
   ACTIVE: 'active',
-  /** 已邀请未激活。 */
+  /** 已邀请未激活 */
   INVITED: 'invited',
-  /** 已锁定。 */
+  /** 已锁定 */
   LOCKED: 'locked',
-  /** 已禁用。 */
+  /** 已禁用 */
   DISABLED: 'disabled',
 } as const
 
 export type UserStatus = EnumValue<typeof UserStatusEnum>
 
 /**
- * 租户列表排序字段。
+ * 租户列表排序字段
  */
 export const TenantSortFieldEnum = {
-  /** 按租户名称排序。 */
+  /** 按租户名称排序 */
   NAME: 'name',
-  /** 按套餐名称排序。 */
+  /** 按套餐名称排序 */
   PACKAGE_NAME: 'packageName',
-  /** 按租户状态排序。 */
+  /** 按租户状态排序 */
   STATUS: 'status',
-  /** 按距到期天数排序。 */
+  /** 按距到期天数排序 */
   DUE_IN_DAYS: 'dueInDays',
 } as const
 
 export type TenantSortField = EnumValue<typeof TenantSortFieldEnum>
 
 /**
- * 租户资质审核状态。
+ * 租户资质审核状态
  */
 export const TenantCertificationStatusEnum = {
-  /** 待初审。 */
+  /** 待初审 */
   PENDING_INITIAL_REVIEW: 'pending_initial_review',
-  /** 待复核。 */
+  /** 待复核 */
   PENDING_SECONDARY_REVIEW: 'pending_secondary_review',
-  /** 待确认。 */
+  /** 待确认 */
   PENDING_CONFIRMATION: 'pending_confirmation',
-  /** 已通过。 */
+  /** 已通过 */
   APPROVED: 'approved',
-  /** 已驳回。 */
+  /** 已驳回 */
   REJECTED: 'rejected',
 } as const
 
 export type TenantCertificationStatus = EnumValue<typeof TenantCertificationStatusEnum>
 
 /**
- * 租户续费收款方式。
+ * 租户续费收款方式
  */
 export const TenantRenewPaymentMethodEnum = {
-  /** 银行转账。 */
+  /** 银行转账 */
   BANK_TRANSFER: 'bank_transfer',
-  /** 微信支付。 */
+  /** 微信支付 */
   WECHAT_PAY: 'wechat_pay',
-  /** 支付宝。 */
+  /** 支付宝 */
   ALIPAY: 'alipay',
-  /** 线下打款。 */
+  /** 线下打款 */
   OFFLINE_REMITTANCE: 'offline_remittance',
 } as const
 
