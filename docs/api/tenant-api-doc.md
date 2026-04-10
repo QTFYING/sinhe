@@ -384,7 +384,7 @@ interface TenantOrder {
 
 ```typescript
 interface CreatePrintRecordsRequest {
-  orderIds: string[]           // 本次实际打印成功的订单 ID 列表；单张打印时数组长度为 1
+  orderIds: string[]           // 本次实际打印成功的订单 ID 列表；单张打印时数组长度为 1，必须非空
   requestId?: string           // 请求唯一标识，预留后续幂等控制
   remark?: string              // 备注信息，预留扩展
 }
@@ -394,7 +394,7 @@ interface CreatePrintRecordsRequest {
 
 ```typescript
 interface CreatePrintRecordsResponse {
-  totalCount: number           // 本次请求提交的订单总数（服务端去重后参与统计）
+  totalCount: number           // 本次请求中参与处理的订单总数（服务端去重后）
   successCount: number         // 成功累计打印次数的订单数
   confirmedAt: string          // 服务端确认时间
   remark?: string              // 原样回传的备注信息，预留扩展
@@ -404,6 +404,7 @@ interface CreatePrintRecordsResponse {
 **业务规则：**
 
 - 该接口是打印成功回执接口，不承担实际打印动作
+- `orderIds` 必须非空
 - `orderIds` 必须来自本次实际打印成功的订单，不应直接提交“用户选中的全部订单”
 - 服务端应按当前租户作用域校验订单归属，并对 `orderIds` 做去重处理
 
@@ -1037,7 +1038,19 @@ interface UpdatePrintingConfigResponse {
 
 **响应 data：**
 
-`GetPrintingConfigListResponse`
+```typescript
+interface GetPrintingConfigListResponse {
+  items: Array<{
+    importTemplateId: string     // 绑定的导入映射模板 ID
+    importTemplateName: string   // 映射模板名称，供前端列表展示
+    hasCustomConfig: boolean     // 是否存在自定义打印配置；false 时前端回退本地默认模板
+    configVersion?: number       // 配置版本号；仅在 hasCustomConfig=true 时返回
+    updatedAt?: string           // 最近更新时间；仅在 hasCustomConfig=true 时返回
+    updatedBy?: string           // 最近更新人，预留审计能力
+    remark?: string              // 备注信息，预留扩展
+  }>
+}
+```
 
 **关键说明：**
 
@@ -1060,7 +1073,18 @@ interface UpdatePrintingConfigResponse {
 
 **响应 data：**
 
-`GetPrintingConfigDetailResponse`
+```typescript
+interface GetPrintingConfigDetailResponse {
+  importTemplateId: string       // 绑定的导入映射模板 ID
+  importTemplateName?: string    // 映射模板名称
+  hasCustomConfig: boolean       // 是否存在自定义打印配置；false 时前端回退本地默认模板
+  configVersion?: number         // 配置版本号；未配置时可为空
+  config?: Record<string, unknown> // 打印配置 JSON；仅在 hasCustomConfig=true 时返回
+  updatedAt?: string             // 最近更新时间
+  updatedBy?: string             // 最近更新人，预留审计能力
+  remark?: string                // 备注信息，预留扩展
+}
+```
 
 **关键说明：**
 
@@ -1083,11 +1107,26 @@ interface UpdatePrintingConfigResponse {
 
 **请求参数：**
 
-`UpdatePrintingConfigRequest`
+```typescript
+interface UpdatePrintingConfigRequest {
+  configVersion?: number         // 前端提交时携带的配置版本号，预留并发保护
+  config: Record<string, unknown> // 打印配置 JSON；服务端按黑盒配置整包保存
+  remark?: string                // 备注信息，预留扩展
+}
+```
 
 **响应 data：**
 
-`UpdatePrintingConfigResponse`
+```typescript
+interface UpdatePrintingConfigResponse {
+  importTemplateId: string       // 绑定的导入映射模板 ID
+  configVersion: number          // 保存成功后的最新配置版本号
+  config: Record<string, unknown> // 当前生效的打印配置 JSON
+  updatedAt: string              // 保存时间
+  updatedBy?: string             // 保存人，预留审计能力
+  remark?: string                // 备注信息，预留扩展
+}
+```
 
 **关键说明：**
 
