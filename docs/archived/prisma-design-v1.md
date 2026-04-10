@@ -1,3 +1,10 @@
+# 历史 Prisma 方案归档（V1）
+
+> 归档日期：2026-04-11
+> 文档状态：历史归档
+> 说明：本文件为早期 Prisma / PostgreSQL 结构设计草案，保留用于回溯历史设计思路，不再作为当前数据建模依据。
+> 当前生效的数据模型参考请以 `docs/prisma/data-model-reference.md` 为准。
+
 # 经销商订单收款平台 - 核心数据库结构设计 (Prisma / PostgreSQL)
 
 ## 设计说明与规范
