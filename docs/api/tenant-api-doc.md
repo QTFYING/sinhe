@@ -837,7 +837,7 @@ interface PaymentRecord {
   orderId: string              // 关联订单号
   customer: string             // 客户名称
   amount: number               // 收款金额（元）
-  channel: string              // 支付通道：微信支付 | 支付宝 | 现金 | 其他
+  channel: string              // 支付通道：拉卡拉 | 现金 | 其他
   fee: number                  // 手续费（元）
   net: number                  // 到账金额（元）= amount - fee
   status: PaymentRecordStatus

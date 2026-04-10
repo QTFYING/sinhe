@@ -30,12 +30,8 @@ export type OfflinePaymentMethod = EnumValue<typeof OfflinePaymentMethodEnum>
  * 支付通道
  */
 export const PaymentChannelEnum = {
-  /** 微信 JSAPI */
-  WX_JSAPI: 'wx_jsapi',
-  /** 支付宝 H5 */
-  ALI_H5: 'ali_h5',
-  /** 直连支付网关 */
-  DIRECT: 'direct',
+  /** 拉卡拉 */
+  LAKALA: 'lakala',
 } as const
 
 export type PaymentChannel = EnumValue<typeof PaymentChannelEnum>

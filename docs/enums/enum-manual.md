@@ -40,7 +40,7 @@
 | `CreditOrderStatus` | `normal` `soon` `today` `overdue` | 正常、即将到期、今日到期、已逾期 | 账期订单视图 |
 | `PaymentMethod` | `online` `cash` `other_paid` | 在线支付、现金支付、其他方式已支付 | `payment_orders.paymentMethod` |
 | `OfflinePaymentMethod` | `cash` `other_paid` | 现金支付、其他方式已支付 | H5 线下登记 |
-| `PaymentChannel` | `wx_jsapi` `ali_h5` `direct` | 微信 JSAPI、支付宝 H5、直连网关 | `payment_orders.channel` |
+| `PaymentChannel` | `lakala` | 拉卡拉 | `payment_orders.channel` |
 | `PaymentOrderStatus` | `unpaid` `paying` `pending_verification` `paid` `expired` | 待支付、支付中、待核销、已完成、已过期 | `payment_orders.status` |
 | `CashVerifyStatus` | `pending` `verified` | 待核销、已核销 | `payment_orders.cashVerifyStatus` |
 | `PaymentRecordStatus` | `success` `partial` `pending` `failed` | 成功、部分完成、处理中、失败 | `payments.status` |

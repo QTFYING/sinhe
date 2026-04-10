@@ -57,23 +57,14 @@ export interface SubmitOfflinePaymentRequest {
 }
 
 export interface ConfirmPaymentRequest {
-  channel?: Exclude<PaymentChannel, 'direct'>
+  channel?: PaymentChannel
 }
 
 export interface ConfirmPaymentResponse {
   orderNo: string
   paymentId: string
   channel: PaymentChannel
-  channelParams: {
-    appId?: string
-    timeStamp?: string
-    nonceStr?: string
-    package?: string
-    signType?: string
-    paySign?: string
-    tradePageUrl?: string
-    directResult?: 'paid'
-  }
+  cashierUrl: string
 }
 
 export interface PaymentStatusResponse {
@@ -83,19 +74,6 @@ export interface PaymentStatusResponse {
   paidAmount?: number
   paidAt?: string
   selectedPaymentMethod?: PaymentMethod
-}
-
-export interface WxJsapiRequest {
-  openId: string
-}
-
-export interface WxJsapiParams {
-  appId: string
-  timeStamp: string
-  nonceStr: string
-  package: string
-  signType: 'RSA'
-  paySign: string
 }
 
 export interface PaymentRecordItem {
