@@ -7,6 +7,12 @@ description: 统一维护本项目的 Prisma 领域建模。新增或调整 `app
 
 先让数据模型自洽，再写业务代码。Prisma schema 必须服务于 API 文档，而不是反过来驱动接口设计。
 
+## 入口约束
+
+1. 先遵守仓库根目录 `AGENTS.md`。
+2. 先确认当前建模属于哪一阶段，再决定是否进入 `schema.prisma` 改动。
+3. 若 `design/*.md` 已明确某域暂缓或冻结，不提前为该域扩展模型。
+
 ## 建模顺序
 
 1. 先读 `docs/prisma/data-model-reference.md`。

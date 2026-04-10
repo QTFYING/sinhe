@@ -1,6 +1,8 @@
 # 第一批实施任务清单
 
 > 日期：2026-04-10
+> 文档状态：当前生效
+> 文档定位：第一批执行手册
 > 范围：第一批落地以“可尽快进入编码并形成稳定主线”为目标
 > 对应总计划：`M1 Auth`、`M2 Prisma`、`M3 配置域`
 
@@ -13,6 +15,7 @@
 1. 一次只推进一个稳定闭环
 2. 每完成一个子批次，就同步做最小验收
 3. 未进入当前批次的模块，不主动扩散修改范围
+4. 本批次不允许订单、支付、打印回执三条主链路提前混改
 
 ## 二、第一批目标
 
@@ -35,7 +38,33 @@
 | P5 | Import Template 对齐 | 导入模板与打印配置绑定基础可用 |
 | P6 | Swagger 第一轮同步 | Auth + Settings 的联调产物可用 |
 
-## 四、P1：Auth 小校准
+## 四、第一批统一交付物
+
+每个子批次完成时，至少应交付以下内容：
+
+1. 受影响目录的代码改动
+2. 对应 contracts 或 schema 的同步改动
+3. 最小验证结果
+4. 当前批次的遗留项说明
+
+第一批允许重点触达的目录如下：
+
+- `apps/api/src/auth`
+- `apps/api/prisma`
+- `apps/api/src/settings` 或承载 settings 的新模块
+- 导入模板相关模块
+- `packages/types/src/contracts`
+- `docs/prisma/data-model-reference.md`
+
+第一批原则上不主动进入以下目录做业务扩展：
+
+- `apps/api/src/order`
+- `apps/api/src/payment`
+- `apps/api/src/print`
+- `apps/api/src/notification`
+- `apps/api/src/report`
+
+## 五、P1：Auth 小校准
 
 ### 目标
 
@@ -55,6 +84,12 @@
 - `packages/types/src/contracts/auth.ts`
 - 必要时联动 `packages/types/src/enums/*`
 
+### 具体输出物
+
+1. 登录 / 刷新 / 退出 / 当前用户 4 个接口对齐结果
+2. 角色枚举与 JWT payload 对齐结果
+3. 用户状态、租户状态校验落地结果
+
 ### 产出
 
 - `/auth/login`
@@ -68,7 +103,7 @@
 - 登录后 JWT 中可区分平台用户与租户用户
 - 租户被冻结或账号不可用时无法继续登录
 
-## 五、P2：Prisma 核心模型重建
+## 六、P2：Prisma 核心模型重建
 
 ### 目标
 
@@ -104,13 +139,19 @@
 - 可生成 Prisma Client 的新 schema
 - 主链路可用的核心数据模型
 
+### 具体输出物
+
+1. `schema.prisma` 重建结果
+2. 核心模型唯一键、索引、金额字段、JSON 字段的落地结果
+3. 与 `data-model-reference` 的同步校对结果
+
 ### 验收
 
 - Prisma Client 可生成
 - schema 名称、字段与 `data-model-reference` 一致
 - 不再保留无归属的旧主链路字段
 
-## 六、P3：Settings / General 落地
+## 七、P3：Settings / General 落地
 
 ### 目标
 
@@ -141,7 +182,13 @@
 - 返回字段与文档一致
 - 平台默认和租户覆盖职责明确
 
-## 七、P4：Settings / Printing 落地
+### 具体输出物
+
+1. `GET /settings/general`
+2. `PUT /settings/general`
+3. 平台默认层与租户覆盖层的合并逻辑
+
+## 八、P4：Settings / Printing 落地
 
 ### 目标
 
@@ -172,7 +219,14 @@
 - 黑盒配置保存和读取成立
 - 不再出现 `/print/jobs` 风格接口耦合
 
-## 八、P5：Import Template 对齐
+### 具体输出物
+
+1. `GET /settings/printing/list`
+2. `GET /settings/printing/:importTemplateId`
+3. `PUT /settings/printing/:importTemplateId`
+4. `tenantId + importTemplateId` 唯一持久化约束
+
+## 九、P5：Import Template 对齐
 
 ### 目标
 
@@ -199,7 +253,13 @@
 - 导入模板主键和打印配置绑定关系清晰
 - 后续订单导入和打印配置可以围绕同一标识继续开发
 
-## 九、P6：Swagger 第一轮同步
+### 具体输出物
+
+1. 导入模板主数据结构校准
+2. 与打印配置绑定键的对齐结果
+3. 对应 contracts 或 schema 的同步改动
+
+## 十、P6：Swagger 第一轮同步
 
 ### 目标
 
@@ -223,7 +283,14 @@
 - 不出现旧字段和旧路径
 - 枚举值与 `packages/types/src/enums` 一致
 
-## 十、第一批不做的事项
+### 具体输出物
+
+1. Auth Swagger
+2. Settings / General Swagger
+3. Settings / Printing Swagger
+4. Import Template Swagger
+
+## 十一、第一批不做的事项
 
 第一批明确不进入以下开发范围：
 
@@ -234,7 +301,7 @@
 5. Notification
 6. Admin 外围域
 
-## 十一、第一批完成判定
+## 十二、第一批完成判定
 
 当以下条件全部满足时，第一批可以判定完成：
 
@@ -245,7 +312,7 @@
 5. Import Template 绑定基础已对齐
 6. 第一轮 Swagger 已同步
 
-## 十二、第一批完成后的下一步
+## 十三、第一批完成后的下一步
 
 第一批完成后，立即进入第二批：
 

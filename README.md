@@ -1,77 +1,189 @@
-# 经销商订单收款平台 (SaaS Monorepo)
+# 经销商订单收款平台
 
-本项目采用 `Turborepo` + `pnpm workspace` 搭建，包含一个基于 NestJS 的服务 API，以及三个前端应用（React/Preact）。
+本仓库是一个基于 `Turborepo` 与 `pnpm workspace` 组织的后端单仓项目，当前核心应用为 `apps/api`。
 
-## 架构说明
+## 当前状态
 
-- `apps/api`: NestJS + Prisma + PostgreSQL + Redis (后端核心)
-- `apps/tenant`: 经销商 SaaS工作台 (React 18 + Vite + Antd 5 + Zustand + TanStack Query)
-- `apps/admin`: OS运营管理台 (React 18 + Vite)
-- `apps/pay-h5`: C端收银台 (Preact + Vite，极速四态流转)
-- `packages/shared-*`: 共享的枚举约束、计算工具和 UI 组件库
+项目目前处于“API 文档先行、后端实现按文档重建”的阶段。
 
-## 本地启动指南
+当前应以以下内容作为事实源和执行依据：
 
-请在项目根目录（`d:\Sinhe\api`）依次执行以下 4 个步骤，即可一键跑通所有端。
+1. `docs/api/*.md`
+2. `packages/types/src/enums`
+3. `packages/types/src/contracts`
+4. `docs/prisma/data-model-reference.md`
+5. `design/*.md`
 
-### 1. 安装全局依赖
+说明：
 
-进入根目录，使用 `pnpm` 安装并链接所有工作区依赖：
+1. `apps/api` 中部分业务模块仍保留早期 MVP 代码，仅可作为历史实现参考。
+2. `auth` 认证机制可复用，其余核心主域需按当前文档逐步校准或重建。
+3. Swagger 是联调产物，不是设计源。
+
+## 技术栈
+
+- 后端框架：NestJS 10
+- ORM：Prisma
+- 数据库：PostgreSQL
+- 缓存与会话：Redis
+- 接口文档：Swagger
+- 工作区管理：pnpm workspace
+- 构建编排：Turborepo
+
+## 目录结构
+
+```text
+.
+├── AGENTS.md                         # 代理执行规则
+├── apps/
+│   └── api/                          # NestJS 后端服务
+├── design/                           # 实施计划与执行手册
+├── docs/                             # API、枚举、数据模型等正式文档
+├── packages/
+│   ├── types/                        # 共享枚举与 contracts
+│   └── utils/                        # 共享工具
+├── review/                           # 评审记录与阶段说明
+├── scripts/                          # 数据初始化脚本
+├── package.json                      # 根脚本
+├── pnpm-workspace.yaml               # 工作区定义
+└── turbo.json                        # Turborepo 任务编排
+```
+
+## 环境要求
+
+- Node.js `>= 22.0.0`
+- pnpm `>= 9.0.0`
+- PostgreSQL
+- Redis
+- Docker 可选
+
+## 本地启动
+
+### 1. 安装依赖
+
 ```powershell
 pnpm install
 ```
-*(提示：如安装后遇到 Prisma 等包触发 ignored build scripts 警告，可按提示运行 `pnpm approve-builds` 并重新执行安装)*
 
-### 2. 启动底层数据库引擎 (二选一)
+### 2. 启动 PostgreSQL 与 Redis
 
-**方案 A：使用 Docker (推荐, 适合 Mac/Linux/WSL 用户)**
-确保电脑上已安装并运行 Docker Desktop，然后在后台静默启动 PostgreSQL 和 Redis 引擎：
+推荐使用 Docker：
+
 ```powershell
 docker-compose up -d
 ```
 
-**方案 B：无 Docker 裸机运行 (适合纯 Windows 用户)**
-如果电脑无法运行 Docker/WSL，可以直接在本机安装并裸跑环境：
-1. **安装 PostgreSQL**：下载 Windows 安装包。超级权限用户与密码统一配置为 `postgres`，默认端口 `5432` 保持不变。安装完成后，打开自带的 pgAdmin 新建一个名叫 `shou` 空白数据库。
-2. **安装 Redis**：Windows 官方无纯净版，可下载微软的 [Memurai](https://www.memurai.com/) 或各类一键运行绿色包。双击启动即可，默认无密码，端口 `6379`。
-*(注：`apps/api/.env` 文件已默认配置好适配裸机直连环境的连接串，无需任何修改)*
+如果不使用 Docker，也可以本机自行安装 PostgreSQL 与 Redis，并确保连接信息与 `apps/api/.env` 保持一致。
 
-### 3. 生成 Prisma 客户端并推送表结构 (只要表结构更新，必须要执行，有一堆TS报错的时候，也可以试试)
+### 3. 推送 Prisma schema 并生成客户端
 
-将按照红线安全规范设计的多租户业务表结构一次性推送到本地 Postgres 数据库中：
 ```powershell
-pnpm --filter api prisma:push  # 建表（将架构表完美推送到你的本地 PostgreSQL）
-pnpm --filter api prisma:generate # 生成客户端，召唤 TypeScript 强类型大军（让你的 TS 编译器认识所有新字段）
+pnpm --filter api prisma:push
+pnpm --filter api prisma:generate
 ```
 
-### 4. 插入测试种子数据 (账号初始化)
+### 4. 初始化测试数据
 
-首次部署时数据库为空，为方便立即体验，请运行注水脚本：
 ```powershell
 pnpm db:seed
 ```
-该命令会自动生成以下真实可用的测试环境：
 
-**👑 OS 运营上帝视角账号**
-- **账号**：`admin` / **密码**：`123456`
-- **角色**：`OS_SUPER_ADMIN` (无租户限制，拥有全局视野)
+默认会创建以下测试账号：
 
-**🏢 测试 SaaS 经销商老板账号**
-- **所属租户**：自动初始化 `华东区饮料总代(测试)`
-- **账号**：`boss` / **密码**：`123456`
-- **角色**：`TENANT_OWNER` (最高权限管理该经销商单体所有数据)
+- OS 管理员：`admin` / `123456`
+- 租户老板：`boss` / `123456`
 
-### 5. 一键启动全栈服务 ⚡️
+### 5. 启动开发服务
 
-借助于 Turborepo 并发控制，只需一条命令即可拉起所有 4 个服务：
 ```powershell
 pnpm run dev
 ```
 
-成功后，各端服务本地监听端口如下：
-- **后端 API (`api`)** -> `http://localhost:3000`
-- **经销商 SaaS (`tenant`)** -> `http://localhost:5000`
-- **OS 运营台 (`admin`)** -> `http://localhost:5001`
-- **C端收银台 (`pay-h5`)** -> `http://localhost:5002`
+默认地址：
 
-您可以打开浏览器访问 [http://localhost:5000](http://localhost:5000) 用上述测试账号体验 B端全景架构，或访问 [http://localhost:5002](http://localhost:5002) 测试 C端防篡改支付。
+- API：`http://localhost:3000`
+- Swagger：`http://localhost:3000/api/docs`
+
+## 常用命令
+
+### 根目录
+
+```powershell
+pnpm run dev
+pnpm run build
+pnpm run lint
+pnpm run format
+pnpm db:seed
+pnpm db:init
+```
+
+### API 应用
+
+```powershell
+pnpm --filter api dev
+pnpm --filter api build
+pnpm --filter api start:debug
+pnpm --filter api prisma:push
+pnpm --filter api prisma:generate
+```
+
+## 环境变量
+
+主要使用 `apps/api/.env`：
+
+```env
+DATABASE_URL=
+REDIS_URL=
+JWT_SECRET=
+CORS_ORIGINS=
+```
+
+生产初始化脚本 `pnpm db:init` 还会读取以下变量：
+
+```env
+INIT_OS_ADMIN_USERNAME=
+INIT_OS_ADMIN_PASSWORD=
+INIT_OS_ADMIN_REAL_NAME=
+INIT_TENANT_NAME=
+INIT_TENANT_CONTACT_PHONE=
+INIT_TENANT_OWNER_USERNAME=
+INIT_TENANT_OWNER_PASSWORD=
+INIT_TENANT_OWNER_REAL_NAME=
+INIT_TENANT_MAX_CREDIT_DAYS=
+INIT_TENANT_CREDIT_REMINDER_DAYS=
+```
+
+## 核心文档入口
+
+### 业务与接口
+
+- `docs/api/api-architecture-overview.md`
+- `docs/api/admin-api-doc.md`
+- `docs/api/tenant-api-doc.md`
+- `docs/api/h5-api-doc.md`
+
+### 枚举与类型
+
+- `docs/enums/enum-manual.md`
+- `packages/types/src/enums`
+- `packages/types/src/contracts`
+
+### 数据模型
+
+- `docs/prisma/data-model-reference.md`
+- `apps/api/prisma/schema.prisma`
+
+### 执行手册
+
+- `design/api-implementation-delivery-plan-2026-04-10.md`
+- `design/api-target-model-gap-analysis-2026-04-10.md`
+- `design/api-phase-1-execution-checklist-2026-04-10.md`
+
+## 开发约束
+
+1. 先看文档，再看旧代码。
+2. 不让 Swagger 反向定义接口。
+3. 不恢复已废弃的旧语义，例如 `/print/jobs`、`erpOrderNo`、`templateId`、`customFields`、旧 `payStatus` 主流程。
+4. `docs/api` 定业务结构，`enums` 定闭集值，`contracts` 跟随投影，`data-model-reference` 做建模同步。
+
+更严格的代理执行规则见 [AGENTS.md](/D:/Sinhe/api/AGENTS.md)。
