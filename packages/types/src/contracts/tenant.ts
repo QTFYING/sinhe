@@ -1,32 +1,206 @@
-import {
-  TenantCertificationStatusEnum,
-  TenantRoleEnum,
-  TenantStatusEnum,
-  TenantRenewPaymentMethodEnum,
-  TenantSortFieldEnum,
-  UserStatusEnum,
-  type TenantCertificationStatus as TenantCertificationStatusType,
-  type TenantRole as TenantRoleType,
-  type TenantRenewPaymentMethod as TenantRenewPaymentMethodType,
-  type TenantSortField as TenantSortFieldType,
-  type TenantStatus as TenantStatusType,
-  type UserStatus as UserStatusType,
+import type { ListParams } from '../common'
+import type {
+  AuditResult,
+  AuditTargetType,
+  AuthSourceTag,
+  FreezeAction,
+  ReviewAction,
+  SortOrder,
+  TenantCertificationStatus,
+  TenantRenewPaymentMethod,
+  TenantSide,
+  TenantSortField,
+  TenantStatus,
+  UserStatus,
 } from '../enums'
 
-export const TenantRole = TenantRoleEnum
-export type TenantRole = TenantRoleType
+export interface TenantRecordItem {
+  id: string
+  name: string
+  packageName: string
+  admin: string
+  region: string
+  merchants: number
+  users: number
+  channels: string[]
+  monthlyFlow: number
+  dueInDays: number
+  lastActiveAt: string
+  status: TenantStatus
+  rejectReason?: string | null
+  freezeReason?: string | null
+}
 
-export const TenantStatus = TenantStatusEnum
-export type TenantStatus = TenantStatusType
+export interface UserRecordItem {
+  id: string
+  account: string
+  name: string
+  tenant: string
+  tenantType: TenantSide
+  role: string
+  scope: string
+  phone: string
+  status: UserStatus
+  loginAt: string
+  requiresPasswordReset: boolean
+}
 
-export const UserStatus = UserStatusEnum
-export type UserStatus = UserStatusType
+export interface UserListQuery extends ListParams {
+  tenant?: string
+  role?: string
+}
 
-export const TenantSortField = TenantSortFieldEnum
-export type TenantSortField = TenantSortFieldType
+export interface UserUpsertRequest {
+  name: string
+  account: string
+  phone: string
+  tenantType: TenantSide
+  tenant: string
+  role: string
+  scope: string
+  status: UserStatus
+}
 
-export const TenantCertificationStatus = TenantCertificationStatusEnum
-export type TenantCertificationStatus = TenantCertificationStatusType
+export interface UserStatusUpdateRequest {
+  status: UserStatus
+}
 
-export const TenantRenewPaymentMethod = TenantRenewPaymentMethodEnum
-export type TenantRenewPaymentMethod = TenantRenewPaymentMethodType
+export interface ResetUserPasswordRequest {
+  password?: string
+}
+
+export interface ResetUserPasswordResponse {
+  requiresPasswordReset: true
+}
+
+export interface AuditRecordItem {
+  id: string
+  actor: string
+  action: string
+  target: string
+  targetType: AuditTargetType
+  tenant: string
+  time: string
+  result: AuditResult
+}
+
+export interface DashboardMetricItem {
+  label: string
+  value: string
+  helper: string
+  tone: string
+}
+
+export interface PlatformTodoItem {
+  title: string
+  detail: string
+  owner: string
+  priority: string
+}
+
+export interface TenantHealthItem {
+  tenant: string
+  health: number
+  userCoverage: string
+  exception: string
+  owner: string
+}
+
+export interface LoginRiskEventItem {
+  account: string
+  tenant: string
+  event: string
+  time: string
+  level: string
+}
+
+export interface RoleTemplateItem {
+  name: string
+  side: TenantSide
+  permissions: string[]
+}
+
+export interface ConsoleInfoResponse {
+  productName: string
+  suiteName: string
+  scopeLabel: string
+  operator: string
+  role: string
+  currentTenant: string
+  source?: AuthSourceTag
+}
+
+export interface TenantListQuery extends ListParams {
+  status?: TenantStatus
+  sortBy?: TenantSortField
+  sortOrder?: SortOrder
+}
+
+export interface CreateTenantRequest {
+  name: string
+  packageName: string
+  admin: string
+  region: string
+  channel: string
+  dueInDays: number
+}
+
+export interface TenantAuditRequest {
+  action: ReviewAction
+  reviewNote?: string
+  rejectReason?: string
+}
+
+export interface BatchTenantAuditRequest {
+  ids: string[]
+  action: 'approve'
+  reviewNote?: string
+}
+
+export interface TenantRenewRequest {
+  packageName: string
+  days: 30 | 90 | 180 | 365
+  amount: number
+  paymentMethod: TenantRenewPaymentMethod
+}
+
+export interface TenantFreezeRequest {
+  action: FreezeAction
+  reason?: string
+}
+
+export interface BatchTenantFreezeRequest {
+  ids: string[]
+  reason: string
+}
+
+export interface TenantMemberItem {
+  id: string
+  name: string
+  account: string
+  tenant: string
+  tenantType: TenantSide
+  role: string
+  status: UserStatus
+  scope: string
+}
+
+export interface TenantMemberListQuery {
+  page?: number
+  pageSize?: number
+  tenantType?: TenantSide
+}
+
+export interface TenantCertificationRecordItem {
+  id: string
+  tenant: string
+  type: string
+  submitAt: string
+  status: TenantCertificationStatus
+  comment?: string
+}
+
+export interface ReviewTenantCertificationRequest {
+  action: ReviewAction
+  comment?: string
+}

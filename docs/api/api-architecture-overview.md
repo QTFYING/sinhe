@@ -92,9 +92,9 @@ https://api.platform.com/api/v1
 
 ### 2.7 前端共享契约落点
 
-- 显式值契约统一维护在 `packages/shared/src/contracts/`
-- DTO、请求参数和响应结构统一维护在 `packages/shared/src/types/`
-- 当状态机、角色代码、支付方式等离散值发生变化时，必须同步更新相关契约文档和代码定义
+- 枚举事实源统一维护在 `packages/types/src/enums/`
+- 请求、响应和资源结构统一维护在 `packages/types/src/contracts/`
+- 通用分页与响应包装等共享结构统一维护在 `packages/types/src/common/`
 
 ---
 
@@ -141,8 +141,8 @@ https://api.platform.com/api/v1
 
 **已确认的设计决策：**
 - `qrCodeToken` 来源于 `orders.qrCodeToken`；前端按固定路由规则 `/pay/:token` 生成送货单二维码
-- 采用 5 态状态机：`UNPAID` | `PAYING` | `PENDING_VERIFICATION` | `PAID` | `EXPIRED`
-- `payment_orders` 在 `EXPIRED` 状态下允许重新发起支付
+- 采用 5 态状态机：`unpaid` | `paying` | `pending_verification` | `paid` | `expired`
+- `payment_orders` 在 `expired` 状态下允许重新发起支付
 - 现金链路闭环：H5 `offline-payment` 登记待核销，Tenant 侧 `verify-cash` 财务核销
 - 在线支付仅在用户点击支付后触发，依赖后端的 `initiate` 动态返回 `cashierUrl` 与轮询 `status`
 - Webhook 依赖系统底层 `POST /payment/webhook/lakala`（不计入前端直接可见端点）
@@ -163,7 +163,7 @@ H5 前端                    后端                     支付网关
   │                        │   更新 payment_orders   │
   │  GET /pay/:token/status │                        │
   │───────────────────────▶│                        │
-  │  { status: 'PAID' }    │                        │
+  │  { status: 'paid' }    │                        │
   │◀───────────────────────│                        │
 ```
 
@@ -236,7 +236,7 @@ H5 前端                    后端                     支付网关
 | C2 | GET | `/payments/summary` | 收款汇总统计 | TENANT_OWNER, TENANT_FINANCE | payments |
 | C3 | POST | `/orders/:id/verify-cash` | 现金财务核销 | TENANT_FINANCE | payment_orders + payments + orders |
 
-> 引入 5 态状态机后，H5 扫码离线支付变为 `PENDING_VERIFICATION`。C3 用于财务手动确认资金到账。
+> 引入 5 态状态机后，H5 扫码离线支付变为 `pending_verification`。C3 用于财务手动确认资金到账。
 
 #### 模块 D：财务对账（Finance）— 3 个端点
 
@@ -546,7 +546,7 @@ H5 前端                    后端                     支付网关
 | # | 决策 | 结论 |
 |---|------|------|
 | 1 | H5 路由标识 | `qrCodeToken` 来源于 `orders.qrCodeToken`，前端按固定规则生成 `/pay/:token` 二维码链接 |
-| 2 | H5 状态机 | 五态流转 `UNPAID` -> `PAYING` -> `PENDING_VERIFICATION` -> `PAID` / `EXPIRED` |
+| 2 | H5 状态机 | 五态流转 `unpaid` -> `paying` -> `pending_verification` -> `paid` / `expired` |
 | 3 | 物理删除防范 | 以 `POST /orders/:id/void` 替代 `DELETE` 软作废，保留历史日志。 |
 | 4 | 订单导入机制 | 使用服务器管理模板 + 预览步骤 + 异步导入，不直接传接实体 Excel 文件 |
 | 5 | Tenant 安全权限 | 所有角色以固定代码写死。`settings/roles` 等全部为只读配置接口 |

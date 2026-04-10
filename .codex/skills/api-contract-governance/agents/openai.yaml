@@ -1,0 +1,4 @@
+interface:
+  display_name: "API Contract Governance"
+  short_description: "Govern enums, contracts, and API docs consistently."
+  default_prompt: "Use $api-contract-governance when changing enums, shared contracts, or API docs so values stay English-only, documented, and consistent across packages/types and docs."

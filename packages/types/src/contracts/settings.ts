@@ -1,14 +1,12 @@
 import type { TenantRole, UserSimpleStatus } from '../enums'
 
-export type { TenantRole, UserSimpleStatus } from '../enums'
-
 export interface PermissionNode {
   id: string
   label: string
   children?: PermissionNode[]
 }
 
-export interface TenantUser {
+export interface TenantUserItem {
   id: string
   name: string
   account: string
@@ -18,16 +16,14 @@ export interface TenantUser {
   lastLogin?: string
 }
 
-export interface TenantAccount {
+export interface TenantAccountCreateRequest {
   username: string
   password: string
   role: TenantRole
   name: string
 }
 
-export type TenantRoleAccount = TenantAccount
-
-export interface TenantRoleConfig {
+export interface TenantRoleConfigItem {
   id: string
   name: string
   description?: string
@@ -35,20 +31,20 @@ export interface TenantRoleConfig {
   isSystem?: boolean
 }
 
-export interface TenantRolePayload {
+export interface TenantRoleUpsertRequest {
   name: string
   description?: string
   permissions: string[]
 }
 
-export interface TenantUserPayload {
+export interface TenantUserUpsertRequest {
   name: string
   phone: string
   role: TenantRole
   password?: string
 }
 
-export interface TenantUserStatusPayload {
+export interface TenantUserStatusUpdateRequest {
   status: UserSimpleStatus
 }
 
@@ -66,7 +62,7 @@ export interface TenantGeneralSettings {
   dailyReportPush: boolean
 }
 
-export interface TenantNotificationRecord {
+export interface TenantNotificationRecordItem {
   id: string
   title: string
   content: string

@@ -38,7 +38,7 @@
 {
   id: string                // 角色 ID
   name: string              // 角色名称（同 side 内唯一）
-  side: '平台角色' | '租户角色' // 角色归属侧
+  side: TenantSide            // 角色归属侧；platform=平台角色，tenant=租户角色
   permissions: string[]     // 权限项列表
   isSystem: boolean         // 是否系统内置
   tenantId: string | null   // 租户自定义角色时关联租户
@@ -91,7 +91,7 @@
   tenantId: string          // 关联租户 ID
   type: string              // "企业实名认证" | "经营资质补充" | "法人身份证更新"
   submitAt: string          // 提交时间
-  status: '待初审' | '待复核' | '待确认' | '已通过' | '已驳回' // 审核状态
+  status: TenantCertificationStatus // 审核状态
   comment: string | null    // 审核备注
   rejectReason: string | null // 驳回原因
   reviewedAt: string | null // 最近审核时间
@@ -163,7 +163,7 @@
   amount: number            // 订单金额（元）
   paid: number              // 已收金额（元）
   customFieldValues: any    // JSON: 动态模板映射的自定义字段
-  status: 'pending' | 'partial' | 'paid' | 'expired' | 'credit' // 订单收款状态
+  status: OrderStatus         // 订单收款状态
   payType: OrderPayType    // 付款方式
   prints: number            // 打印次数
   creditDays: number | null // 账期天数
@@ -265,7 +265,7 @@
   orderId: string           // 关联订单号
   customer: string          // 客户名称
   amount: number            // 收款金额（元）
-  channel: string           // 支付通道：微信支付 | 支付宝 | 现金 | 其他
+  channel: string           // 支付通道编码，如 wx_jsapi | ali_h5 | direct | cash | other_paid
   fee: number               // 手续费（元）
   net: number               // 到账金额（元）
   status: PaymentRecordStatus // 流水状态
@@ -302,8 +302,8 @@
 
 **约束说明：**
 
-- H5 支付状态统一采用 `UNPAID / PAYING / PENDING_VERIFICATION / PAID / EXPIRED`
-- 当状态为 `EXPIRED` 时，允许再次调用支付发起链路，刷新网关单信息并进入新一轮支付流程
+- H5 支付状态统一采用 `unpaid / paying / pending_verification / paid / expired`
+- 当状态为 `expired` 时，允许再次调用支付发起链路，刷新网关单信息并进入新一轮支付流程
 
 
 

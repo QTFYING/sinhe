@@ -1,61 +1,61 @@
 import type { EnumValue } from './common'
 
 /**
- * 平台套餐状态
+ * 套餐状态。
  */
 export const BillingPackageStatusEnum = {
-  /** 生效 */
-  ACTIVE: 'ACTIVE',
-  /** 草稿 */
-  DRAFT: 'DRAFT',
-  /** 归档/下线 */
-  ARCHIVED: 'ARCHIVED',
+  /** 已生效。 */
+  ACTIVE: 'active',
+  /** 草稿。 */
+  DRAFT: 'draft',
+  /** 已归档。 */
+  ARCHIVED: 'archived',
 } as const
 
 export type BillingPackageStatus = EnumValue<typeof BillingPackageStatusEnum>
 
 /**
- * 平台合同类型（电子合同与归档合同）
+ * 合同类型。
  */
 export const ContractTypeEnum = {
-  /** 电子签 */
-  ELECTRONIC_SIGNATURE: 'ELECTRONIC_SIGNATURE',
-  /** 归档件 */
-  ARCHIVE_COPY: 'ARCHIVE_COPY',
+  /** 电子签合同。 */
+  ELECTRONIC_SIGNATURE: 'electronic_signature',
+  /** 归档件合同。 */
+  ARCHIVE_COPY: 'archive_copy',
 } as const
 
 export type ContractType = EnumValue<typeof ContractTypeEnum>
 
 /**
- * 平台合同状态
+ * 合同状态。
  */
 export const ContractStatusEnum = {
-  /** 履约中 */
-  ACTIVE: 'ACTIVE',
-  /** 待续约 */
-  PENDING_RENEWAL: 'PENDING_RENEWAL',
-  /** 待签署 */
-  PENDING_SIGNING: 'PENDING_SIGNING',
-  /** 待归档 */
-  PENDING_ARCHIVE: 'PENDING_ARCHIVE',
-  /** 已终止 */
-  TERMINATED: 'TERMINATED',
+  /** 履约中。 */
+  ACTIVE: 'active',
+  /** 待续约。 */
+  PENDING_RENEWAL: 'pending_renewal',
+  /** 待签署。 */
+  PENDING_SIGNING: 'pending_signing',
+  /** 待归档。 */
+  PENDING_ARCHIVE: 'pending_archive',
+  /** 已终止。 */
+  TERMINATED: 'terminated',
 } as const
 
 export type ContractStatus = EnumValue<typeof ContractStatusEnum>
 
 /**
- * 平台发票状态
+ * 发票状态。
  */
 export const InvoiceStatusEnum = {
-  /** 已开票 */
-  ISSUED: 'ISSUED',
-  /** 待开票 */
-  PENDING_ISSUE: 'PENDING_ISSUE',
-  /** 对账中 */
-  RECONCILING: 'RECONCILING',
-  /** 已作废 */
-  VOIDED: 'VOIDED',
+  /** 已开票。 */
+  ISSUED: 'issued',
+  /** 待开票。 */
+  PENDING_ISSUE: 'pending_issue',
+  /** 对账中。 */
+  RECONCILING: 'reconciling',
+  /** 已作废。 */
+  VOIDED: 'voided',
 } as const
 
 export type InvoiceStatus = EnumValue<typeof InvoiceStatusEnum>

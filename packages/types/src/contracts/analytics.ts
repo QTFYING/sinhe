@@ -1,23 +1,23 @@
-export interface DailyTrend {
+export interface DailyTrendItem {
   day: string
-  应收: number
-  实收: number
+  receivableAmount: number
+  receivedAmount: number
 }
 
-export interface MonthlyTrend {
+export interface MonthlyTrendItem {
   month: string
-  应收: number
-  实收: number
+  receivableAmount: number
+  receivedAmount: number
 }
 
-export interface LiveFeedEntry {
+export interface LiveFeedEntryItem {
   time: string
   customer: string
   amount: number
   status: string
 }
 
-export interface AnalyticsDashboard {
+export interface AnalyticsDashboardResponse {
   todayReceivable: number
   todayReceived: number
   todayPending: number

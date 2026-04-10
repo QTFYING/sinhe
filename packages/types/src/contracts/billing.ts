@@ -1,8 +1,6 @@
 import type { BillingPackageStatus, ContractStatus, ContractType, InvoiceStatus } from '../enums'
 
-export type { BillingPackageStatus, ContractStatus, ContractType, InvoiceStatus } from '../enums'
-
-export interface PackagePlan {
+export interface PackagePlanItem {
   id: string
   name: string
   price: string
@@ -14,7 +12,7 @@ export interface PackagePlan {
   status?: BillingPackageStatus
 }
 
-export interface PackagePlanPayload {
+export interface PackagePlanUpsertRequest {
   name: string
   price: string
   rate: string
@@ -22,7 +20,7 @@ export interface PackagePlanPayload {
   features: string[]
 }
 
-export interface ContractRecord {
+export interface ContractRecordItem {
   contractNo: string
   tenant: string
   type: ContractType
@@ -30,9 +28,7 @@ export interface ContractRecord {
   status: ContractStatus
 }
 
-export type ContractRow = ContractRecord
-
-export interface CreateContractPayload {
+export interface CreateContractRequest {
   tenant: string
   contactName: string
   phone: string
@@ -43,13 +39,13 @@ export interface CreateContractPayload {
   serviceEnd: string
 }
 
-export interface CreateContractResult {
+export interface CreateContractResponse {
   contractNo: string
   signLink: string
   smsSent: boolean
 }
 
-export interface InvoiceRecord {
+export interface InvoiceRecordItem {
   billNo: string
   tenant: string
   amount: string
@@ -57,5 +53,3 @@ export interface InvoiceRecord {
   status: InvoiceStatus
   issuedAt?: string | null
 }
-
-export type InvoiceRow = InvoiceRecord

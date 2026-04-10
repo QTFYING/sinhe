@@ -1,35 +1,125 @@
-import {
-  CashVerifyStatusEnum,
-  OfflinePaymentMethodEnum,
-  PaymentChannelEnum,
-  PaymentMethodEnum,
-  PaymentOrderStatusEnum,
-  PaymentRecordStatusEnum,
-  type CashVerifyStatus as CashVerifyStatusType,
-  type OfflinePaymentMethod as OfflinePaymentMethodType,
-  type PaymentChannel as PaymentChannelType,
-  type PaymentMethod as PaymentMethodType,
-  type PaymentOrderStatus as PaymentOrderStatusType,
-  type PaymentRecordStatus as PaymentRecordStatusType,
+import type { ListParams } from '../common'
+import type {
+  CashVerifyStatus,
+  OfflinePaymentMethod,
+  PaymentChannel,
+  PaymentMethod,
+  PaymentOrderStatus,
+  PaymentRecordStatus,
 } from '../enums'
 
-export const PaymentMethod = PaymentMethodEnum
-export type PaymentMethod = PaymentMethodType
+export interface PaymentOrderLineItem {
+  itemId: string
+  skuName: string
+  skuSpec?: string
+  unit: string
+  quantity: number
+  unitPrice: number
+  lineAmount: number
+}
 
-export const OfflinePaymentMethod = OfflinePaymentMethodEnum
-export type OfflinePaymentMethod = OfflinePaymentMethodType
+export interface OfflinePaymentInfo {
+  method: OfflinePaymentMethod
+  remark: string
+  cashVerifyStatus: CashVerifyStatus | null
+  cashVerifyStatusText: string
+  submittedAt: string
+  verifiedAt?: string | null
+}
 
-export const PaymentChannel = PaymentChannelEnum
-export type PaymentChannel = PaymentChannelType
+export interface PaymentOrderDetailResponse {
+  orderNo: string
+  merchant: string
+  customer: string
+  amount: number
+  paidAmount?: number
+  summary: string
+  date: string
+  status: PaymentOrderStatus
+  statusMessage?: string
+  servicePhone?: string
+  selectedPaymentMethod: PaymentMethod | null
+  offlinePayment: OfflinePaymentInfo | null
+  items: PaymentOrderLineItem[]
+}
 
-export const PaymentOrderStatus = PaymentOrderStatusEnum
-export type PaymentOrderStatus = PaymentOrderStatusType
+export interface PaymentOrderActionResponse {
+  orderNo: string
+  status: PaymentOrderStatus
+  statusMessage?: string
+  selectedPaymentMethod: PaymentMethod | null
+  offlinePayment: OfflinePaymentInfo | null
+}
 
-export const H5PayOrderStatus = PaymentOrderStatusEnum
-export type H5PayOrderStatus = PaymentOrderStatusType
+export interface SubmitOfflinePaymentRequest {
+  paymentMethod: OfflinePaymentMethod
+  remark?: string
+}
 
-export const CashVerifyStatus = CashVerifyStatusEnum
-export type CashVerifyStatus = CashVerifyStatusType
+export interface ConfirmPaymentRequest {
+  channel?: Exclude<PaymentChannel, 'direct'>
+}
 
-export const PaymentRecordStatus = PaymentRecordStatusEnum
-export type PaymentRecordStatus = PaymentRecordStatusType
+export interface ConfirmPaymentResponse {
+  orderNo: string
+  paymentId: string
+  channel: PaymentChannel
+  channelParams: {
+    appId?: string
+    timeStamp?: string
+    nonceStr?: string
+    package?: string
+    signType?: string
+    paySign?: string
+    tradePageUrl?: string
+    directResult?: 'paid'
+  }
+}
+
+export interface PaymentStatusResponse {
+  orderNo: string
+  status: PaymentOrderStatus
+  statusMessage?: string
+  paidAmount?: number
+  paidAt?: string
+  selectedPaymentMethod?: PaymentMethod
+}
+
+export interface WxJsapiRequest {
+  openId: string
+}
+
+export interface WxJsapiParams {
+  appId: string
+  timeStamp: string
+  nonceStr: string
+  package: string
+  signType: 'RSA'
+  paySign: string
+}
+
+export interface PaymentRecordItem {
+  id: string
+  orderId: string
+  customer: string
+  amount: number
+  channel: string
+  fee: number
+  net: number
+  status: PaymentRecordStatus
+  tenant?: string
+  time?: string
+  paidAt?: string
+}
+
+export interface PaymentListQuery extends ListParams {
+  channel?: string
+}
+
+export interface PaymentSummaryResponse {
+  totalAmount: number
+  totalFee: number
+  totalNet: number
+  totalCount: number
+  abnormalCount: number
+}

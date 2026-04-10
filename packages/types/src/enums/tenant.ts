@@ -1,99 +1,99 @@
 import type { EnumValue } from './common'
 
 /**
- * 租户角色（预设固定角色）
+ * 租户角色。
  */
 export const TenantRoleEnum = {
-  /** 老板（拥有所有权限） */
+  /** 老板。 */
   OWNER: 'TENANT_OWNER',
-  /** 打单员（订单处理、打印发货） */
+  /** 打单员。 */
   OPERATOR: 'TENANT_OPERATOR',
-  /** 财务（对账、核销） */
+  /** 财务。 */
   FINANCE: 'TENANT_FINANCE',
-  /** 访客/只读（审计与查看） */
+  /** 访客/只读。 */
   VIEWER: 'TENANT_VIEWER',
 } as const
 
 export type TenantRole = EnumValue<typeof TenantRoleEnum>
 
 /**
- * 租户状态（平台视角）
+ * 租户状态。
  */
 export const TenantStatusEnum = {
-  /** 正常活跃 */
-  ACTIVE: 'ACTIVE',
-  /** 初始化/资料待审 */
-  ONBOARDING: 'ONBOARDING',
-  /** 临近过期提醒 */
-  ATTENTION: 'ATTENTION',
-  /** 冻结/停用 */
-  PAUSED: 'PAUSED',
+  /** 正常活跃。 */
+  ACTIVE: 'active',
+  /** 初始化或资料待审。 */
+  ONBOARDING: 'onboarding',
+  /** 临近过期提醒。 */
+  ATTENTION: 'attention',
+  /** 冻结或停用。 */
+  PAUSED: 'paused',
 } as const
 
 export type TenantStatus = EnumValue<typeof TenantStatusEnum>
 
 /**
- * 用户完整状态机（平台账号或租户账号）
+ * 用户状态。
  */
 export const UserStatusEnum = {
-  /** 正常活跃 */
-  ACTIVE: 'ACTIVE',
-  /** 已邀请未激活 */
-  INVITED: 'INVITED',
-  /** 已锁定（通常因安全原因） */
-  LOCKED: 'LOCKED',
-  /** 已禁用（手动停用） */
-  DISABLED: 'DISABLED',
+  /** 正常。 */
+  ACTIVE: 'active',
+  /** 已邀请未激活。 */
+  INVITED: 'invited',
+  /** 已锁定。 */
+  LOCKED: 'locked',
+  /** 已禁用。 */
+  DISABLED: 'disabled',
 } as const
 
 export type UserStatus = EnumValue<typeof UserStatusEnum>
 
 /**
- * 租户中心列表排序字段
+ * 租户列表排序字段。
  */
 export const TenantSortFieldEnum = {
-  /** 按名称排序 */
-  NAME: 'NAME',
-  /** 按套餐名排序 */
-  PACKAGE_NAME: 'PACKAGE_NAME',
-  /** 按状态排序 */
-  STATUS: 'STATUS',
-  /** 按距到期天数排序 */
-  DUE_IN_DAYS: 'DUE_IN_DAYS',
+  /** 按租户名称排序。 */
+  NAME: 'name',
+  /** 按套餐名称排序。 */
+  PACKAGE_NAME: 'packageName',
+  /** 按租户状态排序。 */
+  STATUS: 'status',
+  /** 按距到期天数排序。 */
+  DUE_IN_DAYS: 'dueInDays',
 } as const
 
 export type TenantSortField = EnumValue<typeof TenantSortFieldEnum>
 
 /**
- * 租户资质审核状态
+ * 租户资质审核状态。
  */
 export const TenantCertificationStatusEnum = {
-  /** 待初审 */
-  PENDING_INITIAL_REVIEW: 'PENDING_INITIAL_REVIEW',
-  /** 待复核 */
-  PENDING_SECONDARY_REVIEW: 'PENDING_SECONDARY_REVIEW',
-  /** 待确认 */
-  PENDING_CONFIRMATION: 'PENDING_CONFIRMATION',
-  /** 已通过 */
-  APPROVED: 'APPROVED',
-  /** 已驳回 */
-  REJECTED: 'REJECTED',
+  /** 待初审。 */
+  PENDING_INITIAL_REVIEW: 'pending_initial_review',
+  /** 待复核。 */
+  PENDING_SECONDARY_REVIEW: 'pending_secondary_review',
+  /** 待确认。 */
+  PENDING_CONFIRMATION: 'pending_confirmation',
+  /** 已通过。 */
+  APPROVED: 'approved',
+  /** 已驳回。 */
+  REJECTED: 'rejected',
 } as const
 
 export type TenantCertificationStatus = EnumValue<typeof TenantCertificationStatusEnum>
 
 /**
- * 租户续费支付方式（平台收款登记）
+ * 租户续费收款方式。
  */
 export const TenantRenewPaymentMethodEnum = {
-  /** 银行转账 */
-  BANK_TRANSFER: 'BANK_TRANSFER',
-  /** 微信支付 */
-  WECHAT_PAY: 'WECHAT_PAY',
-  /** 支付宝 */
-  ALIPAY: 'ALIPAY',
-  /** 线下打款 */
-  OFFLINE_REMITTANCE: 'OFFLINE_REMITTANCE',
+  /** 银行转账。 */
+  BANK_TRANSFER: 'bank_transfer',
+  /** 微信支付。 */
+  WECHAT_PAY: 'wechat_pay',
+  /** 支付宝。 */
+  ALIPAY: 'alipay',
+  /** 线下打款。 */
+  OFFLINE_REMITTANCE: 'offline_remittance',
 } as const
 
 export type TenantRenewPaymentMethod = EnumValue<typeof TenantRenewPaymentMethodEnum>

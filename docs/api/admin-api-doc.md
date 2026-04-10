@@ -281,6 +281,11 @@ Array<{
 ### 类型定义
 
 ```typescript
+type TenantStatus = 'active' | 'onboarding' | 'attention' | 'paused'
+type TenantSortField = 'name' | 'packageName' | 'status' | 'dueInDays'
+type SortOrder = 'asc' | 'desc'
+type ReviewAction = 'approve' | 'reject'
+type FreezeAction = 'freeze' | 'unfreeze'
 
 interface TenantRecord {
   id: string                   // 如 "TEN-001"
@@ -413,8 +418,8 @@ interface TenantRecord {
 ```
 
 **业务规则：**
-- `approve` → 状态变为 `ACTIVE`
-- `reject` → 状态保持 `ONBOARDING`，记录驳回原因
+- `approve` → 状态变为 `active`
+- `reject` → 状态保持 `onboarding`，记录驳回原因
 
 ### 5.4 批量审核租户
 
@@ -427,7 +432,7 @@ interface TenantRecord {
 ```typescript
 {
   ids: string[]                // 租户 ID 列表
-  action: 'APPROVE'            // 批量审核动作
+  action: 'approve'            // 批量审核动作
   reviewNote?: string          // 审核备注
 }
 ```
@@ -454,7 +459,7 @@ interface TenantRecord {
   packageName: string          // 续费套餐
   days: number                 // 续费天数: 30 | 90 | 180 | 365
   amount: number               // 续费金额（元）
-  paymentMethod: string        // 支付方式: "银行转账" | "微信支付" | "支付宝" | "线下打款"
+  paymentMethod: 'bank_transfer' | 'wechat_pay' | 'alipay' | 'offline_remittance' // 支付方式
 }
 ```
 
@@ -511,8 +516,8 @@ interface TenantRecord {
 ```
 
 **业务规则：**
-- `freeze` → 状态变为 `PAUSED`
-- `unfreeze` → 状态恢复为 `ACTIVE`
+- `freeze` → 状态变为 `paused`
+- `unfreeze` → 状态恢复为 `active`
 
 ### 5.7 批量冻结租户
 
@@ -575,7 +580,7 @@ interface TenantRecord {
 
 - **GET** `/tenants/certifications`
 - **关联表**：tenant_certifications
-- **说明**：该队列仅展示仍在审核流中的记录，即 `待初审 / 待复核 / 待确认`。
+- **说明**：该队列仅展示仍在审核流中的记录，即 `pending_initial_review / pending_secondary_review / pending_confirmation`。
 
 **响应 data：**
 
@@ -621,10 +626,10 @@ Array<{
 
 **状态流转规则：**
 
-- `待初审` + `approve` -> `待复核`
-- `待复核` + `approve` -> `待确认`
-- `待确认` + `approve` -> `已通过`
-- 任一待处理状态 + `reject` -> `已驳回`
+- `pending_initial_review` + `approve` -> `pending_secondary_review`
+- `pending_secondary_review` + `approve` -> `pending_confirmation`
+- `pending_confirmation` + `approve` -> `approved`
+- 任一待处理状态 + `reject` -> `rejected`
 
 ---
 
@@ -633,6 +638,15 @@ Array<{
 ### 类型定义
 
 ```typescript
+type TenantSide = 'platform' | 'tenant'
+type UserStatus = 'active' | 'invited' | 'locked' | 'disabled'
+type UserCreateStatus = 'active' | 'invited'
+type TenantCertificationStatus =
+  | 'pending_initial_review'
+  | 'pending_secondary_review'
+  | 'pending_confirmation'
+  | 'approved'
+  | 'rejected'
 
 interface UserRecord {
   id: string                   // 如 "USR-001"
@@ -746,7 +760,7 @@ interface UserRecord {
   tenant?: string              // 所属租户名称
   role?: string                // 角色名称
   scope?: string               // 数据范围
-  status?: 'ACTIVE' | 'INVITED' // 账号状态
+  status?: UserStatus           // 账号状态
 }
 ```
 
@@ -834,6 +848,8 @@ interface UserRecord {
 ### 类型定义
 
 ```typescript
+type OrderStatus = 'pending' | 'partial' | 'paid' | 'expired' | 'credit'
+type OrderPayType = 'cash' | 'credit'
 
 interface AdminOrder {
   id: string                   // 如 "ORD-20260330-001"
@@ -965,6 +981,7 @@ interface AdminOrder {
 ### 类型定义
 
 ```typescript
+type PaymentRecordStatus = 'success' | 'partial' | 'pending' | 'failed'
 
 interface PaymentRecord {
   id: string                   // 流水号，如 "PAY-20260330-001"
@@ -972,7 +989,7 @@ interface PaymentRecord {
   orderId: string              // 关联订单号
   customer: string             // 客户名称
   amount: number               // 收款金额（元）
-  channel: string              // 支付通道：微信支付 | 支付宝 | 平安银行
+  channel: string              // 支付通道编码，如 wx_jsapi | ali_h5 | direct | cash | other_paid
   fee: number                  // 手续费（元）
   net: number                  // 到账金额（元）
   time: string                 // 收款时间
@@ -1038,6 +1055,12 @@ interface PaymentRecord {
 
 ## 九、财务对账 Reconciliation（3 个端点）
 
+### 类型定义
+
+```typescript
+type AdminReconciliationStatus = 'reconciling' | 'verified' | 'partial_unverified' | 'overdue_unpaid'
+```
+
 ### 9.1 获取对账汇总
 
 - **GET** `/reconciliation/summary`
@@ -1082,7 +1105,7 @@ interface PaymentRecord {
     amount: number             // 应收金额
     received: number           // 已到账
     pending: number            // 未到账
-    status: '对账中' | '已核销' | '部分未核' | '逾期未收'
+    status: AdminReconciliationStatus // 对账状态
   }>
   total: number
 }
@@ -1103,6 +1126,8 @@ interface PaymentRecord {
 ### 类型定义
 
 ```typescript
+type BillingPackageStatus = 'active' | 'draft' | 'archived'
+
 interface PackagePlan {
   id: string
   name: string                 // "基础版" | "标准版" | "旗舰版"
@@ -1112,6 +1137,7 @@ interface PackagePlan {
   strategy: string             // 策略说明
   orderTrend: string           // 订单趋势
   features: string[]           // 套餐内容列表
+  status: BillingPackageStatus // 套餐状态
 }
 ```
 
@@ -1132,6 +1158,7 @@ Array<{
   strategy: string             // 策略说明
   orderTrend: string           // 订单趋势描述
   features: string[]           // 套餐内容列表
+  status: BillingPackageStatus // 套餐状态
 }>
 ```
 
@@ -1164,6 +1191,7 @@ Array<{
   strategy: string
   orderTrend: string
   features: string[]
+  status: BillingPackageStatus
 }
 ```
 
@@ -1196,6 +1224,7 @@ Array<{
   strategy: string
   orderTrend: string
   features: string[]
+  status: BillingPackageStatus
 }
 ```
 
@@ -1214,6 +1243,8 @@ Array<{
 ### 类型定义
 
 ```typescript
+type ContractType = 'electronic_signature' | 'archive_copy'
+type ContractStatus = 'active' | 'pending_renewal' | 'pending_signing' | 'pending_archive' | 'terminated'
 
 interface ContractRecord {
   contractNo: string           // 如 "HT-202603-001"
@@ -1293,7 +1324,7 @@ interface ContractRecord {
 ### 11.3 更新合同
 
 - **PUT** `/billing/contracts/{id}`
-- **描述**：更新合同信息（仅待签署/草稿状态可修改）
+- **描述**：更新合同信息（仅 `pending_signing` / `pending_archive` 状态可修改）
 - **关联表**：contracts
 
 **请求参数：**
@@ -1324,13 +1355,13 @@ interface ContractRecord {
 ```
 
 **校验规则：**
-- 仅 `待签署` 或 `待归档` 状态可修改
-- `履约中` 状态禁止修改
+- 仅 `pending_signing` 或 `pending_archive` 状态可修改
+- `active` 状态禁止修改
 
 ### 11.4 审批合同
 
 - **POST** `/billing/contracts/{id}/approve`
-- **描述**：审批通过合同，状态流转为"履约中"
+- **描述**：审批通过合同，状态流转为 `active`
 - **关联表**：contracts
 
 **请求参数：**
@@ -1354,7 +1385,7 @@ interface ContractRecord {
 }
 ```
 
-**状态流转：** `待签署` → `履约中`
+**状态流转：** `pending_signing` → `active`
 
 ### 11.5 终止合同
 
@@ -1384,7 +1415,7 @@ interface ContractRecord {
 ```
 
 **校验规则：**
-- 仅 `履约中` 状态可终止
+- 仅 `active` 状态可终止
 
 ---
 
@@ -1393,6 +1424,7 @@ interface ContractRecord {
 ### 类型定义
 
 ```typescript
+type InvoiceStatus = 'issued' | 'pending_issue' | 'reconciling' | 'voided'
 
 interface InvoiceRecord {
   billNo: string               // 如 "INV-001"
@@ -1454,13 +1486,13 @@ interface InvoiceRecord {
 ```typescript
 {
   billNo: string               // 生成的发票编号
-  status: '待开票'
+  status: 'pending_issue'
 }
 ```
 
 **业务规则：**
-- 创建开票记录后，初始状态为 `待开票`
-- 只有在发票真正开具完成后，状态才会流转为 `已开票`
+- 创建开票记录后，初始状态为 `pending_issue`
+- 只有在发票真正开具完成后，状态才会流转为 `issued`
 
 ### 12.3 作废发票
 
@@ -1479,8 +1511,8 @@ interface InvoiceRecord {
 **响应 data：** `null`
 
 **校验规则：**
-- 仅 `已开票` 状态可作废
-- 作废后状态变为 `已作废`
+- 仅 `issued` 状态可作废
+- 作废后状态变为 `voided`
 
 ---
 
@@ -1491,6 +1523,7 @@ interface InvoiceRecord {
 ### 类型定义
 
 ```typescript
+type ServiceProviderStatus = 'active' | 'trial'
 
 interface ServiceProviderRecord {
   id: string                   // 服务商记录 ID
@@ -1536,7 +1569,7 @@ Array<{
   category: string             // "消息通道" | "资质审核" | "合同管理"
   contactName: string          // 对接联系人
   contactPhone: string         // 联系电话
-  status?: ServiceProviderStatus // 默认 '试运行'
+  status?: ServiceProviderStatus // 默认 'trial'
 }
 ```
 
@@ -1595,7 +1628,7 @@ Array<{
 **响应 data：** `null`
 
 **校验规则：**
-- `已接入` 且有活跃租户依赖时，禁止直接删除，需先下线
+- `active` 且有活跃租户依赖时，禁止直接删除，需先下线
 
 ---
 
@@ -1606,6 +1639,8 @@ Array<{
 ### 类型定义
 
 ```typescript
+type NoticeStatus = 'published' | 'draft' | 'offline'
+type PublishTiming = 'immediate' | 'scheduled'
 
 interface NoticeRecord {
   id: string
@@ -1732,7 +1767,7 @@ Array<{
 
 **校验规则：**
 - 草稿状态可直接删除
-- 已发布状态需先标记为下架（`status = '已下架'`）再删除
+- 已发布状态需先标记为下架（`status = 'offline'`）再删除
 
 ---
 
@@ -1741,6 +1776,7 @@ Array<{
 ### 类型定义
 
 ```typescript
+type TicketStatus = 'pending' | 'processing' | 'resolved'
 
 interface TicketRecord {
   no: string                   // 如 "TK-2301"
@@ -1847,12 +1883,12 @@ interface TicketReplyResult {
 }
 ```
 
-**状态流转：** `待分派` → `处理中`
+**状态流转：** `pending` → `processing`
 
 ### 15.5 关闭工单
 
 - **POST** `/tickets/{id}/close`
-- **描述**：关闭工单（标记为已解决）
+- **描述**：关闭工单（标记为 `resolved`）
 - **关联表**：tickets
 
 **请求参数：**
@@ -1875,7 +1911,7 @@ interface TicketReplyResult {
 }
 ```
 
-**状态流转：** `处理中` → `已解决`
+**状态流转：** `processing` → `resolved`
 
 ---
 
@@ -1884,10 +1920,12 @@ interface TicketReplyResult {
 ### 类型定义
 
 ```typescript
+type RoleSide = 'platform'
+
 interface RoleTemplate {
   id: string
   name: string
-  side: '平台角色'
+  side: RoleSide               // 平台角色固定为 'platform'
   permissions: string[]
 }
 ```
@@ -1903,7 +1941,7 @@ interface RoleTemplate {
 Array<{
   id: string
   name: string
-  side: '平台角色'
+  side: RoleSide
   permissions: string[]
 }>
 ```
@@ -1918,7 +1956,7 @@ Array<{
 ```typescript
 {
   name: string                 // 角色名称（必填，唯一）
-  side: '平台角色'
+  side: RoleSide               // 固定传 'platform'
   permissions: string[]        // 至少一项
 }
 ```
@@ -1929,7 +1967,7 @@ Array<{
 {
   id: string
   name: string
-  side: '平台角色'
+  side: RoleSide
   permissions: string[]
 }
 ```
@@ -1948,7 +1986,7 @@ Array<{
 ```typescript
 {
   name?: string
-  side?: '平台角色'
+  side?: RoleSide
   permissions?: string[]
 }
 ```
@@ -1959,7 +1997,7 @@ Array<{
 {
   id: string
   name: string
-  side: '平台角色'
+  side: RoleSide
   permissions: string[]
 }
 ```
@@ -1981,6 +2019,13 @@ Array<{
 ---
 
 ## 十七、操作日志 Security - Audit Logs（1 个端点）
+
+### 类型定义
+
+```typescript
+type AuditTargetType = 'account' | 'role' | 'tenant'
+type AuditResult = 'success' | 'pending'
+```
 
 ### 17.1 获取操作日志列表
 

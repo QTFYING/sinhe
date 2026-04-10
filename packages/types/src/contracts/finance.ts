@@ -1,8 +1,6 @@
 import type { AdminReconciliationStatus, FinanceReconciliationStatus } from '../enums'
 
-export type { AdminReconciliationStatus, FinanceReconciliationStatus } from '../enums'
-
-export interface FinanceSummary {
+export interface FinanceSummaryResponse {
   totalReceivable: number
   totalReceived: number
   totalFee: number
@@ -12,7 +10,7 @@ export interface FinanceSummary {
   orderCount: number
 }
 
-export interface FinanceReconciliationRecord {
+export interface FinanceReconciliationRecordItem {
   orderId: string
   customer: string
   amount: number
@@ -23,7 +21,7 @@ export interface FinanceReconciliationRecord {
   status: FinanceReconciliationStatus
 }
 
-export interface AdminReconciliationSummary {
+export interface AdminReconciliationSummaryResponse {
   totalReceivable: number
   totalReceived: number
   totalPending: number
@@ -31,7 +29,7 @@ export interface AdminReconciliationSummary {
   progressPercent: number
 }
 
-export interface AdminReconciliationDailyRecord {
+export interface AdminReconciliationDailyRecordItem {
   date: string
   tenant: string
   orders: number

@@ -33,6 +33,8 @@
 ### 1.6 角色定义
 
 ```typescript
+type TenantRole = 'TENANT_OWNER' | 'TENANT_OPERATOR' | 'TENANT_FINANCE' | 'TENANT_VIEWER'
+type AuthSourceTag = 'mock' | 'remote'
 ```
 
 | 角色 | 中文名 | 说明 |
@@ -156,6 +158,13 @@
 ### 类型定义
 
 ```typescript
+type OrderStatus = 'pending' | 'partial' | 'paid' | 'expired' | 'credit'
+type OrderPayType = 'cash' | 'credit'
+type OrderImportConflictPolicy = 'skip' | 'overwrite'
+type OrderImportJobStatus = 'pending' | 'processing' | 'completed' | 'failed'
+type OrderTemplateFieldType = 'text' | 'number' | 'money' | 'date' | 'enum'
+type PaymentRecordStatus = 'success' | 'partial' | 'pending' | 'failed'
+type CreditOrderStatus = 'normal' | 'soon' | 'today' | 'overdue'
 
 interface TenantOrder {
   id: string                   // 如 "PLT-20260325-001"
@@ -293,7 +302,7 @@ interface TenantOrder {
   amount: number               // 订单金额（必填）
   paid?: number                // 已收金额，默认 0
   status?: OrderStatus         // 默认 'pending'
-  payType?: OrderPayType       // 默认 '现款'
+  payType?: OrderPayType       // 默认 'cash'
   date?: string                // 不传则取当前时间
 }
 ```
@@ -820,6 +829,9 @@ Array<{
 ### 类型定义
 
 ```typescript
+type PaymentOrderStatus = 'unpaid' | 'paying' | 'pending_verification' | 'paid' | 'expired'
+type PaymentRecordStatus = 'success' | 'partial' | 'pending' | 'failed'
+
 interface PaymentRecord {
   id: string                   // 流水号，如 "PAY-20260330-001"
   orderId: string              // 关联订单号
@@ -891,7 +903,7 @@ interface PaymentRecord {
 
 - **POST** `/orders/{id}/verify-cash`
 - **角色**：TENANT_FINANCE
-- **描述**：对 H5 端提交的现金支付订单进行核销确认；`payment_orders.status` 从 `PENDING_VERIFICATION` 变为 `PAID`
+- **描述**：对 H5 端提交的现金支付订单进行核销确认；`payment_orders.status` 从 `pending_verification` 变为 `paid`
 
 **请求参数：** 无
 
@@ -901,25 +913,25 @@ interface PaymentRecord {
 {
   orderId: string
   orderStatus: OrderStatus      // 订单收款状态；通常更新为 'paid'
-  paymentStatus: 'PAID'         // H5 支付单状态
+  paymentStatus: 'paid'         // H5 支付单状态
   verifiedAt: string            // 核销时间
 }
 ```
 
 **业务规则：**
-- 仅 `PENDING_VERIFICATION` 状态的支付单可以核销
+- 仅 `pending_verification` 状态的支付单可以核销
 - 核销后，H5 端再次打开该订单页面将看到"订单已完成"
-- 同时在 `payments` 表生成一条 `channel=现金` 的收款记录
+- 同时在 `payments` 表生成一条 `channel=cash` 的收款记录
 - 同步更新 `orders.paid` 与 `orders.status`
 
 **数据流：**
 
 ```
-H5 客户选择"现金支付" → payment_orders.status = PENDING_VERIFICATION
+H5 客户选择"现金支付" → payment_orders.status = pending_verification
                                     ↓
 Tenant 财务 POST /orders/{id}/verify-cash
                                     ↓
-              payment_orders.status = PAID + payments 新增一条记录 + orders 收款状态更新
+              payment_orders.status = paid + payments 新增一条记录 + orders 收款状态更新
                                     ↓
               H5 客户再次打开页面 → 看到"订单已完成"
 ```
@@ -930,6 +942,12 @@ Tenant 财务 POST /orders/{id}/verify-cash
 
 > 源码：`features/finance/`
 > 提供本租户维度的财务汇总和对账明细。
+
+### 类型定义
+
+```typescript
+type FinanceReconciliationStatus = 'verified' | 'pending' | 'exception'
+```
 
 ### 5.1 获取财务汇总
 
@@ -976,7 +994,7 @@ Tenant 财务 POST /orders/{id}/verify-cash
     fee: number                // 手续费（元）
     channel: string            // 支付通道，如 "拉卡拉"
     paidAt: string             // 到账时间
-    status: 'VERIFIED' | 'PENDING' | 'EXCEPTION' // 对账状态
+    status: FinanceReconciliationStatus // 对账状态
   }>
   total: number                // 明细总数
   page: number                 // 当前页码
@@ -1189,6 +1207,7 @@ Array<{
 ### 类型定义
 
 ```typescript
+type TenantUserStatus = 'active' | 'disabled'
 
 interface TenantSettingsUser {
   id: string                   // 用户 ID
@@ -1700,8 +1719,14 @@ interface NotificationRecord {
 ### 类型定义
 
 ```typescript
+type TenantCertificationStatus =
+  | 'pending_initial_review'
+  | 'pending_secondary_review'
+  | 'pending_confirmation'
+  | 'approved'
+  | 'rejected'
 
-interface QualificationSubmitRequest {
+interface TenantCertificationSubmitRequest {
   licenseUrl: string           // 营业执照或资质文件地址
   legalPerson: string          // 法人姓名
   legalIdCard: string          // 法人身份证号
@@ -1709,7 +1734,7 @@ interface QualificationSubmitRequest {
   remark?: string              // 补充说明
 }
 
-interface QualificationStatusResult {
+interface TenantCertificationStatusResult {
   certId: string | null        // 资质记录 ID
   status: TenantCertificationStatus | null // 当前资质状态
   submittedAt: string | null   // 提交时间
@@ -1742,7 +1767,7 @@ interface QualificationStatusResult {
 ```typescript
 {
   certId: string               // 认证记录 ID
-  status: '待初审'              // 提交后进入待初审
+  status: 'pending_initial_review' // 提交后进入待初审
   submittedAt: string          // 提交时间
 }
 ```
@@ -1826,7 +1851,7 @@ interface QualificationStatusResult {
 | Tenant 操作 | 关联的 H5 端行为 |
 |-------------|-----------------|
 | 创建订单 / 导入订单 → 生成订单二维码 | H5 通过 `qrCodeToken` 打开对应订单页面，是否展示支付按钮由订单状态决定 |
-| 财务核销 `POST /orders/{id}/verify-cash` | H5 端现金支付订单状态从 `PENDING_VERIFICATION` → `PAID` |
+| 财务核销 `POST /orders/{id}/verify-cash` | H5 端现金支付订单状态从 `pending_verification` → `paid` |
 | 收款流水 `GET /payments` | 包含 H5 在线支付成功后生成的记录 |
 
 ### 与 Admin 端的关联

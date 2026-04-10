@@ -1,6 +1,4 @@
-export type AgentStatus = 'active' | 'pending' | 'paused'
-
-export interface Agent {
+export interface AgentItem {
   id: string
   name: string
   region: string
@@ -8,17 +6,17 @@ export interface Agent {
   gmv: number
   rate: number
   commission: number
-  status: AgentStatus
+  status: 'active' | 'pending' | 'paused'
 }
 
-export interface AgentSettlementRecord {
+export interface AgentSettlementRecordItem {
   id: string
   amount: number
   period: string
   settledAt: string
 }
 
-export interface AgentSettleResult {
+export interface AgentSettleResponse {
   settlementId: string
   amount: number
   settledAt: string
