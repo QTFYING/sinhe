@@ -9,15 +9,23 @@ export interface PackagePlanItem {
   strategy: string
   orderTrend: string
   features: string[]
-  status?: BillingPackageStatus
+  status: BillingPackageStatus
 }
 
-export interface PackagePlanUpsertRequest {
+export interface CreatePackagePlanRequest {
   name: string
   price: string
   rate: string
   strategy: string
   features: string[]
+}
+
+export interface UpdatePackagePlanRequest {
+  name?: string
+  price?: string
+  rate?: string
+  strategy?: string
+  features?: string[]
 }
 
 export interface ContractRecordItem {
@@ -26,6 +34,7 @@ export interface ContractRecordItem {
   type: ContractType
   expireAt: string
   status: ContractStatus
+  terminateReason?: string
 }
 
 export interface CreateContractRequest {
@@ -39,17 +48,51 @@ export interface CreateContractRequest {
   serviceEnd: string
 }
 
+export interface UpdateContractRequest {
+  contactName?: string
+  phone?: string
+  packageName?: string
+  annualFee?: string
+  rate?: string
+  serviceStart?: string
+  serviceEnd?: string
+}
+
 export interface CreateContractResponse {
   contractNo: string
   signLink: string
   smsSent: boolean
 }
 
+export interface ApproveContractRequest {
+  remark?: string
+}
+
+export interface TerminateContractRequest {
+  terminateReason: string
+}
+
 export interface InvoiceRecordItem {
   billNo: string
   tenant: string
   amount: string
-  period: string
+  cycle: string
   status: InvoiceStatus
   issuedAt?: string | null
+}
+
+export interface CreateInvoiceRequest {
+  tenant: string
+  cycle: string
+  amount: string
+  taxRate?: number
+}
+
+export interface CreateInvoiceResponse {
+  billNo: string
+  status: 'pending_issue'
+}
+
+export interface VoidInvoiceRequest {
+  voidReason: string
 }

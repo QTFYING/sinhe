@@ -9,22 +9,22 @@ import type {
 } from '../enums'
 
 export interface OrderLineItem {
-  lineId: string
-  sourceLineNo?: string
-  sourceOrderNo?: string
-  skuCode?: string
+  itemId?: string
+  skuId?: string | null
   skuName: string
   skuSpec?: string
-  unit?: string
+  unit: string
   quantity: number
   unitPrice: number
   lineAmount: number
 }
 
-export type OrderCustomFieldValue = string | number | boolean | null
-
-export interface OrderItem {
+export interface TenantOrderItem {
   id: string
+  sourceOrderNo?: string
+  groupKey?: string
+  mappingTemplateId?: string
+  qrCodeToken?: string
   customer: string
   summary: string
   amount: number
@@ -33,27 +33,72 @@ export interface OrderItem {
   payType: OrderPayType
   prints: number
   date: string
-  qrCodeToken?: string
-  sourceOrderNo?: string
-  groupKey?: string
-  sourcePlatform?: string
-  mappingTemplateId?: string
-  importBatchId?: string
-  importedAt?: string
-  voided?: boolean
+  lineItems: OrderLineItem[]
+  customFieldValues?: Record<string, string>
+  voided: boolean
   voidReason?: string
   voidedAt?: string
-  lineItems?: OrderLineItem[]
-  customFieldValues?: Record<string, OrderCustomFieldValue>
+}
+
+export interface AdminOrderItem {
+  id: string
+  tenant: string
+  sourceOrderNo?: string
+  groupKey?: string
+  mappingTemplateId?: string
+  qrCodeToken?: string
+  customer: string
+  lineItems: OrderLineItem[]
+  customFieldValues?: Record<string, string>
+  amount: number
+  paid: number
+  status: OrderStatus
+  payType: OrderPayType
+  date: string
+  voided: boolean
+  voidReason?: string
+  voidedAt?: string
 }
 
 export interface OrderListQuery extends ListParams {
   status?: OrderStatus
   payType?: OrderPayType
-  dateFrom?: string
-  dateTo?: string
   templateId?: string
   sourceOrderNo?: string
+  dateFrom?: string
+  dateTo?: string
+}
+
+export interface AdminOrderListQuery {
+  page: number
+  pageSize: number
+  keyword?: string
+}
+
+export interface CreateOrderRequest {
+  customer: string
+  summary?: string
+  amount: number
+  paid?: number
+  status?: OrderStatus
+  payType?: OrderPayType
+  date?: string
+}
+
+export interface UpdateOrderRequest {
+  customer?: string
+  summary?: string
+  amount?: number
+  paid?: number
+  status?: OrderStatus
+  payType?: OrderPayType
+  date?: string
+  lineItems?: OrderLineItem[]
+  customFieldValues?: Record<string, string>
+}
+
+export interface VoidOrderRequest {
+  voidReason: string
 }
 
 export interface OrderImportMapping {
@@ -82,11 +127,27 @@ export interface OrderImportTemplateField {
 export interface OrderImportTemplate {
   id: string
   name: string
-  isDefault?: boolean
-  updatedAt?: string
+  isDefault: boolean
+  updatedAt: string
+  sourceColumns: OrderImportSourceColumn[]
+  fields: OrderImportTemplateField[]
   mappings: OrderImportMapping[]
+}
+
+export interface CreateOrderImportTemplateRequest {
+  name: string
+  isDefault: boolean
+  sourceColumns: OrderImportSourceColumn[]
+  fields: OrderImportTemplateField[]
+  mappings: OrderImportMapping[]
+}
+
+export interface UpdateOrderImportTemplateRequest {
+  name?: string
+  isDefault?: boolean
   sourceColumns?: OrderImportSourceColumn[]
   fields?: OrderImportTemplateField[]
+  mappings?: OrderImportMapping[]
 }
 
 export interface OrderImportPreviewSummary {
@@ -125,9 +186,9 @@ export interface OrderImportPreviewResponse {
   matchedFieldCount?: number
   requiredFieldMissing: string[]
   summary: OrderImportPreviewSummary
-  aggregatedOrders: OrderItem[]
-  invalidRows: OrderImportPreviewRowError[]
+  aggregatedOrders: TenantOrderItem[]
   duplicateOrders: OrderImportDuplicateOrder[]
+  invalidRows: OrderImportPreviewRowError[]
 }
 
 export interface OrderImportSubmitRequest {
@@ -135,6 +196,12 @@ export interface OrderImportSubmitRequest {
   templateId?: string
   conflictPolicy?: OrderImportConflictPolicy
   rows?: Array<Record<string, unknown>>
+}
+
+export interface OrderImportSubmitResponse {
+  jobId: string
+  submittedCount: number
+  status: OrderImportJobStatus
 }
 
 export interface OrderImportJobFailure {
@@ -148,12 +215,6 @@ export interface OrderImportJobConflictDetail {
   existingOrderId?: string
   action: OrderImportConflictPolicy
   reason: string
-}
-
-export interface OrderImportSubmitResponse {
-  jobId: string
-  submittedCount: number
-  status: OrderImportJobStatus
 }
 
 export interface OrderImportJobResponse {
@@ -174,14 +235,27 @@ export interface OrderExportQuery extends OrderListQuery {
   ids?: string[]
 }
 
+export interface OrderPrintRecordRequest {
+  orderIds: string[]
+  requestId?: string
+  remark?: string
+}
+
+export interface OrderPrintRecordResponse {
+  requestId?: string
+  totalCount: number
+  successCount: number
+  confirmedAt: string
+  remark?: string
+}
+
 export interface OrderRemindRequest {
   channels?: string[]
 }
 
 export interface OrderRemindResponse {
   sent: boolean
-  channels?: string[]
-  channel?: string
+  channels: string[]
 }
 
 export interface CreditOrderItem {

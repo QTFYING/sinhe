@@ -2,7 +2,7 @@ import type { ListParams } from '../common'
 import type {
   CashVerifyStatus,
   OfflinePaymentMethod,
-  PaymentChannel,
+  OrderStatus,
   PaymentMethod,
   PaymentOrderStatus,
   PaymentRecordStatus,
@@ -10,6 +10,7 @@ import type {
 
 export interface PaymentOrderLineItem {
   itemId: string
+  skuId?: string | null
   skuName: string
   skuSpec?: string
   unit: string
@@ -32,7 +33,7 @@ export interface PaymentOrderDetailResponse {
   merchant: string
   customer: string
   amount: number
-  paidAmount?: number
+  paidAmount: number
   summary: string
   date: string
   status: PaymentOrderStatus
@@ -43,12 +44,10 @@ export interface PaymentOrderDetailResponse {
   items: PaymentOrderLineItem[]
 }
 
-export interface PaymentOrderActionResponse {
-  orderNo: string
-  status: PaymentOrderStatus
-  statusMessage?: string
-  selectedPaymentMethod: PaymentMethod | null
-  offlinePayment: OfflinePaymentInfo | null
+export interface InitiatePaymentResponse {
+  cashierUrl: string
+  orderId: string
+  payableAmount: string
 }
 
 export interface SubmitOfflinePaymentRequest {
@@ -56,15 +55,12 @@ export interface SubmitOfflinePaymentRequest {
   remark?: string
 }
 
-export interface ConfirmPaymentRequest {
-  channel?: PaymentChannel
-}
-
-export interface ConfirmPaymentResponse {
+export interface SubmitOfflinePaymentResponse {
   orderNo: string
-  paymentId: string
-  channel: PaymentChannel
-  cashierUrl: string
+  status: PaymentOrderStatus
+  statusMessage?: string
+  selectedPaymentMethod: PaymentMethod | null
+  offlinePayment: OfflinePaymentInfo | null
 }
 
 export interface PaymentStatusResponse {
@@ -76,7 +72,14 @@ export interface PaymentStatusResponse {
   selectedPaymentMethod?: PaymentMethod
 }
 
-export interface PaymentRecordItem {
+export interface VerifyCashPaymentResponse {
+  orderId: string
+  orderStatus: OrderStatus
+  paymentStatus: 'paid'
+  verifiedAt: string
+}
+
+export interface TenantPaymentRecordItem {
   id: string
   orderId: string
   customer: string
@@ -85,12 +88,30 @@ export interface PaymentRecordItem {
   fee: number
   net: number
   status: PaymentRecordStatus
-  tenant?: string
-  time?: string
-  paidAt?: string
+  paidAt: string
+}
+
+export interface AdminPaymentRecordItem {
+  id: string
+  tenant: string
+  orderId: string
+  customer: string
+  amount: number
+  channel: string
+  fee: number
+  net: number
+  time: string
+  status: PaymentRecordStatus
 }
 
 export interface PaymentListQuery extends ListParams {
+  channel?: string
+}
+
+export interface AdminPaymentListQuery {
+  page: number
+  pageSize: number
+  keyword?: string
   channel?: string
 }
 

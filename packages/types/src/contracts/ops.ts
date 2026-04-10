@@ -8,10 +8,20 @@ export interface AlertRuleItem {
   enabled: boolean
 }
 
-export interface AlertRuleUpsertRequest {
+export interface CreateAlertRuleRequest {
   name: string
   trigger: string
   channel: string
+}
+
+export interface UpdateAlertRuleRequest {
+  name?: string
+  trigger?: string
+  channel?: string
+}
+
+export interface ToggleAlertRuleRequest {
+  enabled: boolean
 }
 
 export interface SystemConfigItem {
@@ -30,12 +40,20 @@ export interface ServiceConfigItem {
   note: string
 }
 
-export interface ServiceConfigUpsertRequest {
+export interface CreateServiceConfigRequest {
   name: string
   category: string
   key: string
   provider: string
   note: string
+}
+
+export interface UpdateServiceConfigRequest {
+  name?: string
+  category?: string
+  key?: string
+  provider?: string
+  note?: string
 }
 
 export interface NoticeRecordItem {
@@ -71,10 +89,48 @@ export interface TicketRecordItem {
   status: TicketStatus
 }
 
+export interface TicketReplyResult {
+  replyId: string
+  content: string
+  repliedBy: string
+  repliedAt: string
+}
+
+export interface ReplyTicketRequest {
+  content: string
+  attachments?: string[]
+}
+
+export interface AssignTicketRequest {
+  assignee: string
+}
+
+export interface CloseTicketRequest {
+  resolution?: string
+}
+
 export interface ServiceProviderRecordItem {
   id: string
   name: string
   category: string
+  contactName: string
+  contactPhone: string
   status: ServiceProviderStatus
   score: string
+}
+
+export interface CreateServiceProviderRequest {
+  name: string
+  category: string
+  contactName: string
+  contactPhone: string
+  status?: ServiceProviderStatus
+}
+
+export interface UpdateServiceProviderRequest {
+  name?: string
+  category?: string
+  contactName?: string
+  contactPhone?: string
+  status?: ServiceProviderStatus
 }
