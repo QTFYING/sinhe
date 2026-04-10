@@ -79,13 +79,13 @@
 
 ```typescript
 {
-  accessToken: string
+  accessToken: string          // 访问令牌
   expiresIn: number           // 令牌有效期（秒）
   user: {
-    id: string
-    username: string
-    realName: string
-    role: string
+    id: string                // 用户 ID
+    username: string          // 登录账号
+    realName: string          // 用户姓名
+    role: string              // 当前角色
     tenantId: string | null   // 平台账号为 null
   }
 }
@@ -109,8 +109,8 @@
 
 ```typescript
 {
-  accessToken: string
-  expiresIn: number
+  accessToken: string         // 新的访问令牌
+  expiresIn: number           // 新令牌有效期（秒）
 }
 ```
 
@@ -138,11 +138,11 @@
 
 ```typescript
 {
-  id: string
-  username: string
-  realName: string
-  role: string
-  tenantId: string | null
+  id: string                  // 当前用户 ID
+  username: string            // 登录账号
+  realName: string            // 用户姓名
+  role: string                // 当前角色
+  tenantId: string | null     // 平台账号为 null
 }
 ```
 
@@ -266,9 +266,9 @@ Array<{
   }
 
   renewalRisks: Array<{
-    tenantName: string
-    dueInDays: number
-    owner: string
+    tenantName: string           // 租户名称
+    dueInDays: number            // 距到期天数
+    owner: string                // 负责人
   }>
 }
 ```
@@ -294,7 +294,7 @@ interface TenantRecord {
   monthlyFlow: number          // 本月流水（元）
   dueInDays: number            // 距到期天数，0 表示已到期
   lastActiveAt: string         // 最近活跃时间
-  status: TenantStatus
+  status: TenantStatus           // 租户状态
 }
 ```
 
@@ -307,12 +307,12 @@ interface TenantRecord {
 
 ```typescript
 {
-  page: number
-  pageSize: number
+  page: number                   // 页码
+  pageSize: number               // 每页条数
   keyword?: string            // 搜索关键词（匹配租户名称、ID、管理员）
   status?: TenantStatus       // 状态筛选
-  sortBy?: 'name' | 'packageName' | 'status' | 'dueInDays'
-  sortOrder?: 'asc' | 'desc'
+  sortBy?: 'name' | 'packageName' | 'status' | 'dueInDays' // 排序字段
+  sortOrder?: 'asc' | 'desc'   // 排序方向
 }
 ```
 
@@ -321,20 +321,20 @@ interface TenantRecord {
 ```typescript
 {
   list: Array<{
-    id: string
-    name: string
-    packageName: string
-    admin: string
-    region: string
-    channels: string[]
-    merchants: number
-    users: number
-    monthlyFlow: number
-    dueInDays: number
-    lastActiveAt: string
-    status: TenantStatus
+    id: string                  // 租户 ID
+    name: string                // 租户名称
+    packageName: string         // 套餐名称
+    admin: string               // 管理员姓名
+    region: string              // 地区
+    channels: string[]          // 支付通道列表
+    merchants: number           // 商户数
+    users: number               // 账号数
+    monthlyFlow: number         // 本月流水（元）
+    dueInDays: number           // 距到期天数
+    lastActiveAt: string        // 最近活跃时间
+    status: TenantStatus        // 租户状态
   }>
-  total: number
+  total: number                 // 租户总数
 }
 ```
 
@@ -372,7 +372,7 @@ interface TenantRecord {
   monthlyFlow: number          // 本月流水（元）
   dueInDays: number            // 距到期天数
   lastActiveAt: string         // 最近活跃时间
-  status: TenantStatus
+  status: TenantStatus         // 租户状态
 }
 ```
 
@@ -386,7 +386,7 @@ interface TenantRecord {
 
 ```typescript
 {
-  action: 'approve' | 'reject'
+  action: 'approve' | 'reject' // 审核动作
   reviewNote?: string          // 审核备注（通过时可选）
   rejectReason?: string        // 驳回原因（驳回时必填）
 }
@@ -396,18 +396,18 @@ interface TenantRecord {
 
 ```typescript
 {
-  id: string
-  name: string
-  packageName: string
-  admin: string
-  region: string
-  channels: string[]
-  merchants: number
-  users: number
-  monthlyFlow: number
-  dueInDays: number
-  lastActiveAt: string
-  status: TenantStatus
+  id: string                   // 租户 ID
+  name: string                 // 租户名称
+  packageName: string          // 套餐名称
+  admin: string                // 管理员姓名
+  region: string               // 地区
+  channels: string[]           // 已开通支付通道列表
+  merchants: number            // 商户数
+  users: number                // 账号数
+  monthlyFlow: number          // 本月流水（元）
+  dueInDays: number            // 距到期天数
+  lastActiveAt: string         // 最近活跃时间
+  status: TenantStatus         // 租户状态
 }
 ```
 
@@ -426,8 +426,8 @@ interface TenantRecord {
 ```typescript
 {
   ids: string[]                // 租户 ID 列表
-  action: 'approve'
-  reviewNote?: string
+  action: 'approve'            // 批量审核动作
+  reviewNote?: string          // 审核备注
 }
 ```
 
@@ -435,8 +435,8 @@ interface TenantRecord {
 
 ```typescript
 {
-  successCount: number
-  failedIds: string[]
+  successCount: number         // 成功处理数量
+  failedIds: string[]          // 失败租户 ID 列表
 }
 ```
 
@@ -461,18 +461,18 @@ interface TenantRecord {
 
 ```typescript
 {
-  id: string
-  name: string
-  packageName: string
-  admin: string
-  region: string
-  channels: string[]
-  merchants: number
-  users: number
-  monthlyFlow: number
-  dueInDays: number
-  lastActiveAt: string
-  status: TenantStatus
+  id: string                   // 租户 ID
+  name: string                 // 租户名称
+  packageName: string          // 套餐名称
+  admin: string                // 管理员姓名
+  region: string               // 地区
+  channels: string[]           // 已开通支付通道列表
+  merchants: number            // 商户数
+  users: number                // 账号数
+  monthlyFlow: number          // 本月流水（元）
+  dueInDays: number            // 距到期天数
+  lastActiveAt: string         // 最近活跃时间
+  status: TenantStatus         // 租户状态
 }
 ```
 
@@ -485,7 +485,7 @@ interface TenantRecord {
 
 ```typescript
 {
-  action: 'freeze' | 'unfreeze'
+  action: 'freeze' | 'unfreeze' // 冻结动作
   reason?: string              // 冻结原因（冻结时必填）
 }
 ```
@@ -494,18 +494,18 @@ interface TenantRecord {
 
 ```typescript
 {
-  id: string
-  name: string
-  packageName: string
-  admin: string
-  region: string
-  channels: string[]
-  merchants: number
-  users: number
-  monthlyFlow: number
-  dueInDays: number
-  lastActiveAt: string
-  status: TenantStatus
+  id: string                   // 租户 ID
+  name: string                 // 租户名称
+  packageName: string          // 套餐名称
+  admin: string                // 管理员姓名
+  region: string               // 地区
+  channels: string[]           // 已开通支付通道列表
+  merchants: number            // 商户数
+  users: number                // 账号数
+  monthlyFlow: number          // 本月流水（元）
+  dueInDays: number            // 距到期天数
+  lastActiveAt: string         // 最近活跃时间
+  status: TenantStatus         // 租户状态
 }
 ```
 
@@ -522,8 +522,8 @@ interface TenantRecord {
 
 ```typescript
 {
-  ids: string[]
-  reason: string
+  ids: string[]                // 租户 ID 列表
+  reason: string               // 冻结原因
 }
 ```
 
@@ -531,8 +531,8 @@ interface TenantRecord {
 
 ```typescript
 {
-  successCount: number
-  failedIds: string[]
+  successCount: number         // 成功处理数量
+  failedIds: string[]          // 失败租户 ID 列表
 }
 ```
 
@@ -546,9 +546,9 @@ interface TenantRecord {
 
 ```typescript
 {
-  page: number
-  pageSize: number
-  tenantType?: '平台' | '租户'
+  page: number                 // 页码
+  pageSize: number             // 每页条数
+  tenantType?: '平台' | '租户'  // 成员所属侧筛选
 }
 ```
 
@@ -557,16 +557,16 @@ interface TenantRecord {
 ```typescript
 {
   list: Array<{
-    id: string
-    name: string
-    account: string
-    tenant: string
-    tenantType: '平台' | '租户'
-    role: string
-    status: 'active' | 'invited' | 'locked' | 'disabled'
-    scope: string
+    id: string                 // 用户 ID
+    name: string               // 姓名
+    account: string            // 登录账号
+    tenant: string             // 所属租户
+    tenantType: '平台' | '租户' // 用户所属侧
+    role: string               // 当前角色
+    status: 'active' | 'invited' | 'locked' | 'disabled' // 账号状态
+    scope: string              // 数据范围
   }>
-  total: number
+  total: number                // 成员总数
 }
 ```
 
@@ -574,16 +574,17 @@ interface TenantRecord {
 
 - **GET** `/tenants/certifications`
 - **关联表**：tenant_certifications
+- **说明**：该队列仅展示仍在审核流中的记录，即 `待初审 / 待复核 / 待确认`。
 
 **响应 data：**
 
 ```typescript
 Array<{
-  id: string
+  id: string                   // 资质记录 ID
   tenant: string               // 租户名称
   type: string                 // "企业实名认证" | "经营资质补充" | "法人身份证更新"
-  submitAt: string
-  status: '待初审' | '待复核' | '待确认'
+  submitAt: string             // 提交时间
+  status: '待初审' | '待复核' | '待确认' // 当前审核状态
 }>
 ```
 
@@ -591,13 +592,14 @@ Array<{
 
 - **POST** `/tenants/certifications/{id}/review`
 - **关联表**：tenant_certifications
+- **说明**：该接口推进资质审核状态流转；`approve` 表示推进到下一审核节点或最终通过，`reject` 表示驳回。
 
 **请求参数：**
 
 ```typescript
 {
-  action: 'approve' | 'reject'
-  comment?: string
+  action: 'approve' | 'reject' // 审核动作
+  comment?: string             // 审核备注
 }
 ```
 
@@ -605,15 +607,23 @@ Array<{
 
 ```typescript
 {
-  id: string
+  id: string                   // 资质记录 ID
   tenant: string               // 租户名称
   type: string                 // 资质类型
   submitAt: string             // 提交时间
-  status: '已通过' | '已驳回'
+  previousStatus: '待初审' | '待复核' | '待确认' // 审核前状态
+  status: '待复核' | '待确认' | '已通过' | '已驳回' // 审核后状态
   comment?: string             // 审核备注
   reviewedAt: string           // 审核完成时间
 }
 ```
+
+**状态流转规则：**
+
+- `待初审` + `approve` -> `待复核`
+- `待复核` + `approve` -> `待确认`
+- `待确认` + `approve` -> `已通过`
+- 任一待处理状态 + `reject` -> `已驳回`
 
 ---
 
@@ -626,16 +636,16 @@ type UserStatus = 'active' | 'invited' | 'locked' | 'disabled'
 
 interface UserRecord {
   id: string                   // 如 "USR-001"
-  name: string
+  name: string                 // 姓名
   account: string              // 登录账号
-  phone: string
-  tenantType: '平台' | '租户'
+  phone: string                // 手机号
+  tenantType: '平台' | '租户'   // 用户所属侧
   tenant: string               // 所属租户
-  role: string
+  role: string                 // 当前角色
   scope: string                // 数据范围描述
-  status: UserStatus
+  status: UserStatus           // 账号状态
   loginAt: string              // 最后登录时间
-  requiresPasswordReset: boolean
+  requiresPasswordReset: boolean // 是否要求下次登录强制改密
 }
 ```
 
@@ -649,8 +659,8 @@ interface UserRecord {
 
 ```typescript
 {
-  page: number
-  pageSize: number
+  page: number                 // 页码
+  pageSize: number             // 每页条数
   keyword?: string             // 搜索关键词（匹配姓名、账号、手机号）
   tenant?: string              // 按租户筛选
   role?: string                // 按角色筛选
@@ -662,19 +672,19 @@ interface UserRecord {
 ```typescript
 {
   list: Array<{
-    id: string
-    name: string
-    account: string
-    phone: string
-    tenantType: '平台' | '租户'
-    tenant: string
-    role: string
-    scope: string
-    status: UserStatus
-    loginAt: string
-    requiresPasswordReset: boolean
+    id: string                 // 用户 ID
+    name: string               // 姓名
+    account: string            // 登录账号
+    phone: string              // 手机号
+    tenantType: '平台' | '租户' // 用户所属侧
+    tenant: string             // 所属租户
+    role: string               // 当前角色
+    scope: string              // 数据范围描述
+    status: UserStatus         // 账号状态
+    loginAt: string            // 最后登录时间
+    requiresPasswordReset: boolean // 是否要求下次登录强制改密
   }>
-  total: number
+  total: number                // 用户总数
 }
 ```
 
@@ -690,11 +700,11 @@ interface UserRecord {
   name: string                 // 姓名（必填）
   account: string              // 登录账号（必填，全局唯一）
   phone: string                // 手机号（必填）
-  tenantType: '平台' | '租户'
+  tenantType: '平台' | '租户'   // 用户所属侧
   tenant: string               // 所属租户名称
   role: string                 // 角色名称
   scope: string                // 数据范围
-  status: 'active' | 'invited'
+  status: 'active' | 'invited' // 初始状态
 }
 ```
 
@@ -702,17 +712,17 @@ interface UserRecord {
 
 ```typescript
 {
-  id: string
-  name: string
-  account: string
-  phone: string
-  tenantType: '平台' | '租户'
-  tenant: string
-  role: string
-  scope: string
-  status: UserStatus
-  loginAt: string
-  requiresPasswordReset: boolean
+  id: string                   // 用户 ID
+  name: string                 // 姓名
+  account: string              // 登录账号
+  phone: string                // 手机号
+  tenantType: '平台' | '租户'   // 用户所属侧
+  tenant: string               // 所属租户名称
+  role: string                 // 角色名称
+  scope: string                // 数据范围
+  status: UserStatus           // 账号状态
+  loginAt: string              // 最后登录时间
+  requiresPasswordReset: boolean // 是否要求下次登录强制改密
 }
 ```
 
@@ -732,11 +742,11 @@ interface UserRecord {
   name?: string                // 姓名
   account?: string             // 登录账号
   phone?: string               // 手机号
-  tenantType?: '平台' | '租户'
+  tenantType?: '平台' | '租户'  // 用户所属侧
   tenant?: string              // 所属租户名称
   role?: string                // 角色名称
   scope?: string               // 数据范围
-  status?: 'active' | 'invited'
+  status?: 'active' | 'invited' // 账号状态
 }
 ```
 
@@ -744,17 +754,17 @@ interface UserRecord {
 
 ```typescript
 {
-  id: string
-  name: string
-  account: string
-  phone: string
-  tenantType: '平台' | '租户'
-  tenant: string
-  role: string
-  scope: string
-  status: UserStatus
-  loginAt: string
-  requiresPasswordReset: boolean
+  id: string                   // 用户 ID
+  name: string                 // 姓名
+  account: string              // 登录账号
+  phone: string                // 手机号
+  tenantType: '平台' | '租户'   // 用户所属侧
+  tenant: string               // 所属租户名称
+  role: string                 // 角色名称
+  scope: string                // 数据范围
+  status: UserStatus           // 账号状态
+  loginAt: string              // 最后登录时间
+  requiresPasswordReset: boolean // 是否要求下次登录强制改密
 }
 ```
 
@@ -775,7 +785,7 @@ interface UserRecord {
 
 ```typescript
 {
-  status: UserStatus
+  status: UserStatus           // 目标账号状态
 }
 ```
 
@@ -783,17 +793,17 @@ interface UserRecord {
 
 ```typescript
 {
-  id: string
-  name: string
-  account: string
-  phone: string
-  tenantType: '平台' | '租户'
-  tenant: string
-  role: string
-  scope: string
-  status: UserStatus
-  loginAt: string
-  requiresPasswordReset: boolean
+  id: string                   // 用户 ID
+  name: string                 // 姓名
+  account: string              // 登录账号
+  phone: string                // 手机号
+  tenantType: '平台' | '租户'   // 用户所属侧
+  tenant: string               // 所属租户名称
+  role: string                 // 角色名称
+  scope: string                // 数据范围
+  status: UserStatus           // 账号状态
+  loginAt: string              // 最后登录时间
+  requiresPasswordReset: boolean // 是否要求下次登录强制改密
 }
 ```
 
@@ -819,6 +829,7 @@ interface UserRecord {
 
 > Admin 看到的是**跨租户**的订单数据，与 Tenant 的 `/orders` 共用同一资源路径，后端通过 token 区分权限范围。
 > Admin 端仅提供查单与审计能力，不提供创建、导入、轮询、催款等运营动作。
+> `qrCodeToken` 来源于 `orders.qrCodeToken`；Admin 仅查看该 H5 公开入口字段，不负责生成或管理。
 
 ### 类型定义
 
@@ -831,12 +842,13 @@ interface AdminOrder {
   sourceOrderNo?: string       // 由 Excel 导入的原始 ERP 订单号
   groupKey?: string            // 用于防重的辅键
   mappingTemplateId?: string   // 关联的导入模板
+  qrCodeToken?: string         // 订单级 H5 公开路由标识，仅供查看与排障
   customer: string             // 客户名称
   lineItems: any[]             // 商品明细 (对应 OrderItem 结构)
   customFieldValues?: Record<string, string> // 模板动态映射的自定义字段
   amount: number               // 订单金额（元）
   paid: number                 // 已收金额（元）
-  status: OrderStatus
+  status: OrderStatus          // 收款状态
   payType: string              // 现款 | 账期
   date: string                 // 订单日期 YYYY-MM-DD
   voided: boolean              // 是否已作废（防物理删除）
@@ -864,8 +876,8 @@ interface AdminOrder {
 
 ```typescript
 {
-  page: number
-  pageSize: number
+  page: number                 // 页码
+  pageSize: number             // 每页条数
   keyword?: string             // 搜索订单号、客户、租户
 }
 ```
@@ -875,55 +887,57 @@ interface AdminOrder {
 ```typescript
 {
   list: Array<{
-    id: string
-    tenant: string
-    sourceOrderNo?: string
-    groupKey?: string
-    mappingTemplateId?: string
-    customer: string
+    id: string                 // 订单 ID
+    tenant: string             // 所属租户
+    sourceOrderNo?: string     // 原始 ERP 订单号
+    groupKey?: string          // 防重辅键
+    mappingTemplateId?: string // 导入模板 ID
+    qrCodeToken?: string       // 订单级 H5 公开路由标识
+    customer: string           // 客户名称
     lineItems: Array<{
-      itemId?: string
-      skuId?: string | null
-      skuName: string
-      skuSpec?: string
-      unit: string
-      quantity: number
-      unitPrice: number
-      lineAmount: number
+      itemId?: string          // 行项目 ID
+      skuId?: string | null    // 商品主数据 ID
+      skuName: string          // 商品名称
+      skuSpec?: string         // 商品规格
+      unit: string             // 单位
+      quantity: number         // 数量
+      unitPrice: number        // 单价
+      lineAmount: number       // 行金额
     }>
-    customFieldValues?: Record<string, string>
-    amount: number
-    paid: number
-    status: OrderStatus
-    payType: string
-    date: string
-    voided: boolean
-    voidReason?: string
-    voidedAt?: string
+    customFieldValues?: Record<string, string> // 动态自定义字段
+    amount: number             // 订单金额（元）
+    paid: number               // 已收金额（元）
+    status: OrderStatus        // 收款状态
+    payType: string            // 付款方式
+    date: string               // 下单日期
+    voided: boolean            // 是否已作废
+    voidReason?: string        // 作废原因
+    voidedAt?: string          // 作废时间
   }>
-  total: number
+  total: number                // 订单总数
 }
 ```
 
 ### 7.2 获取订单详情
 
 - **GET** `/orders/{id}`
-- **描述**：查看单个订单的聚合详情、商品明细与审计所需字段
+- **描述**：查看单个订单的聚合详情、商品明细、`qrCodeToken` 与审计所需字段
 - **关联表**：orders
 
 **响应 data：**
 
 ```typescript
 {
-  id: string
+  id: string                   // 订单 ID
   tenant: string               // 所属租户
   sourceOrderNo?: string       // 原始 ERP 订单号
   groupKey?: string            // 防重辅键
   mappingTemplateId?: string   // 导入模板 ID
+  qrCodeToken?: string         // 订单级 H5 公开路由标识，仅查看不生成
   customer: string             // 客户名称
   lineItems: Array<{
     itemId?: string            // 行项目 ID
-    skuId?: string | null
+    skuId?: string | null      // 商品主数据 ID
     skuName: string            // 商品名称
     skuSpec?: string           // 商品规格
     unit: string               // 单位
@@ -934,7 +948,7 @@ interface AdminOrder {
   customFieldValues?: Record<string, string> // 动态自定义字段
   amount: number               // 订单金额（元）
   paid: number                 // 已收金额（元）
-  status: OrderStatus
+  status: OrderStatus          // 收款状态
   payType: string              // 现款 | 账期
   date: string                 // 订单日期
   voided: boolean              // 是否已作废
@@ -956,13 +970,13 @@ interface PaymentRecord {
   id: string                   // 流水号，如 "PAY-20260330-001"
   tenant: string               // 所属租户
   orderId: string              // 关联订单号
-  customer: string
+  customer: string             // 客户名称
   amount: number               // 收款金额（元）
   channel: string              // 支付通道：微信支付 | 支付宝 | 平安银行
   fee: number                  // 手续费（元）
   net: number                  // 到账金额（元）
   time: string                 // 收款时间
-  status: 'success' | 'partial'
+  status: 'success' | 'partial' // 流水状态
 }
 ```
 
@@ -987,18 +1001,18 @@ interface PaymentRecord {
 ```typescript
 {
   list: Array<{
-    id: string
-    tenant: string
-    orderId: string
-    customer: string
-    amount: number
-    channel: string
-    fee: number
-    net: number
-    time: string
-    status: 'success' | 'partial'
+    id: string                  // 流水 ID
+    tenant: string              // 所属租户
+    orderId: string             // 关联订单号
+    customer: string            // 客户名称
+    amount: number              // 收款金额（元）
+    channel: string             // 支付通道
+    fee: number                 // 手续费（元）
+    net: number                 // 到账金额（元）
+    time: string                // 收款时间
+    status: 'success' | 'partial' // 流水状态
   }>
-  total: number
+  total: number                 // 流水总数
 }
 ```
 
@@ -1229,14 +1243,14 @@ interface ContractRecord {
 ```typescript
 {
   list: Array<{
-    contractNo: string
-    tenant: string
-    type: '电子签' | '归档件'
-    expireAt: string
-    status: '履约中' | '待续约' | '待签署' | '待归档' | '已终止'
-    terminateReason?: string
+    contractNo: string          // 合同编号
+    tenant: string              // 租户名称
+    type: '电子签' | '归档件'   // 合同类型
+    expireAt: string            // 到期时间
+    status: '履约中' | '待续约' | '待签署' | '待归档' | '已终止' // 合同状态
+    terminateReason?: string    // 终止原因
   }>
-  total: number
+  total: number                 // 合同总数
 }
 ```
 
@@ -1406,13 +1420,13 @@ interface InvoiceRecord {
 ```typescript
 {
   list: Array<{
-    billNo: string
-    tenant: string
-    amount: string
-    cycle: string
-    status: '已开票' | '待开票' | '对账中' | '已作废'
+    billNo: string              // 发票编号
+    tenant: string              // 租户名称
+    amount: string              // 开票金额
+    cycle: string               // 结算周期
+    status: '已开票' | '待开票' | '对账中' | '已作废' // 发票状态
   }>
-  total: number
+  total: number                 // 发票总数
 }
 ```
 
@@ -1476,12 +1490,12 @@ interface InvoiceRecord {
 
 ```typescript
 interface ServiceProviderRecord {
-  id: string
-  name: string
+  id: string                   // 服务商记录 ID
+  name: string                 // 服务商名称
   category: string             // "消息通道" | "资质审核" | "合同管理"
-  contactName: string
-  contactPhone: string
-  status: '已接入' | '试运行'
+  contactName: string          // 联系人姓名
+  contactPhone: string         // 联系电话
+  status: '已接入' | '试运行'  // 接入状态
   score: string                // 质量指标，如 "SLA 99.95%"
 }
 ```
@@ -1495,12 +1509,12 @@ interface ServiceProviderRecord {
 
 ```typescript
 Array<{
-  id: string
-  name: string
+  id: string                   // 服务商记录 ID
+  name: string                 // 服务商名称
   category: string             // 服务商分类
-  contactName: string
-  contactPhone: string
-  status: '已接入' | '试运行'
+  contactName: string          // 联系人姓名
+  contactPhone: string         // 联系电话
+  status: '已接入' | '试运行'  // 接入状态
   score: string                // 服务质量指标
 }>
 ```
@@ -1527,13 +1541,13 @@ Array<{
 
 ```typescript
 {
-  id: string
-  name: string
-  category: string
-  contactName: string
-  contactPhone: string
-  status: '已接入' | '试运行'
-  score: string
+  id: string                   // 服务商记录 ID
+  name: string                 // 服务商名称
+  category: string             // 服务商分类
+  contactName: string          // 联系人姓名
+  contactPhone: string         // 联系电话
+  status: '已接入' | '试运行'  // 接入状态
+  score: string                // 服务质量指标
 }
 ```
 
@@ -1547,11 +1561,11 @@ Array<{
 
 ```typescript
 {
-  name?: string
-  category?: string
-  contactName?: string
-  contactPhone?: string
-  status?: '已接入' | '试运行'
+  name?: string                // 服务商名称
+  category?: string            // 服务商分类
+  contactName?: string         // 联系人姓名
+  contactPhone?: string        // 联系电话
+  status?: '已接入' | '试运行' // 接入状态
 }
 ```
 
@@ -1559,13 +1573,13 @@ Array<{
 
 ```typescript
 {
-  id: string
-  name: string
-  category: string
-  contactName: string
-  contactPhone: string
-  status: '已接入' | '试运行'
-  score: string
+  id: string                   // 服务商记录 ID
+  name: string                 // 服务商名称
+  category: string             // 服务商分类
+  contactName: string          // 联系人姓名
+  contactPhone: string         // 联系电话
+  status: '已接入' | '试运行'  // 接入状态
+  score: string                // 服务质量指标
 }
 ```
 
@@ -1758,13 +1772,13 @@ interface TicketReplyResult {
 ```typescript
 {
   list: Array<{
-    no: string
-    tenant: string
-    issue: string
-    assignee: string
-    status: '处理中' | '待分派' | '已解决'
+    no: string                  // 工单编号
+    tenant: string              // 提单租户
+    issue: string               // 问题描述
+    assignee: string            // 当前处理人
+    status: '处理中' | '待分派' | '已解决' // 工单状态
   }>
-  total: number
+  total: number                 // 工单总数
 }
 ```
 
@@ -2287,8 +2301,8 @@ Array<{
 Array<{
   group: string                // "全局参数" | "邮件通道" | "短信通道"
   key: string                  // 如 "tenant_default_trial_days"
-  value: string
-  note: string
+  value: string                // 配置值
+  note: string                 // 配置说明
 }>
 ```
 
@@ -2301,12 +2315,12 @@ Array<{
 
 ```typescript
 Array<{
-  id: string
-  name: string
+  id: string                   // 配置记录 ID
+  name: string                 // 配置名称
   category: string             // "短信通道" | "电子签署"
-  key: string
-  provider: string
-  note: string
+  key: string                  // 配置键
+  provider: string             // 服务提供方
+  note: string                 // 备注说明
 }>
 ```
 
@@ -2331,12 +2345,12 @@ Array<{
 
 ```typescript
 {
-  id: string
-  name: string
-  category: string
-  key: string
-  provider: string
-  note: string
+  id: string                   // 配置记录 ID
+  name: string                 // 配置名称
+  category: string             // 配置分类
+  key: string                  // 配置键
+  provider: string             // 服务提供方
+  note: string                 // 备注说明
 }
 ```
 
@@ -2349,11 +2363,11 @@ Array<{
 
 ```typescript
 {
-  name?: string
-  category?: string
-  key?: string
-  provider?: string
-  note?: string
+  name?: string                // 配置名称
+  category?: string            // 配置分类
+  key?: string                 // 配置键
+  provider?: string            // 服务提供方
+  note?: string                // 备注说明
 }
 ```
 
@@ -2361,12 +2375,12 @@ Array<{
 
 ```typescript
 {
-  id: string
-  name: string
-  category: string
-  key: string
-  provider: string
-  note: string
+  id: string                   // 配置记录 ID
+  name: string                 // 配置名称
+  category: string             // 配置分类
+  key: string                  // 配置键
+  provider: string             // 服务提供方
+  note: string                 // 备注说明
 }
 ```
 
@@ -2397,6 +2411,7 @@ Array<{
 
 | Admin 数据 | 关联的 H5 端 |
 |-----------|-------------|
+| `GET /orders/{id}` 订单详情 | 可查看 `qrCodeToken` 对应的订单公开入口，仅用于排障与核查 |
 | `GET /payments` 收款流水 | 包含 H5 在线支付成功的记录 |
 | `GET /reconciliation/daily` 对账明细 | 包含 H5 在线支付与现金核销产生的到账数据 |
 

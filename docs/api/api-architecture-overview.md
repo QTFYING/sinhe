@@ -120,7 +120,7 @@ https://api.platform.com/api/v1
 
 1. **同一资源、不同前缀**：Admin 走 `/platform/*` 或直接走资源路径获取跨租户数据；Tenant 走相同资源路径但后端自动按 tenantId 过滤；H5 走 `/pay/*` 获取单个订单
 2. **后端通过 Token 中的 `tenantId` 自动隔离数据**：Tenant 端不需要传 tenantId，后端自动注入
-3. **H5 页面公开访问**：`qrCodeToken` 仅作为订单级公开路由标识，用于打开 `/pay/:token` 对应页面，不承载收货人身份鉴权
+3. **H5 页面公开访问**：`qrCodeToken` 来源于 `orders.qrCodeToken`，仅作为订单级公开路由标识，用于打开 `/pay/:token` 对应页面，不承载收货人身份鉴权
 
 ---
 
@@ -139,8 +139,9 @@ https://api.platform.com/api/v1
 | 4 | GET | `/pay/:token/status` | 轮询支付状态 | payment_orders |
 
 **已确认的设计决策：**
-- `qrCodeToken` 为订单级公开路由标识；前端按固定路由规则 `/pay/:token` 生成送货单二维码
+- `qrCodeToken` 来源于 `orders.qrCodeToken`；前端按固定路由规则 `/pay/:token` 生成送货单二维码
 - 采用 5 态状态机：`UNPAID / PAYING / PENDING_VERIFICATION / PAID / EXPIRED`
+- `payment_orders` 在 `EXPIRED` 状态下允许重新发起支付
 - 现金链路闭环：H5 `offline-payment` 登记待核销，Tenant 侧 `verify-cash` 财务核销
 - 在线支付仅在用户点击支付后触发，依赖后端的 `initiate` 动态返回 `cashierUrl` 与轮询 `status`
 - Webhook 依赖系统底层 `POST /payment/webhook/lakala`（不计入前端直接可见端点）
@@ -150,24 +151,24 @@ https://api.platform.com/api/v1
 ```
 H5 前端                    后端                     支付网关
   │                        │                        │
-  │  POST /confirm         │                        │
+  │  POST /pay/:token/initiate                       │
   │───────────────────────▶│                        │
-  │  { channel, params }   │                        │
+  │  返回 cashierUrl       │                        │
   │◀───────────────────────│                        │
   │                        │                        │
-  │  唤起 SDK ─────────────────────────────────────▶│
+  │  跳转 cashierUrl ──────────────────────────────▶│
   │                        │   异步回调              │
   │                        │◀───────────────────────│
   │                        │   更新 payment_orders   │
-  │  GET /status (轮询)    │                        │
+  │  GET /pay/:token/status │                        │
   │───────────────────────▶│                        │
-  │  { status: 'paid' }   │                        │
+  │  { status: 'PAID' }    │                        │
   │◀───────────────────────│                        │
 ```
 
 ---
 
-### 4.2 Tenant 端（商户 SaaS）— 48 个端点
+### 4.2 Tenant 端（商户 SaaS）— 46 个端点
 
 > 鉴权方式：业务请求走 Bearer Access Token；Refresh Token 存于 HttpOnly Cookie，后端通过 token 中的 tenantId 自动隔离数据
 > 角色（固定枚举）：TENANT_OWNER / TENANT_OPERATOR / TENANT_FINANCE / TENANT_VIEWER
@@ -194,7 +195,7 @@ H5 前端                    后端                     支付网关
 | B4 | PUT | `/orders/{id}` | 更新订单 | TENANT_OWNER, TENANT_OPERATOR | orders |
 | B5 | POST | `/orders/:id/void` | 作废订单 | TENANT_OWNER | orders |
 | B6 | POST | `/orders/import` | 异步正式导入 | TENANT_OWNER, TENANT_OPERATOR | orders |
-| B7 | POST | `/orders/print-records` | 打印成功回执（单个/批量） | TENANT_OWNER, TENANT_OPERATOR | orders |
+| B7 | POST | `/orders/print-records` | 打印成功回执（单个/批量） | TENANT_OWNER, TENANT_OPERATOR | orders + print_record_batches |
 | B8 | POST | `/orders/{id}/remind` | 发送催款提醒 | TENANT_OWNER, TENANT_FINANCE | orders |
 | B9 | GET | `/import/templates` | 导入-获取模板列表 | TENANT_OWNER, TENANT_OPERATOR | — |
 | B10 | POST | `/import/templates` | 导入-创建模板 | TENANT_OWNER, TENANT_OPERATOR | — |
@@ -208,6 +209,8 @@ H5 前端                    后端                     支付网关
 - 调用 `/orders/import` 提交 JSON Payload，支持 `{ previewId?, templateId?, conflictPolicy?, rows? }`
 - 请求参数支持包含：`customFieldDefs` 和实列值映射
 - 使用 `/orders/import/jobs/:jobId` 轮询导入进度，结果需包含 `overwrittenCount` 与 `conflictDetails`
+- 创建订单与正式导入成功时，同步生成 `orders.qrCodeToken`
+- `POST /orders/print-records` 建议携带 `requestId`，按 `tenantId + requestId` 实现批次级幂等
 
 **订单列表筛选参数：**
 
@@ -230,7 +233,7 @@ H5 前端                    后端                     支付网关
 |---|--------|------|------|------|--------|
 | C1 | GET | `/payments` | 本租户收款流水列表 | TENANT_OWNER, TENANT_FINANCE | payments |
 | C2 | GET | `/payments/summary` | 收款汇总统计 | TENANT_OWNER, TENANT_FINANCE | payments |
-| C3 | POST | `/orders/:id/verify-cash` | 现金财务核销 | TENANT_FINANCE | payment_orders |
+| C3 | POST | `/orders/:id/verify-cash` | 现金财务核销 | TENANT_FINANCE | payment_orders + payments + orders |
 
 > 引入 5 态状态机后，H5 扫码离线支付变为 `PENDING_VERIFICATION`。C3 用于财务手动确认资金到账。
 
@@ -270,12 +273,16 @@ H5 前端                    后端                     支付网关
 | H5 | PUT | `/settings/users/{id}` | 更新用户 | TENANT_OWNER | users |
 | H6 | DELETE | `/settings/users/{id}` | 删除用户 | TENANT_OWNER | users |
 | H7 | PUT | `/settings/users/{id}/status` | 启用/禁用用户 | TENANT_OWNER | users |
-| H8 | GET | `/settings/general` | 获取通用配置（企业信息+通知） | TENANT_OWNER | system_configs |
-| H9 | PUT | `/settings/general` | 保存通用配置 | TENANT_OWNER | system_configs |
+| H8 | GET | `/settings/general` | 获取通用配置（企业信息+通知） | TENANT_OWNER | system_configs + tenant_general_settings |
+| H9 | PUT | `/settings/general` | 保存通用配置 | TENANT_OWNER | system_configs + tenant_general_settings |
 | H10 | GET | `/settings/printing` | 获取打印配置列表 | TENANT_OWNER | printer_templates, import_templates |
 | H11 | GET | `/settings/printing/{importTemplateId}` | 获取单张映射模板的打印配置 | TENANT_OWNER | printer_templates, import_templates |
 | H12 | PUT | `/settings/printing/{importTemplateId}` | 保存单张映射模板的打印配置 | TENANT_OWNER | printer_templates |
 | H13 | GET | `/settings/audit-logs` | 获取本租户操作日志 | TENANT_OWNER | audit_logs |
+
+**Settings 已确认决策：**
+- `/settings/general` 采用“平台默认 + 租户覆盖”两层模型；GET 返回合并结果，PUT 仅更新租户覆盖层
+- `/settings/printing*` 以 `tenantId + importTemplateId` 为持久化维度；若无自定义配置，则前端回退本地默认模板
 
 #### 模块 I：通知（Notifications）— 2 个端点
 
@@ -296,19 +303,19 @@ H5 前端                    后端                     支付网关
 | 模块 | 端点数 | 主要关联表 |
 |------|--------|-----------|
 | Auth | 4 | users |
-| Orders | 13 | orders, order_items |
-| Payment & 核销 | 3 | payments, payment_orders |
+| Orders | 13 | orders, order_items, import_templates, import_jobs, print_record_batches |
+| Payment & 核销 | 3 | orders, payments, payment_orders |
 | Finance | 3 | orders, payments |
 | Credit | 2 | orders, payments |
 | Analytics | 4 | orders, payments |
-| Settings | 13 | roles, permissions, users, system_configs, printer_templates, import_templates, audit_logs |
+| Settings | 13 | roles, permissions, users, system_configs, tenant_general_settings, printer_templates, import_templates, audit_logs |
 | Notifications | 2 | notices |
 | Certification | 2 | tenant_certifications |
 | **合计** | **46** | — |
 
 ---
 
-### 4.3 Admin 端（平台运营）— 84 个端点
+### 4.3 Admin 端（平台运营）— 81 个端点
 
 > 鉴权方式：业务请求走 Bearer Access Token；Refresh Token 存于 HttpOnly Cookie；tenantId = null 表示平台用户
 > 平台用户可跨租户查看和管理数据
@@ -537,9 +544,12 @@ H5 前端                    后端                     支付网关
 
 | # | 决策 | 结论 |
 |---|------|------|
-| 1 | H5 路由标识 | `qrCodeToken` 为订单级公开路由标识，前端按固定规则生成 `/pay/:token` 二维码链接 |
+| 1 | H5 路由标识 | `qrCodeToken` 来源于 `orders.qrCodeToken`，前端按固定规则生成 `/pay/:token` 二维码链接 |
 | 2 | H5 状态机 | 五态流转 `UNPAID -> PAYING -> PENDING_VERIFICATION -> PAID / EXPIRED` |
 | 3 | 物理删除防范 | 以 `POST /orders/:id/void` 替代 `DELETE` 软作废，保留历史日志。 |
 | 4 | 订单导入机制 | 使用服务器管理模板 + 预览步骤 + 异步导入，不直接传接实体 Excel 文件 |
 | 5 | Tenant 安全权限 | 所有角色以固定代码写死。`settings/roles` 等全部为只读配置接口 |
+| 6 | 通用配置模型 | `/settings/general` 采用“平台默认 + 租户覆盖”两层模型，GET 返回合并结果 |
+| 7 | 打印配置模型 | `/settings/printing*` 只存黑盒 JSON，持久化维度为 `tenantId + importTemplateId` |
+| 8 | 打印回执幂等 | `/orders/print-records` 按 `tenantId + requestId` 做批次级幂等 |
 

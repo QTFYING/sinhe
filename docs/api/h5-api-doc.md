@@ -24,7 +24,7 @@
 
 共计 **4** 个端点。
 
-> 说明：`qrCodeToken` 是订单级公开路由标识，用于将送货单二维码路由到对应订单 H5 页面，不承载收货人身份鉴权。
+> 说明：`qrCodeToken` 对应 `orders.qrCodeToken`，是订单级公开路由标识，用于将送货单二维码路由到对应订单 H5 页面，不承载收货人身份鉴权。
 
 ---
 
@@ -38,7 +38,7 @@
 
 | 参数 | 类型 | 说明 |
 |------|------|------|
-| token | string | URL 中的 `qrCodeToken`，用于路由到对应订单 H5 页面 |
+| token | string | URL 中的 `qrCodeToken`，直接对应 `orders.qrCodeToken`，用于路由到对应订单 H5 页面 |
 
 ### 响应 data
 
@@ -55,8 +55,8 @@
   statusMessage?: string       // 状态说明文案（如失败原因）
   servicePhone?: string        // 客服电话（失败状态下展示）
 
-  selectedPaymentMethod: PaymentMethodType | null
-  offlinePayment: OfflinePaymentInfo | null
+  selectedPaymentMethod: PaymentMethodType | null // 当前已选择的支付方式
+  offlinePayment: OfflinePaymentInfo | null // 线下支付信息；未登记时为 null
 
   items: Array<{
     itemId: string             // 行项目 ID
@@ -90,7 +90,7 @@
 
 | 参数 | 类型 | 说明 |
 |------|------|------|
-| token | string | URL 中的 `qrCodeToken`，用于路由到对应订单 H5 页面 |
+| token | string | URL 中的 `qrCodeToken`，直接对应 `orders.qrCodeToken`，用于路由到对应订单 H5 页面 |
 
 ### 请求参数
 
@@ -118,6 +118,7 @@
 ### 业务规则
 
 - 仅状态为 `UNPAID` 与 `EXPIRED` 的订单可以由本路由成功发起在线支付。
+- 当状态为 `EXPIRED` 时，表示上一轮支付尝试已失效；允许重新预下单并进入新一轮支付流程。
 - 成功下发收银台 URL 的同时，后端将订单状态迁移为 `PAYING`。
 - `cashierUrl` 不是订单固定字段；只有用户点击支付后，后端向支付渠道发起预下单时才会动态返回。
 - H5 前端获取到 `cashierUrl` 后直接跳转，在用户完成支付关掉页面后，利用 `/pay/:token/status` 的轮询检查最终核实。
@@ -134,7 +135,7 @@
 
 | 参数 | 类型 | 说明 |
 |------|------|------|
-| token | string | URL 中的 `qrCodeToken`，用于路由到对应订单 H5 页面 |
+| token | string | URL 中的 `qrCodeToken`，直接对应 `orders.qrCodeToken`，用于路由到对应订单 H5 页面 |
 
 ### 请求参数
 
@@ -150,10 +151,10 @@
 ```typescript
 {
   orderNo: string
-  status: PaymentOrderStatus
-  statusMessage?: string
-  selectedPaymentMethod: PaymentMethodType | null
-  offlinePayment: OfflinePaymentInfo | null
+  status: PaymentOrderStatus    // 更新后的支付状态
+  statusMessage?: string        // 状态说明文案
+  selectedPaymentMethod: PaymentMethodType | null // 当前已选择的支付方式
+  offlinePayment: OfflinePaymentInfo | null // 线下支付详情；未登记时为 null
 }
 ```
 
@@ -182,25 +183,25 @@
 ## 4. 轮询支付状态
 
 - **GET** `/pay/:token/status`
-- **描述**：在线支付发起后，前端轮询此接口等待支付网关异步回调结果
+- **描述**：在线支付发起后，前端轮询此接口等待支付网关异步回调结果；返回状态直接来源于 `payment_orders.status`
 - **是否鉴权**：否
 
 ### 路径参数
 
 | 参数 | 类型 | 说明 |
 |------|------|------|
-| token | string | URL 中的 `qrCodeToken`，用于路由到对应订单 H5 页面 |
+| token | string | URL 中的 `qrCodeToken`，直接对应 `orders.qrCodeToken`，用于路由到对应订单 H5 页面 |
 
 ### 响应 data
 
 ```typescript
 {
   orderNo: string
-  status: PaymentOrderStatus
-  statusMessage?: string
+  status: PaymentOrderStatus    // 当前支付状态，直接来源于 payment_orders.status
+  statusMessage?: string        // 状态说明文案
   paidAmount?: number          // 已付金额（支付完成时返回）
   paidAt?: string              // 支付完成时间（支付完成时返回）
-  selectedPaymentMethod?: PaymentMethodType
+  selectedPaymentMethod?: PaymentMethodType // 当前已选择的支付方式
 }
 ```
 
@@ -260,6 +261,8 @@ type PaymentOrderStatus = 'UNPAID' | 'PAYING' | 'PENDING_VERIFICATION' | 'PAID' 
 | `PENDING_VERIFICATION` | 待核销 | 线下现金支付已登记，等待 Tenant 财务核销 | 橙色面板，"订单待核销" |
 | `PAID` | 已完成 | 支付成功或已通过其他方式确认全款 | 绿色面板，"订单已完成" |
 | `EXPIRED` | 已作废/过期 | 超时未付或商户作废订单产生此状态 | 灰色面板，无法进行交互动作 |
+
+> 补充说明：`EXPIRED` 状态下允许再次调用 `POST /pay/:token/initiate`，重新发起一笔新的在线支付尝试。
 
 ### 状态流转图
 
