@@ -196,7 +196,7 @@
 
 ### 任务
 
-1. 落地 `GET /settings/printing/list`
+1. 落地 `GET /settings/printing`
 2. 落地 `GET /settings/printing/:importTemplateId`
 3. 落地 `PUT /settings/printing/:importTemplateId`
 4. 按 `tenantId + importTemplateId` 维护配置
@@ -221,7 +221,7 @@
 
 ### 具体输出物
 
-1. `GET /settings/printing/list`
+1. `GET /settings/printing`
 2. `GET /settings/printing/:importTemplateId`
 3. `PUT /settings/printing/:importTemplateId`
 4. `tenantId + importTemplateId` 唯一持久化约束

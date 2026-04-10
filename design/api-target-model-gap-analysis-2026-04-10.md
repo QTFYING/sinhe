@@ -121,7 +121,7 @@
 
 目标状态：
 
-- `GET /settings/printing/list`
+- `GET /settings/printing`
 - `GET /settings/printing/:importTemplateId`
 - `PUT /settings/printing/:importTemplateId`
 - 服务端只存黑盒 JSON，不解析模板内部结构

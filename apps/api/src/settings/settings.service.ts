@@ -1,8 +1,16 @@
-import { ForbiddenException, Injectable } from '@nestjs/common';
-import { TenantGeneralSettings as TenantGeneralSettingsModel } from '@prisma/client';
+import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  Prisma,
+  TenantGeneralSettings as TenantGeneralSettingsModel,
+} from '@prisma/client';
 import type {
+  GetPrintingConfigDetailResponse,
+  GetPrintingConfigListResponse,
+  PrintingConfigListItem,
   TenantGeneralSettings,
   UpdateTenantGeneralSettingsRequest,
+  UpdatePrintingConfigRequest,
+  UpdatePrintingConfigResponse,
 } from '@shou/types/contracts';
 import { JwtPayload } from '../auth/decorators/current-user.decorator';
 import { PrismaService } from '../prisma/prisma.service';
@@ -61,12 +69,151 @@ export class SettingsService {
     return this.getGeneralSettings(currentUser);
   }
 
+  async getPrintingConfigList(currentUser: JwtPayload): Promise<GetPrintingConfigListResponse> {
+    const tenantId = this.getTenantId(currentUser);
+
+    const templates = await this.prisma.importTemplate.findMany({
+      where: {
+        tenantId,
+        deletedAt: null,
+      },
+      include: {
+        printerTemplate: true,
+      },
+      orderBy: {
+        createdAt: 'asc',
+      },
+    });
+
+    return {
+      items: templates.map((template) => {
+        const item: PrintingConfigListItem = {
+          importTemplateId: template.id,
+          importTemplateName: template.name,
+          hasCustomConfig: Boolean(template.printerTemplate),
+        };
+
+        if (template.printerTemplate) {
+          item.configVersion = template.printerTemplate.configVersion;
+          item.updatedAt = template.printerTemplate.updatedAt.toISOString();
+          item.updatedBy = template.printerTemplate.updatedBy ?? undefined;
+          item.remark = template.printerTemplate.remark ?? undefined;
+        }
+
+        return item;
+      }),
+    };
+  }
+
+  async getPrintingConfigDetail(
+    currentUser: JwtPayload,
+    importTemplateId: string,
+  ): Promise<GetPrintingConfigDetailResponse> {
+    const template = await this.getScopedImportTemplate(currentUser, importTemplateId);
+
+    if (!template.printerTemplate) {
+      return {
+        importTemplateId: template.id,
+        importTemplateName: template.name,
+        hasCustomConfig: false,
+      };
+    }
+
+    return {
+      importTemplateId: template.id,
+      importTemplateName: template.name,
+      hasCustomConfig: true,
+      configVersion: template.printerTemplate.configVersion,
+      config: template.printerTemplate.config as Record<string, unknown>,
+      updatedAt: template.printerTemplate.updatedAt.toISOString(),
+      updatedBy: template.printerTemplate.updatedBy ?? undefined,
+      remark: template.printerTemplate.remark ?? undefined,
+    };
+  }
+
+  async updatePrintingConfig(
+    currentUser: JwtPayload,
+    importTemplateId: string,
+    request: UpdatePrintingConfigRequest,
+  ): Promise<UpdatePrintingConfigResponse> {
+    const tenantId = this.getTenantId(currentUser);
+    await this.getScopedImportTemplate(currentUser, importTemplateId);
+
+    const operator = await this.getOperatorDisplayName(currentUser.userId);
+    const template = await this.prisma.printerTemplate.upsert({
+      where: {
+        tenantId_importTemplateId: {
+          tenantId,
+          importTemplateId,
+        },
+      },
+      create: {
+        tenantId,
+        importTemplateId,
+        config: request.config as Prisma.InputJsonValue,
+        configVersion: 1,
+        remark: request.remark,
+        updatedBy: operator,
+      },
+      update: {
+        config: request.config as Prisma.InputJsonValue,
+        configVersion: {
+          increment: 1,
+        },
+        remark: request.remark,
+        updatedBy: operator,
+      },
+    });
+
+    return {
+      importTemplateId: template.importTemplateId,
+      configVersion: template.configVersion,
+      config: template.config as Record<string, unknown>,
+      updatedAt: template.updatedAt.toISOString(),
+      updatedBy: template.updatedBy ?? undefined,
+      remark: template.remark ?? undefined,
+    };
+  }
+
   private getTenantId(currentUser: JwtPayload): string {
     if (!currentUser.tenantId) {
       throw new ForbiddenException('当前登录态不属于租户侧，无法访问通用配置');
     }
 
     return currentUser.tenantId;
+  }
+
+  private async getScopedImportTemplate(currentUser: JwtPayload, importTemplateId: string) {
+    const tenantId = this.getTenantId(currentUser);
+
+    const template = await this.prisma.importTemplate.findFirst({
+      where: {
+        id: importTemplateId,
+        tenantId,
+        deletedAt: null,
+      },
+      include: {
+        printerTemplate: true,
+      },
+    });
+
+    if (!template) {
+      throw new NotFoundException('未找到对应的导入映射模板');
+    }
+
+    return template;
+  }
+
+  private async getOperatorDisplayName(userId: string): Promise<string | undefined> {
+    const operator = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        realName: true,
+        account: true,
+      },
+    });
+
+    return operator?.realName || operator?.account || undefined;
   }
 
   private async getPlatformGeneralSettingsDefaults(): Promise<TenantGeneralSettings> {

@@ -154,7 +154,7 @@
 任务范围：
 
 - 落地 `/settings/general`
-- 落地 `/settings/printing/list`
+- 落地 `/settings/printing`
 - 落地 `/settings/printing/:importTemplateId`
 - 落地导入模板相关接口
 
