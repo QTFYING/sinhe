@@ -1,11 +1,11 @@
 services:
   db:
     image: postgres:15-alpine
-    container_name: distributor-pay-db
+    container_name: shou-db
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
-      POSTGRES_DB: ${POSTGRES_DB:-distributor_pay}
+      POSTGRES_DB: ${POSTGRES_DB:-shou}
       TZ: Asia/Shanghai
     ports:
       - "5432:5432"
@@ -15,7 +15,7 @@ services:
 
   redis:
     image: redis:7-alpine
-    container_name: distributor-pay-redis
+    container_name: shou-redis
     command: redis-server --appendonly yes
     ports:
       - "6379:6379"
@@ -28,9 +28,9 @@ services:
       context: .
       dockerfile: Dockerfile
       target: api
-    container_name: distributor-pay-api
+    container_name: shou-api
     environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-distributor_pay}?schema=public
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-shou}?schema=public
       REDIS_URL: redis://redis:6379
       JWT_SECRET: ${JWT_SECRET:-please-change-this-secret}
       NODE_ENV: production
@@ -41,16 +41,16 @@ services:
 
   nginx:
     image: nginx:alpine
-    container_name: distributor-pay-nginx
+    container_name: shou-nginx
     ports:
       - "5001:5001"
       - "5002:5002"
       - "5003:5003"
     volumes:
-      - ./web/dist-admin:/usr/share/nginx/admin
-      - ./web/dist-tenant:/usr/share/nginx/tenant
-      - ./web/dist-pay-h5:/usr/share/nginx/pay-h5
-      - ./deploy/nginx.conf:/etc/nginx/conf.d/default.conf
+      - ./dist/admin:/usr/share/nginx/admin
+      - ./dist/tenant:/usr/share/nginx/tenant
+      - ./dist/h5:/usr/share/nginx/pay-h5
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf
     depends_on:
       - api
     restart: always

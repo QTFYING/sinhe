@@ -13,7 +13,7 @@
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\"",
     "prisma:generate": "prisma generate",
     "prisma:push": "prisma db push",
-    "prisma:init-prod": "node prisma/init-prod.js"
+    "prisma:init-prod": "node ../../scripts/db-init.js"
   },
   "dependencies": {
     "@nestjs/common": "^10.0.0",
@@ -21,6 +21,8 @@
     "@nestjs/jwt": "^11.0.2",
     "@nestjs/passport": "^11.0.5",
     "@nestjs/platform-express": "^10.0.0",
+    "@nestjs/swagger": "^8.0.0",
+    "swagger-ui-express": "^5.0.0",
     "@prisma/client": "^5.10.0",
     "prisma": "^5.10.0",
     "bcrypt": "^6.0.0",
@@ -33,8 +35,8 @@
     "redis": "^5.11.0",
     "reflect-metadata": "^0.2.0",
     "rxjs": "^7.8.1",
-    "shared-types": "workspace:*",
-    "shared-utils": "workspace:*"
+    "@shou/types": "workspace:*",
+    "@shou/utils": "workspace:*"
   },
   "devDependencies": {
     "@nestjs/cli": "^10.0.0",

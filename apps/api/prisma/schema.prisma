@@ -63,42 +63,23 @@ enum NotificationTypeEnum {
 
 // ---------------- MODELS ----------------
 
-model Agent {
-  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  name           String   @db.VarChar(100)
-  contactPhone   String   @unique @db.VarChar(20)
-  commissionRate Decimal  @default(0.00) @db.Decimal(5, 4)
-
-  tenants            Tenant[]
-  commissionLedgers  AgentCommissionLedger[]
-
-  createdAt  DateTime  @default(now())
-  updatedAt  DateTime  @updatedAt
-  deletedAt  DateTime?
-
-  @@map("sys_agent")
-}
-
 model Tenant {
-  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  agentId      String?  @db.Uuid
-  name         String   @db.VarChar(100)
-  contactPhone String   @db.VarChar(20)
-  status       Int      @default(1)
-  paymentConfig Json?   @default("{}")
-  expireAt     DateTime?
+  id            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name          String    @db.VarChar(100)
+  contactPhone  String    @db.VarChar(20)
+  status        Int       @default(1)
+  paymentConfig Json?     @default("{}")
+  expireAt      DateTime?
 
-  maxCreditDays      Int  @default(30)
-  creditReminderDays Int  @default(3)
+  maxCreditDays      Int              @default(30)
+  creditReminderDays Int              @default(3)
+  users              User[]
+  orders             Order[]
+  importTemplates    ImportTemplate[]
 
-  agent           Agent?           @relation(fields: [agentId], references: [id])
-  users           User[]
-  orders          Order[]
-  importTemplates ImportTemplate[]
-
-  createdAt  DateTime  @default(now())
-  updatedAt  DateTime  @updatedAt
-  deletedAt  DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
 
   @@map("sys_tenant")
 }
@@ -112,14 +93,13 @@ model User {
   role         UserRoleEnum
   status       Int          @default(1)
 
-  tenant        Tenant?              @relation(fields: [tenantId], references: [id])
-  lifecycleLogs OrderLifecycleLog[]
+  tenant         Tenant?             @relation(fields: [tenantId], references: [id])
+  lifecycleLogs  OrderLifecycleLog[]
   manualPayments PaymentRecord[]
-  notifications  Notification[]
 
-  createdAt  DateTime  @default(now())
-  updatedAt  DateTime  @updatedAt
-  deletedAt  DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
 
   @@unique([tenantId, username])
   @@map("sys_user")
@@ -129,53 +109,76 @@ model ImportTemplate {
   id           String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   tenantId     String  @db.Uuid
   templateName String  @db.VarChar(100)
-  mappingRules Json
-  customFieldDefs Json?  @default("[]")
+  isDefault    Boolean @default(false)
 
-  tenant  Tenant   @relation(fields: [tenantId], references: [id])
-  orders  Order[]
+  sourceColumns Json @default("[]")
+  fields        Json @default("[]")
+  mappings      Json @default("[]")
 
-  createdAt  DateTime  @default(now())
-  updatedAt  DateTime  @updatedAt
+  tenant Tenant  @relation(fields: [tenantId], references: [id])
+  orders Order[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@map("biz_import_template")
 }
 
-model Order {
-  id              String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  tenantId        String  @db.Uuid
-  erpOrderNo      String  @db.VarChar(100)
-  customerName    String  @db.VarChar(100)
-  customerPhone   String? @db.VarChar(20)
-  deliveryAddress String? @db.VarChar(255)
-  deliveryPersonName String? @db.VarChar(50)
-  templateId      String?  @db.Uuid
-  customFields    Json?    @default("{}")
+model ImportJob {
+  id               String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId         String @db.Uuid
+  status           String @db.VarChar(20) // PENDING, PROCESSING, COMPLETED, FAILED
+  submittedCount   Int    @default(0)
+  processedCount   Int    @default(0)
+  successCount     Int    @default(0)
+  skippedCount     Int    @default(0)
+  failedCount      Int    @default(0)
+  overwrittenCount Int    @default(0)
 
-  totalAmount    Decimal  @db.Decimal(10, 2)
-  paidAmount     Decimal  @default(0.00) @db.Decimal(10, 2)
-  discountAmount Decimal  @default(0.00) @db.Decimal(10, 2)
+  failedRows      Json? @default("[]")
+  conflictDetails Json? @default("[]")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("biz_import_job")
+}
+
+model Order {
+  id                String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId          String  @db.Uuid
+  sourceOrderNo     String? @db.VarChar(100)
+  groupKey          String? @db.VarChar(100)
+  mappingTemplateId String? @db.Uuid
+
+  customerName       String  @db.VarChar(100)
+  customerPhone      String? @db.VarChar(20)
+  deliveryAddress    String? @db.VarChar(255)
+  deliveryPersonName String? @db.VarChar(50)
+  customFieldValues  Json?   @default("{}")
+
+  totalAmount    Decimal @db.Decimal(10, 2)
+  paidAmount     Decimal @default(0.00) @db.Decimal(10, 2)
+  discountAmount Decimal @default(0.00) @db.Decimal(10, 2)
 
   payStatus      PayStatusEnum      @default(UNPAID)
   deliveryStatus DeliveryStatusEnum @default(PENDING)
 
-  qrCodeToken    String    @unique @db.VarChar(64)
+  qrCodeToken    String   @unique @db.VarChar(64)
   qrExpireAt     DateTime
   creditExpireAt DateTime
 
-  tenant    Tenant          @relation(fields: [tenantId], references: [id])
-  template  ImportTemplate? @relation(fields: [templateId], references: [id])
-  items     OrderItem[]
-  payments  PaymentRecord[]
-  logs      OrderLifecycleLog[]
-  creditReminders  OrderCreditReminder[]
-  notifications    Notification[]
+  tenant   Tenant              @relation(fields: [tenantId], references: [id])
+  template ImportTemplate?     @relation(fields: [mappingTemplateId], references: [id])
+  items    OrderItem[]
+  payments PaymentRecord[]
+  logs     OrderLifecycleLog[]
 
-  createdAt  DateTime   @default(now())
-  updatedAt  DateTime   @updatedAt
-  deletedAt  DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
 
-  @@unique([tenantId, erpOrderNo])
+  @@unique([tenantId, sourceOrderNo])
   @@index([tenantId, payStatus])
   @@map("biz_order")
 }
@@ -188,111 +191,56 @@ model OrderItem {
   unitPrice   Decimal @db.Decimal(10, 2)
   amount      Decimal @db.Decimal(10, 2)
 
-  order  Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
 
   @@index([orderId])
   @@map("biz_order_item")
 }
 
 model PaymentRecord {
-  id        String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  orderId   String  @db.Uuid
-  tenantId  String  @db.Uuid
+  id       String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  orderId  String @db.Uuid
+  tenantId String @db.Uuid
 
-  actualAmount  Decimal             @db.Decimal(10, 2)
+  actualAmount  Decimal           @db.Decimal(10, 2)
   paymentMethod PaymentMethodEnum
 
-  channel        String?  @db.VarChar(50)
-  channelTradeNo String?  @unique @db.VarChar(100)
-  feeAmount      Decimal  @default(0.00) @db.Decimal(10, 2)
+  channel         String? @db.VarChar(50)
+  channelTradeNo  String? @unique @db.VarChar(100)
+  feeAmount       Decimal @default(0.00) @db.Decimal(10, 2)
   rawCallbackData Json?
 
-  operatorId  String?  @db.Uuid
-  markReason  String?  @db.VarChar(500)
+  operatorId String? @db.Uuid
+  markReason String? @db.VarChar(500)
 
-  status    PaymentRecordStatusEnum  @default(SUCCESS)
-  paidTime  DateTime
+  status   PaymentRecordStatusEnum @default(SUCCESS)
+  paidTime DateTime
 
-  order     Order  @relation(fields: [orderId], references: [id])
-  operator  User?  @relation(fields: [operatorId], references: [id])
+  order    Order @relation(fields: [orderId], references: [id])
+  operator User? @relation(fields: [operatorId], references: [id])
 
-  createdAt  DateTime  @default(now())
-  updatedAt  DateTime  @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([orderId])
   @@map("biz_payment_record")
 }
 
 model OrderLifecycleLog {
-  id        String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  orderId   String              @db.Uuid
-  tenantId  String              @db.Uuid
-  event     LifecycleEventEnum
-  operatorId  String?  @db.Uuid
-  snapshot    Json?
-  remark      String?  @db.VarChar(500)
+  id         String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  orderId    String             @db.Uuid
+  tenantId   String             @db.Uuid
+  event      LifecycleEventEnum
+  operatorId String?            @db.Uuid
+  snapshot   Json?
+  remark     String?            @db.VarChar(500)
 
-  order     Order  @relation(fields: [orderId], references: [id])
-  operator  User?  @relation(fields: [operatorId], references: [id])
+  order    Order @relation(fields: [orderId], references: [id])
+  operator User? @relation(fields: [operatorId], references: [id])
 
-  createdAt  DateTime  @default(now())
+  createdAt DateTime @default(now())
 
   @@index([orderId])
   @@index([tenantId, event])
   @@map("biz_order_lifecycle_log")
-}
-
-model Notification {
-  id          String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  tenantId    String               @db.Uuid
-  recipientId String               @db.Uuid
-  type        NotificationTypeEnum
-  title       String               @db.VarChar(200)
-  content     String               @db.VarChar(1000)
-  isRead      Boolean              @default(false)
-  readAt      DateTime?
-  relatedOrderId  String?  @db.Uuid
-
-  order      Order?  @relation(fields: [relatedOrderId], references: [id])
-  recipient  User    @relation(fields: [recipientId], references: [id])
-
-  createdAt  DateTime  @default(now())
-
-  @@index([recipientId, isRead])
-  @@index([tenantId, createdAt])
-  @@map("sys_notification")
-}
-
-model OrderCreditReminder {
-  id       String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  orderId  String  @db.Uuid
-  tenantId String  @db.Uuid
-  reminderStage  String    @db.VarChar(50)
-  sentAt         DateTime  @default(now())
-
-  order  Order  @relation(fields: [orderId], references: [id])
-
-  @@unique([orderId, reminderStage])
-  @@index([tenantId])
-  @@map("biz_order_credit_reminder")
-}
-
-model AgentCommissionLedger {
-  id               String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  agentId          String   @db.Uuid
-  tenantId         String   @db.Uuid
-  settlementDate   DateTime @db.Date
-  totalOrderAmount  Decimal  @db.Decimal(12, 2)
-  commissionRate    Decimal  @db.Decimal(5, 4)
-  commissionAmount  Decimal  @db.Decimal(10, 2)
-  status            Int      @default(0)
-
-  agent  Agent  @relation(fields: [agentId], references: [id])
-
-  createdAt  DateTime  @default(now())
-  updatedAt  DateTime  @updatedAt
-
-  @@unique([agentId, tenantId, settlementDate])
-  @@index([agentId, status])
-  @@map("biz_agent_commission_ledger")
 }

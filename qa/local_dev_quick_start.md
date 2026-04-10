@@ -75,7 +75,7 @@ docker ps -a --format 'table {{.Names}}\t{{.Status}}'
 ### Docker PostgreSQL
 
 - 跑在容器里
-- 当前项目容器名：`distributor-pay-db`
+- 当前项目容器名：`shou-db`
 - 容器内数据目录通常是：`/var/lib/postgresql/data`
 
 结论：
@@ -124,7 +124,7 @@ psql -h 127.0.0.1 -p 5432 -U virgo -d postgres -c "select version();"
 
 - Host：`127.0.0.1`
 - Port：`5432`
-- Database：`distributor_pay`
+- Database：`shou`
 - Username：`postgres`
 - Password：`postgres`
 
@@ -146,13 +146,13 @@ ports:
 
 - 用户：`postgres`
 - 密码：`postgres`
-- 数据库：`distributor_pay`
+- 数据库：`shou`
 
 ### 本机 Homebrew PostgreSQL 这次排查到的情况
 
 - 角色为 `virgo`
 - 原本不存在 `postgres` 角色
-- 原本不存在 `distributor_pay` 数据库
+- 原本不存在 `shou` 数据库
 
 ## 8. Prisma 常见问题
 

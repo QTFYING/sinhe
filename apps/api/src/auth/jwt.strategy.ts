@@ -4,6 +4,7 @@ import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { Request } from 'express';
 import { RedisService } from '../redis/redis.service';
 import { JwtPayload } from './decorators/current-user.decorator';
+import { extractBearerToken } from './auth-session.util';
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
@@ -18,7 +19,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
 
   async validate(req: Request, payload: Record<string, unknown>): Promise<JwtPayload> {
     // 检查 Token 是否已被加入黑名单（logout）
-    const token = (req.headers.authorization || '').replace('Bearer ', '');
+    const token = extractBearerToken(req.headers.authorization);
     if (token && await this.redis.isBlacklisted(token)) {
       throw new UnauthorizedException('Token 已失效，请重新登录');
     }

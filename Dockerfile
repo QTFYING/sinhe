@@ -21,8 +21,8 @@ COPY package.json pnpm-lock.yaml pnpm-workspace.yaml turbo.json tsconfig.base.js
 COPY apps/api/package.json apps/api/
 
 # packages
-COPY packages/shared-types/package.json packages/shared-types/
-COPY packages/shared-utils/package.json packages/shared-utils/
+COPY packages/types/package.json packages/types/
+COPY packages/utils/package.json packages/utils/
 
 RUN pnpm install --frozen-lockfile
 

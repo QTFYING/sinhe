@@ -8,19 +8,19 @@
 
 ```bash
 pnpm --filter api prisma:push
-node apps/api/prisma/seed.js
+pnpm db:seed
 ```
 
 典型报错如下：
 
 ```text
-P1010: User `postgres` was denied access on the database `distributor_pay.public`
+P1010: User `postgres` was denied access on the database `shou.public`
 ```
 
 以及：
 
 ```text
-User `postgres` was denied access on the database `distributor_pay.public`
+User `postgres` was denied access on the database `shou.public`
 ```
 
 ## 2. 排查后的真实原因
@@ -32,20 +32,20 @@ User `postgres` was denied access on the database `distributor_pay.public`
 项目仓库中的 [apps/api/.env](/Users/virgo/Documents/github/sinhe/apps/api/.env) 最初使用的是：
 
 ```env
-DATABASE_URL="postgresql://postgres:postgres@localhost:5432/distributor_pay?schema=public"
+DATABASE_URL="postgresql://postgres:postgres@localhost:5432/shou?schema=public"
 ```
 
 这套配置默认假设本地数据库是 Windows 裸装 PostgreSQL，且存在：
 
 - 用户：`postgres`
 - 密码：`postgres`
-- 数据库：`distributor_pay`
+- 数据库：`shou`
 
 但当前这台 Mac 电脑上，本机数据库是 Homebrew 安装的 PostgreSQL 18，实际情况是：
 
 - 本机角色只有 `virgo`
 - 不存在 `postgres` 角色
-- 原本也没有 `distributor_pay` 数据库
+- 原本也没有 `shou` 数据库
 - `localhost` 访问使用的是本机 Homebrew PostgreSQL，不是 Docker 容器里的 PostgreSQL
 
 因此 Prisma 连接串里的 `postgres` 并不匹配本机实例。
@@ -74,7 +74,7 @@ EACCES: permission denied, unlink '.../.prisma/client/index.d.ts'
 
 - 角色 `postgres` 不存在
 - 角色 `virgo` 存在，并且是超级用户
-- `distributor_pay` 初始不存在
+- `shou` 初始不存在
 
 ## 4. 已执行的修复
 
@@ -83,7 +83,7 @@ EACCES: permission denied, unlink '.../.prisma/client/index.d.ts'
 本地 [apps/api/.env](/Users/virgo/Documents/github/sinhe/apps/api/.env) 已调整为：
 
 ```env
-DATABASE_URL="postgresql://virgo@localhost:5432/distributor_pay?schema=public"
+DATABASE_URL="postgresql://virgo@localhost:5432/shou?schema=public"
 ```
 
 ### 4.2 创建本机数据库
@@ -91,7 +91,7 @@ DATABASE_URL="postgresql://virgo@localhost:5432/distributor_pay?schema=public"
 已创建本地数据库：
 
 ```bash
-createdb distributor_pay
+createdb shou
 ```
 
 ### 4.3 验证数据库写入
@@ -100,7 +100,7 @@ createdb distributor_pay
 
 ```bash
 pnpm --filter api prisma:push
-node apps/api/prisma/seed.js
+pnpm db:seed
 ```
 
 结果说明：
@@ -141,7 +141,7 @@ EACCES: permission denied, unlink '.../.prisma/client/index.d.ts'
 - 运行在容器中
 - 镜像为 `postgres:15-alpine`
 - 数据存储在 Docker volume 中
-- 当前项目容器名为 `distributor-pay-db`
+- 当前项目容器名为 `shou-db`
 
 结论：
 
@@ -198,13 +198,13 @@ psql -h 127.0.0.1 -p 5432 -U virgo -d postgres -c "select version();"
 
 - `POSTGRES_USER=postgres`
 - `POSTGRES_PASSWORD=postgres`
-- `POSTGRES_DB=distributor_pay`
+- `POSTGRES_DB=shou`
 
 如果 Docker 容器实际占用的是宿主机 `5432`，则 DBeaver 可使用：
 
 - Host：`127.0.0.1`
 - Port：`5432`
-- Database：`distributor_pay`
+- Database：`shou`
 - Username：`postgres`
 - Password：`postgres`
 

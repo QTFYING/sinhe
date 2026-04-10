@@ -8,10 +8,10 @@
 
 | 服务 | 容器名 | 说明 |
 | --- | --- | --- |
-| PostgreSQL | `distributor-pay-db` | 主业务数据库 |
-| Redis | `distributor-pay-redis` | 缓存与分布式锁 |
-| API | `distributor-pay-api` | NestJS 后端服务，容器内端口 `3000` |
-| Nginx | `distributor-pay-nginx` | 托管三个前端并反向代理 `/api` |
+| PostgreSQL | `shou-db` | 主业务数据库 |
+| Redis | `shou-redis` | 缓存与分布式锁 |
+| API | `shou-api` | NestJS 后端服务，容器内端口 `3000` |
+| Nginx | `shou-nginx` | 托管三个前端并反向代理 `/api` |
 
 对外访问入口以 `docker-compose.yml` 为准，当前端口如下：
 
@@ -95,7 +95,7 @@ cd /data/www/sinhe
 cat > .env <<'EOF'
 POSTGRES_USER=postgres
 POSTGRES_PASSWORD=<请替换为强密码>
-POSTGRES_DB=distributor_pay
+POSTGRES_DB=shou
 JWT_SECRET=<请替换为长度至少 64 位的随机密钥>
 EOF
 ```
@@ -179,7 +179,7 @@ curl -I http://127.0.0.1:5003
 
 ### 5.4 服务器重启后的自动拉起
 
-当前仓库的 [`docker-compose.yml`](/D:/Sinhe/sinho/docker-compose.yml) 已为 `db`、`redis`、`api`、`nginx` 四个服务统一配置 `restart: always`，这意味着：
+当前仓库的 [`docker-compose.yml`](/D:/Sinhe/api/docker-compose.yml) 已为 `db`、`redis`、`api`、`nginx` 四个服务统一配置 `restart: always`，这意味着：
 
 - 只要 Docker 守护进程在宿主机启动后自动恢复运行，这 4 个容器就会自动拉起。
 - 如果你执行过 `docker compose down`，容器会被删除；此时仅靠 `restart: always` 不会自动重新创建容器，需要再次执行 `docker compose up -d`。
@@ -195,7 +195,7 @@ sudo systemctl status docker
 如果希望项目级别也由 `systemd` 显式托管，可额外创建一个服务单元：
 
 ```bash
-sudo tee /etc/systemd/system/distributor-pay.service <<'EOF'
+sudo tee /etc/systemd/system/shou.service <<'EOF'
 [Unit]
 Description=Distributor Pay Platform
 Requires=docker.service
@@ -214,15 +214,15 @@ WantedBy=multi-user.target
 EOF
 
 sudo systemctl daemon-reload
-sudo systemctl enable distributor-pay
-sudo systemctl start distributor-pay
-sudo systemctl status distributor-pay
+sudo systemctl enable shou
+sudo systemctl start shou
+sudo systemctl status shou
 ```
 
 说明：
 
 - 对当前项目而言，通常先启用 `docker.service` 开机自启就够了。
-- 只有在你希望用 `systemd` 明确管理项目启动顺序、状态查看、统一运维入口时，才需要额外增加 `distributor-pay.service`。
+- 只有在你希望用 `systemd` 明确管理项目启动顺序、状态查看、统一运维入口时，才需要额外增加 `shou.service`。
 
 ## 6. 生产初始化
 
@@ -231,7 +231,7 @@ sudo systemctl status distributor-pay
 以下脚本仅适用于本地开发或演示环境：
 
 ```bash
-node apps/api/prisma/seed.js
+pnpm db:seed
 ```
 
 原因：
@@ -244,7 +244,7 @@ node apps/api/prisma/seed.js
 
 ### 6.2 正式环境初始化脚本
 
-仓库已提供生产初始化脚本 `apps/api/prisma/init-prod.js`，用于安全创建：
+仓库已提供生产初始化脚本 `scripts/db-init.js`，用于安全创建：
 
 - 首个 OS 超级管理员
 - 可选的首个租户
@@ -264,7 +264,7 @@ docker compose run --rm \
   -e INIT_TENANT_OWNER_REAL_NAME='租户老板' \
   -e INIT_TENANT_MAX_CREDIT_DAYS=45 \
   -e INIT_TENANT_CREDIT_REMINDER_DAYS=7 \
-  api node prisma/init-prod.js
+docker-compose exec api node ../../scripts/db-init.js
 ```
 
 执行规则：
@@ -308,17 +308,17 @@ docker compose logs -f api
 ```bash
 mkdir -p /data/backup/postgres
 
-docker exec distributor-pay-db \
+docker exec shou-db \
   pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" \
-  > /data/backup/postgres/distributor_pay_$(date +%F_%H%M%S).sql
+  > /data/backup/postgres/shou_$(date +%F_%H%M%S).sql
 ```
 
 如果宿主机环境变量未导出，可直接写明用户名和库名：
 
 ```bash
-docker exec distributor-pay-db \
-  pg_dump -U postgres -d distributor_pay \
-  > /data/backup/postgres/distributor_pay_$(date +%F_%H%M%S).sql
+docker exec shou-db \
+  pg_dump -U postgres -d shou \
+  > /data/backup/postgres/shou_$(date +%F_%H%M%S).sql
 ```
 
 ### 8.2 PostgreSQL 恢复
@@ -326,7 +326,7 @@ docker exec distributor-pay-db \
 恢复前请先停业务并确认目标库是否允许覆盖：
 
 ```bash
-cat /data/backup/postgres/<备份文件>.sql | docker exec -i distributor-pay-db psql -U postgres -d distributor_pay
+cat /data/backup/postgres/<备份文件>.sql | docker exec -i shou-db psql -U postgres -d shou
 ```
 
 ### 8.3 Redis 备份
@@ -419,7 +419,7 @@ docker compose up -d --build
 
 ```bash
 docker compose logs -f db
-docker exec -it distributor-pay-db psql -U postgres -d distributor_pay
+docker exec -it shou-db psql -U postgres -d shou
 ```
 
 常见原因：
