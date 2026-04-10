@@ -2,6 +2,45 @@ const { PrismaClient } = require('@prisma/client');
 const bcrypt = require('bcrypt');
 const prisma = new PrismaClient();
 
+const GENERAL_SETTINGS_CONFIG_GROUP = 'tenant_general_defaults';
+
+const DEFAULT_GENERAL_SETTINGS_CONFIGS = [
+  { key: 'companyName', value: '', note: '企业名称默认值' },
+  { key: 'contactPerson', value: '', note: '联系人默认值' },
+  { key: 'contactPhone', value: '', note: '联系电话默认值' },
+  { key: 'address', value: '', note: '企业地址默认值' },
+  { key: 'licenseNo', value: '', note: '营业执照号默认值' },
+  { key: 'qrCodeExpiry', value: '30', note: '收款码有效期默认值（天）' },
+  { key: 'notifySeller', value: 'true', note: '是否默认通知业务员' },
+  { key: 'notifyOwner', value: 'true', note: '是否默认通知老板' },
+  { key: 'notifyFinance', value: 'true', note: '是否默认通知财务' },
+  { key: 'creditRemindDays', value: '3', note: '账期提醒提前天数默认值' },
+  { key: 'dailyReportPush', value: 'true', note: '是否默认开启日报推送' },
+];
+
+async function ensureGeneralSettingsDefaults() {
+  for (const item of DEFAULT_GENERAL_SETTINGS_CONFIGS) {
+    await prisma.systemConfig.upsert({
+      where: {
+        group_key: {
+          group: GENERAL_SETTINGS_CONFIG_GROUP,
+          key: item.key,
+        },
+      },
+      create: {
+        group: GENERAL_SETTINGS_CONFIG_GROUP,
+        key: item.key,
+        value: item.value,
+        note: item.note,
+      },
+      update: {
+        value: item.value,
+        note: item.note,
+      },
+    });
+  }
+}
+
 async function main() {
   console.log('开启强制数据对齐与密码 Bcrypt 洗表工程...');
   // 10 盐轮数的强单向哈希
@@ -34,6 +73,8 @@ async function main() {
   } else {
     await prisma.user.update({ where: { id: boss.id }, data: { passwordHash: defaultHash } });
   }
+
+  await ensureGeneralSettingsDefaults();
 
   console.log('✅ 底层洗表完毕！所有原本裸奔在 DB 的明文账号密码，已被强制更迭为 Bcrypt 防御级散列值！');
 }

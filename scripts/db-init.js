@@ -3,6 +3,22 @@ const bcrypt = require('bcrypt');
 
 const prisma = new PrismaClient();
 
+const GENERAL_SETTINGS_CONFIG_GROUP = 'tenant_general_defaults';
+
+const DEFAULT_GENERAL_SETTINGS_CONFIGS = [
+  { key: 'companyName', value: '', note: '企业名称默认值' },
+  { key: 'contactPerson', value: '', note: '联系人默认值' },
+  { key: 'contactPhone', value: '', note: '联系电话默认值' },
+  { key: 'address', value: '', note: '企业地址默认值' },
+  { key: 'licenseNo', value: '', note: '营业执照号默认值' },
+  { key: 'qrCodeExpiry', value: '30', note: '收款码有效期默认值（天）' },
+  { key: 'notifySeller', value: 'true', note: '是否默认通知业务员' },
+  { key: 'notifyOwner', value: 'true', note: '是否默认通知老板' },
+  { key: 'notifyFinance', value: 'true', note: '是否默认通知财务' },
+  { key: 'creditRemindDays', value: '3', note: '账期提醒提前天数默认值' },
+  { key: 'dailyReportPush', value: 'true', note: '是否默认开启日报推送' },
+];
+
 function requireEnv(name) {
   const value = process.env[name];
   if (!value || !value.trim()) {
@@ -20,6 +36,29 @@ function parseOptionalInt(name, defaultValue) {
     throw new Error(`${name} must be a positive integer`);
   }
   return value;
+}
+
+async function ensureGeneralSettingsDefaults() {
+  for (const item of DEFAULT_GENERAL_SETTINGS_CONFIGS) {
+    await prisma.systemConfig.upsert({
+      where: {
+        group_key: {
+          group: GENERAL_SETTINGS_CONFIG_GROUP,
+          key: item.key,
+        },
+      },
+      create: {
+        group: GENERAL_SETTINGS_CONFIG_GROUP,
+        key: item.key,
+        value: item.value,
+        note: item.note,
+      },
+      update: {
+        value: item.value,
+        note: item.note,
+      },
+    });
+  }
 }
 
 async function ensureOsAdmin() {
@@ -157,6 +196,7 @@ async function ensureTenantAndOwner() {
 
 async function main() {
   console.log('开始执行生产初始化...');
+  await ensureGeneralSettingsDefaults();
   await ensureOsAdmin();
   await ensureTenantAndOwner();
   console.log('生产初始化完成');
