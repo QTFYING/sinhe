@@ -5,7 +5,7 @@ export class LoginDto {
   @ApiProperty({ description: '登录账号', example: 'admin' })
   @IsString()
   @IsNotEmpty()
-  username!: string;
+  account!: string;
 
   @ApiProperty({ description: '登录密码', example: '123456' })
   @IsString()

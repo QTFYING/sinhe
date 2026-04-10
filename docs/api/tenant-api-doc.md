@@ -60,7 +60,7 @@ type AuthSourceTag = 'mock' | 'remote'
 
 ```typescript
 {
-  username: string   // 登录账号
+  account: string    // 登录账号
   password: string   // 密码
 }
 ```
@@ -73,7 +73,7 @@ type AuthSourceTag = 'mock' | 'remote'
   expiresIn: number          // 令牌有效期（秒）
   user: {
     id: string                // 用户 ID
-    username: string          // 登录账号
+    account: string           // 登录账号
     realName: string          // 用户姓名
     role: TenantRole          // 当前主角色
     tenantId: string | null  // 租户用户有值，平台用户为 null
@@ -93,7 +93,7 @@ type AuthSourceTag = 'mock' | 'remote'
 {
   token: string              // accessToken
   role: TenantRole           // 校验后的角色
-  name: string               // realName || name || username
+  name: string               // realName || name || account
   source: AuthSourceTag      // 数据来源标记
 }
 ```
@@ -140,7 +140,7 @@ type AuthSourceTag = 'mock' | 'remote'
 ```typescript
 {
   id: string                  // 当前用户 ID
-  username: string            // 登录账号
+  account: string             // 登录账号
   realName: string            // 用户姓名
   role: TenantRole            // 当前主角色
   tenantId: string | null     // 所属租户 ID；平台用户为 null

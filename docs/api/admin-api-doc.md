@@ -71,7 +71,7 @@
 
 ```typescript
 {
-  username: string       // 平台账号
+  account: string        // 平台登录账号
   password: string       // 密码
 }
 ```
@@ -84,7 +84,7 @@
   expiresIn: number           // 令牌有效期（秒）
   user: {
     id: string                // 用户 ID
-    username: string          // 登录账号
+    account: string           // 登录账号
     realName: string          // 用户姓名
     role: string              // 当前角色
     tenantId: string | null   // 平台账号为 null
@@ -140,7 +140,7 @@
 ```typescript
 {
   id: string                  // 当前用户 ID
-  username: string            // 登录账号
+  account: string             // 登录账号
   realName: string            // 用户姓名
   role: string                // 当前角色
   tenantId: string | null     // 平台账号为 null

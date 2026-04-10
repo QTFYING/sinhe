@@ -30,8 +30,8 @@ export class AuthService {
   ) {}
 
   async login(loginDto: LoginDto) {
-    const { username, password } = loginDto;
-    const user = await this.findLoginUser(username, password);
+    const { account, password } = loginDto;
+    const user = await this.findLoginUser(account, password);
     const accessToken = this.jwtService.sign(this.buildAccessTokenPayload(user));
 
     // 生成 Refresh Token（随机字符串），存入 Redis
@@ -92,10 +92,10 @@ export class AuthService {
     }
   }
 
-  private async findLoginUser(username: string, password: string): Promise<AuthUserRecord> {
+  private async findLoginUser(account: string, password: string): Promise<AuthUserRecord> {
     const users = await this.prisma.user.findMany({
       where: {
-        username,
+        username: account,
         deletedAt: null,
       },
       include: {
@@ -180,7 +180,7 @@ export class AuthService {
   private toUserProfile(user: AuthUserRecord) {
     return {
       id: user.id,
-      username: user.username,
+      account: user.username,
       realName: user.realName,
       role: user.role as UserRoleEnum,
       tenantId: user.tenantId,
