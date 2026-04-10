@@ -320,7 +320,20 @@ interface TenantRecord {
 
 ```typescript
 {
-  list: TenantRecord[]
+  list: Array<{
+    id: string
+    name: string
+    packageName: string
+    admin: string
+    region: string
+    channels: string[]
+    merchants: number
+    users: number
+    monthlyFlow: number
+    dueInDays: number
+    lastActiveAt: string
+    status: TenantStatus
+  }>
   total: number
 }
 ```
@@ -344,7 +357,24 @@ interface TenantRecord {
 }
 ```
 
-**响应 data：** 返回完整的 `TenantRecord`
+**响应 data：**
+
+```typescript
+{
+  id: string                   // 租户 ID
+  name: string                 // 租户名称
+  packageName: string          // 套餐名称
+  admin: string                // 管理员姓名
+  region: string               // 地区
+  channels: string[]           // 已开通支付通道列表
+  merchants: number            // 商户数
+  users: number                // 账号数
+  monthlyFlow: number          // 本月流水（元）
+  dueInDays: number            // 距到期天数
+  lastActiveAt: string         // 最近活跃时间
+  status: TenantStatus
+}
+```
 
 ### 5.3 审核租户
 
@@ -362,7 +392,24 @@ interface TenantRecord {
 }
 ```
 
-**响应 data：** 返回更新后的 `TenantRecord`
+**响应 data：**
+
+```typescript
+{
+  id: string
+  name: string
+  packageName: string
+  admin: string
+  region: string
+  channels: string[]
+  merchants: number
+  users: number
+  monthlyFlow: number
+  dueInDays: number
+  lastActiveAt: string
+  status: TenantStatus
+}
+```
 
 **业务规则：**
 - `approve` → 状态变为 `active`
@@ -410,7 +457,24 @@ interface TenantRecord {
 }
 ```
 
-**响应 data：** 返回更新后的 `TenantRecord`
+**响应 data：**
+
+```typescript
+{
+  id: string
+  name: string
+  packageName: string
+  admin: string
+  region: string
+  channels: string[]
+  merchants: number
+  users: number
+  monthlyFlow: number
+  dueInDays: number
+  lastActiveAt: string
+  status: TenantStatus
+}
+```
 
 ### 5.6 冻结 / 解冻租户
 
@@ -426,7 +490,24 @@ interface TenantRecord {
 }
 ```
 
-**响应 data：** 返回更新后的 `TenantRecord`
+**响应 data：**
+
+```typescript
+{
+  id: string
+  name: string
+  packageName: string
+  admin: string
+  region: string
+  channels: string[]
+  merchants: number
+  users: number
+  monthlyFlow: number
+  dueInDays: number
+  lastActiveAt: string
+  status: TenantStatus
+}
+```
 
 **业务规则：**
 - `freeze` → 状态变为 `paused`
@@ -520,7 +601,19 @@ Array<{
 }
 ```
 
-**响应 data：** 返回更新后的资质记录
+**响应 data：**
+
+```typescript
+{
+  id: string
+  tenant: string               // 租户名称
+  type: string                 // 资质类型
+  submitAt: string             // 提交时间
+  status: '已通过' | '已驳回'
+  comment?: string             // 审核备注
+  reviewedAt: string           // 审核完成时间
+}
+```
 
 ---
 
@@ -568,7 +661,19 @@ interface UserRecord {
 
 ```typescript
 {
-  list: UserRecord[]
+  list: Array<{
+    id: string
+    name: string
+    account: string
+    phone: string
+    tenantType: '平台' | '租户'
+    tenant: string
+    role: string
+    scope: string
+    status: UserStatus
+    loginAt: string
+    requiresPasswordReset: boolean
+  }>
   total: number
 }
 ```
@@ -593,7 +698,23 @@ interface UserRecord {
 }
 ```
 
-**响应 data：** `UserRecord`
+**响应 data：**
+
+```typescript
+{
+  id: string
+  name: string
+  account: string
+  phone: string
+  tenantType: '平台' | '租户'
+  tenant: string
+  role: string
+  scope: string
+  status: UserStatus
+  loginAt: string
+  requiresPasswordReset: boolean
+}
+```
 
 **校验规则：**
 - `account` 全局唯一
@@ -604,9 +725,38 @@ interface UserRecord {
 - **PUT** `/users/{id}`
 - **关联表**：users
 
-**请求参数：** 同 6.2 创建用户参数
+**请求参数：**
 
-**响应 data：** `UserRecord`
+```typescript
+{
+  name?: string                // 姓名
+  account?: string             // 登录账号
+  phone?: string               // 手机号
+  tenantType?: '平台' | '租户'
+  tenant?: string              // 所属租户名称
+  role?: string                // 角色名称
+  scope?: string               // 数据范围
+  status?: 'active' | 'invited'
+}
+```
+
+**响应 data：**
+
+```typescript
+{
+  id: string
+  name: string
+  account: string
+  phone: string
+  tenantType: '平台' | '租户'
+  tenant: string
+  role: string
+  scope: string
+  status: UserStatus
+  loginAt: string
+  requiresPasswordReset: boolean
+}
+```
 
 ### 6.4 删除用户
 
@@ -629,7 +779,23 @@ interface UserRecord {
 }
 ```
 
-**响应 data：** `UserRecord`
+**响应 data：**
+
+```typescript
+{
+  id: string
+  name: string
+  account: string
+  phone: string
+  tenantType: '平台' | '租户'
+  tenant: string
+  role: string
+  scope: string
+  status: UserStatus
+  loginAt: string
+  requiresPasswordReset: boolean
+}
+```
 
 ### 6.6 重置用户密码
 
@@ -708,7 +874,33 @@ interface AdminOrder {
 
 ```typescript
 {
-  list: AdminOrder[]
+  list: Array<{
+    id: string
+    tenant: string
+    sourceOrderNo?: string
+    groupKey?: string
+    mappingTemplateId?: string
+    customer: string
+    lineItems: Array<{
+      itemId?: string
+      skuId?: string | null
+      skuName: string
+      skuSpec?: string
+      unit: string
+      quantity: number
+      unitPrice: number
+      lineAmount: number
+    }>
+    customFieldValues?: Record<string, string>
+    amount: number
+    paid: number
+    status: OrderStatus
+    payType: string
+    date: string
+    voided: boolean
+    voidReason?: string
+    voidedAt?: string
+  }>
   total: number
 }
 ```
@@ -719,7 +911,37 @@ interface AdminOrder {
 - **描述**：查看单个订单的聚合详情、商品明细与审计所需字段
 - **关联表**：orders
 
-**响应 data：** `AdminOrder`
+**响应 data：**
+
+```typescript
+{
+  id: string
+  tenant: string               // 所属租户
+  sourceOrderNo?: string       // 原始 ERP 订单号
+  groupKey?: string            // 防重辅键
+  mappingTemplateId?: string   // 导入模板 ID
+  customer: string             // 客户名称
+  lineItems: Array<{
+    itemId?: string            // 行项目 ID
+    skuId?: string | null
+    skuName: string            // 商品名称
+    skuSpec?: string           // 商品规格
+    unit: string               // 单位
+    quantity: number           // 数量
+    unitPrice: number          // 单价（元）
+    lineAmount: number         // 行金额（元）
+  }>
+  customFieldValues?: Record<string, string> // 动态自定义字段
+  amount: number               // 订单金额（元）
+  paid: number                 // 已收金额（元）
+  status: OrderStatus
+  payType: string              // 现款 | 账期
+  date: string                 // 订单日期
+  voided: boolean              // 是否已作废
+  voidReason?: string          // 作废原因
+  voidedAt?: string            // 作废时间
+}
+```
 
 ---
 
@@ -764,7 +986,18 @@ interface PaymentRecord {
 
 ```typescript
 {
-  list: PaymentRecord[]
+  list: Array<{
+    id: string
+    tenant: string
+    orderId: string
+    customer: string
+    amount: number
+    channel: string
+    fee: number
+    net: number
+    time: string
+    status: 'success' | 'partial'
+  }>
   total: number
 }
 ```
@@ -873,7 +1106,20 @@ interface PackagePlan {
 - **GET** `/billing/packages`
 - **关联表**：packages
 
-**响应 data：** `PackagePlan[]`
+**响应 data：**
+
+```typescript
+Array<{
+  id: string
+  name: string                 // 套餐名称
+  price: string                // 价格描述
+  rate: string                 // 费率描述
+  tenants: number              // 在用租户数
+  strategy: string             // 策略说明
+  orderTrend: string           // 订单趋势描述
+  features: string[]           // 套餐内容列表
+}>
+```
 
 ### 10.2 创建套餐
 
@@ -892,16 +1138,52 @@ interface PackagePlan {
 }
 ```
 
-**响应 data：** `PackagePlan`
+**响应 data：**
+
+```typescript
+{
+  id: string
+  name: string
+  price: string
+  rate: string
+  tenants: number
+  strategy: string
+  orderTrend: string
+  features: string[]
+}
+```
 
 ### 10.3 更新套餐
 
 - **PUT** `/billing/packages/{id}`
 - **关联表**：packages
 
-**请求参数：** 同 10.2
+**请求参数：**
 
-**响应 data：** `PackagePlan`
+```typescript
+{
+  name?: string
+  price?: string
+  rate?: string
+  strategy?: string
+  features?: string[]
+}
+```
+
+**响应 data：**
+
+```typescript
+{
+  id: string
+  name: string
+  price: string
+  rate: string
+  tenants: number
+  strategy: string
+  orderTrend: string
+  features: string[]
+}
+```
 
 ### 10.4 删除套餐
 
@@ -946,7 +1228,14 @@ interface ContractRecord {
 
 ```typescript
 {
-  list: ContractRecord[]
+  list: Array<{
+    contractNo: string
+    tenant: string
+    type: '电子签' | '归档件'
+    expireAt: string
+    status: '履约中' | '待续约' | '待签署' | '待归档' | '已终止'
+    terminateReason?: string
+  }>
   total: number
 }
 ```
@@ -1006,7 +1295,18 @@ interface ContractRecord {
 }
 ```
 
-**响应 data：** `ContractRecord`
+**响应 data：**
+
+```typescript
+{
+  contractNo: string
+  tenant: string
+  type: '电子签' | '归档件'
+  expireAt: string
+  status: '履约中' | '待续约' | '待签署' | '待归档' | '已终止'
+  terminateReason?: string
+}
+```
 
 **校验规则：**
 - 仅 `待签署` 或 `待归档` 状态可修改
@@ -1026,7 +1326,18 @@ interface ContractRecord {
 }
 ```
 
-**响应 data：** `ContractRecord`
+**响应 data：**
+
+```typescript
+{
+  contractNo: string
+  tenant: string
+  type: '电子签' | '归档件'
+  expireAt: string
+  status: '履约中' | '待续约' | '待签署' | '待归档' | '已终止'
+  terminateReason?: string
+}
+```
 
 **状态流转：** `待签署` → `履约中`
 
@@ -1044,7 +1355,18 @@ interface ContractRecord {
 }
 ```
 
-**响应 data：** `ContractRecord`
+**响应 data：**
+
+```typescript
+{
+  contractNo: string
+  tenant: string
+  type: '电子签' | '归档件'
+  expireAt: string
+  status: '履约中' | '待续约' | '待签署' | '待归档' | '已终止'
+  terminateReason?: string
+}
+```
 
 **校验规则：**
 - 仅 `履约中` 状态可终止
@@ -1083,7 +1405,13 @@ interface InvoiceRecord {
 
 ```typescript
 {
-  list: InvoiceRecord[]
+  list: Array<{
+    billNo: string
+    tenant: string
+    amount: string
+    cycle: string
+    status: '已开票' | '待开票' | '对账中' | '已作废'
+  }>
   total: number
 }
 ```
@@ -1166,7 +1494,15 @@ interface ServiceProviderRecord {
 **响应 data：**
 
 ```typescript
-ServiceProviderRecord[]
+Array<{
+  id: string
+  name: string
+  category: string             // 服务商分类
+  contactName: string
+  contactPhone: string
+  status: '已接入' | '试运行'
+  score: string                // 服务质量指标
+}>
 ```
 
 ### 13.2 新增服务商
@@ -1187,7 +1523,19 @@ ServiceProviderRecord[]
 }
 ```
 
-**响应 data：** 返回完整服务商记录
+**响应 data：**
+
+```typescript
+{
+  id: string
+  name: string
+  category: string
+  contactName: string
+  contactPhone: string
+  status: '已接入' | '试运行'
+  score: string
+}
+```
 
 ### 13.3 更新服务商
 
@@ -1195,9 +1543,31 @@ ServiceProviderRecord[]
 - **描述**：更新服务商信息或状态
 - **关联表**：service_providers
 
-**请求参数：** `Partial<上述请求参数>`
+**请求参数：**
 
-**响应 data：** 返回更新后的服务商记录
+```typescript
+{
+  name?: string
+  category?: string
+  contactName?: string
+  contactPhone?: string
+  status?: '已接入' | '试运行'
+}
+```
+
+**响应 data：**
+
+```typescript
+{
+  id: string
+  name: string
+  category: string
+  contactName: string
+  contactPhone: string
+  status: '已接入' | '试运行'
+  score: string
+}
+```
 
 ### 13.4 移除服务商
 
@@ -1242,7 +1612,19 @@ interface NoticeRecord {
 **响应 data：**
 
 ```typescript
-NoticeRecord[]
+Array<{
+  id: string
+  title: string
+  audience: string             // 发布范围
+  status: '已发布' | '草稿' | '已下架'
+  publishAt: string
+  content?: string
+  planVersion?: string
+  timing?: 'immediate' | 'scheduled'
+  scheduledAt?: string
+  reminder?: boolean
+  isDraft?: boolean
+}>
 ```
 
 ### 14.2 创建公告
@@ -1266,16 +1648,61 @@ NoticeRecord[]
 }
 ```
 
-**响应 data：** 返回完整公告记录
+**响应 data：**
+
+```typescript
+{
+  id: string
+  title: string
+  audience: string
+  status: '已发布' | '草稿' | '已下架'
+  publishAt: string
+  content?: string
+  planVersion?: string
+  timing?: 'immediate' | 'scheduled'
+  scheduledAt?: string
+  reminder?: boolean
+  isDraft?: boolean
+}
+```
 
 ### 14.3 更新公告
 
 - **PUT** `/notices/{id}`
 - **关联表**：notices
 
-**请求参数：** 同 14.2
+**请求参数：**
 
-**响应 data：** 返回更新后的公告记录
+```typescript
+{
+  title?: string
+  content?: string
+  planVersion?: string
+  audience?: string
+  timing?: 'immediate' | 'scheduled'
+  scheduledAt?: string
+  reminder?: boolean
+  isDraft?: boolean
+}
+```
+
+**响应 data：**
+
+```typescript
+{
+  id: string
+  title: string
+  audience: string
+  status: '已发布' | '草稿' | '已下架'
+  publishAt: string
+  content?: string
+  planVersion?: string
+  timing?: 'immediate' | 'scheduled'
+  scheduledAt?: string
+  reminder?: boolean
+  isDraft?: boolean
+}
+```
 
 ### 14.4 删除公告
 
@@ -1330,7 +1757,13 @@ interface TicketReplyResult {
 
 ```typescript
 {
-  list: TicketRecord[]
+  list: Array<{
+    no: string
+    tenant: string
+    issue: string
+    assignee: string
+    status: '处理中' | '待分派' | '已解决'
+  }>
   total: number
 }
 ```
@@ -1358,7 +1791,16 @@ interface TicketReplyResult {
 }
 ```
 
-**响应 data：** `TicketReplyResult`
+**响应 data：**
+
+```typescript
+{
+  replyId: string
+  content: string
+  repliedBy: string
+  repliedAt: string
+}
+```
 
 ### 15.4 分配工单
 
@@ -1374,7 +1816,17 @@ interface TicketReplyResult {
 }
 ```
 
-**响应 data：** 返回更新后的工单记录
+**响应 data：**
+
+```typescript
+{
+  no: string
+  tenant: string
+  issue: string
+  assignee: string
+  status: '处理中' | '待分派' | '已解决'
+}
+```
 
 **状态流转：** `待分派` → `处理中`
 
@@ -1392,7 +1844,17 @@ interface TicketReplyResult {
 }
 ```
 
-**响应 data：** 返回更新后的工单记录
+**响应 data：**
+
+```typescript
+{
+  no: string
+  tenant: string
+  issue: string
+  assignee: string
+  status: '处理中' | '待分派' | '已解决'
+}
+```
 
 **状态流转：** `处理中` → `已解决`
 
@@ -1416,7 +1878,16 @@ interface RoleTemplate {
 - **GET** `/security/roles`
 - **关联表**：roles
 
-**响应 data：** `RoleTemplate[]`
+**响应 data：**
+
+```typescript
+Array<{
+  id: string
+  name: string
+  side: '平台角色'
+  permissions: string[]
+}>
+```
 
 ### 16.2 创建角色
 
@@ -1433,7 +1904,16 @@ interface RoleTemplate {
 }
 ```
 
-**响应 data：** `RoleTemplate`
+**响应 data：**
+
+```typescript
+{
+  id: string
+  name: string
+  side: '平台角色'
+  permissions: string[]
+}
+```
 
 **校验规则：**
 - `name` 不可与已有角色重名
@@ -1444,9 +1924,26 @@ interface RoleTemplate {
 - **PUT** `/security/roles/{id}`
 - **关联表**：roles
 
-**请求参数：** 同 16.2
+**请求参数：**
 
-**响应 data：** `RoleTemplate`
+```typescript
+{
+  name?: string
+  side?: '平台角色'
+  permissions?: string[]
+}
+```
+
+**响应 data：**
+
+```typescript
+{
+  id: string
+  name: string
+  side: '平台角色'
+  permissions: string[]
+}
+```
 
 **校验规则：**
 - 如果有用户关联此角色，则不允许变更 `side`
@@ -1535,7 +2032,16 @@ Array<{
 }
 ```
 
-**响应 data：** 返回更新后的策略记录
+**响应 data：**
+
+```typescript
+{
+  id: string
+  title: string
+  detail: string
+  enabled: boolean
+}
+```
 
 ### 18.3 获取 IP 白名单
 
@@ -1566,16 +2072,39 @@ Array<{
 }
 ```
 
-**响应 data：** 返回完整白名单条目
+**响应 data：**
+
+```typescript
+{
+  id: string
+  label: string
+  cidr: string
+}
+```
 
 ### 18.5 更新 IP 白名单
 
 - **PUT** `/security/ip-whitelist/{id}`
 - **关联表**：ip_whitelist
 
-**请求参数：** 同 18.4
+**请求参数：**
 
-**响应 data：** 返回更新后的条目
+```typescript
+{
+  label?: string
+  cidr?: string
+}
+```
+
+**响应 data：**
+
+```typescript
+{
+  id: string
+  label: string
+  cidr: string
+}
+```
 
 ### 18.6 删除 IP 白名单
 
@@ -1604,9 +2133,25 @@ Array<{
 - **PUT** `/security/period-policies`
 - **关联表**：period_policies
 
-**请求参数：** 同 18.7 响应结构
+**请求参数：**
 
-**响应 data：** 返回保存后的策略
+```typescript
+{
+  sessionHours: number         // 会话有效时长（小时）
+  passwordDays: number         // 密码过期周期（天）
+  retentionDays: number        // 审计日志保留天数
+}
+```
+
+**响应 data：**
+
+```typescript
+{
+  sessionHours: number
+  passwordDays: number
+  retentionDays: number
+}
+```
 
 ---
 
@@ -1629,7 +2174,17 @@ interface AlertRule {
 - **GET** `/ops/alert-rules`
 - **关联表**：alert_rules
 
-**响应 data：** `AlertRule[]`
+**响应 data：**
+
+```typescript
+Array<{
+  id: string
+  name: string
+  trigger: string
+  channel: string
+  enabled: boolean
+}>
+```
 
 ### 19.2 创建告警规则
 
@@ -1646,16 +2201,44 @@ interface AlertRule {
 }
 ```
 
-**响应 data：** `AlertRule`（`enabled` 默认为 `true`）
+**响应 data：**
+
+```typescript
+{
+  id: string
+  name: string
+  trigger: string
+  channel: string
+  enabled: boolean            // 创建成功后默认为 true
+}
+```
 
 ### 19.3 更新告警规则
 
 - **PUT** `/ops/alert-rules/{id}`
 - **关联表**：alert_rules
 
-**请求参数：** 同 19.2
+**请求参数：**
 
-**响应 data：** `AlertRule`
+```typescript
+{
+  name?: string
+  trigger?: string
+  channel?: string
+}
+```
+
+**响应 data：**
+
+```typescript
+{
+  id: string
+  name: string
+  trigger: string
+  channel: string
+  enabled: boolean
+}
+```
 
 ### 19.4 切换告警规则状态
 
@@ -1670,7 +2253,17 @@ interface AlertRule {
 }
 ```
 
-**响应 data：** `AlertRule`
+**响应 data：**
+
+```typescript
+{
+  id: string
+  name: string
+  trigger: string
+  channel: string
+  enabled: boolean
+}
+```
 
 ### 19.5 删除告警规则
 
@@ -1734,16 +2327,48 @@ Array<{
 }
 ```
 
-**响应 data：** 返回完整服务配置记录
+**响应 data：**
+
+```typescript
+{
+  id: string
+  name: string
+  category: string
+  key: string
+  provider: string
+  note: string
+}
+```
 
 ### 20.4 更新服务接入配置
 
 - **PUT** `/ops/service-configs/{id}`
 - **关联表**：service_configs
 
-**请求参数：** 同 20.3
+**请求参数：**
 
-**响应 data：** 返回更新后的记录
+```typescript
+{
+  name?: string
+  category?: string
+  key?: string
+  provider?: string
+  note?: string
+}
+```
+
+**响应 data：**
+
+```typescript
+{
+  id: string
+  name: string
+  category: string
+  key: string
+  provider: string
+  note: string
+}
+```
 
 ### 20.5 删除服务接入配置
 

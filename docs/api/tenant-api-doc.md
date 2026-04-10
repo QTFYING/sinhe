@@ -204,7 +204,35 @@ interface TenantOrder {
 
 ```typescript
 {
-  list: TenantOrder[]          // 注意：此处必须返回以 sourceOrderNo 聚合后的列表结构
+  list: Array<{               // 注意：此处必须返回以 sourceOrderNo 聚合后的列表结构
+    id: string
+    sourceOrderNo?: string
+    groupKey?: string
+    mappingTemplateId?: string
+    qrCodeToken?: string
+    customer: string
+    summary: string
+    amount: number
+    paid: number
+    status: OrderStatus
+    payType: PayType
+    prints: number
+    date: string
+    lineItems: Array<{
+      itemId?: string
+      skuId?: string | null
+      skuName: string
+      skuSpec?: string
+      unit: string
+      quantity: number
+      unitPrice: number
+      lineAmount: number
+    }>
+    customFieldValues?: Record<string, string>
+    voided: boolean
+    voidReason?: string
+    voidedAt?: string
+  }>
   total: number                // 聚合订单的总数（非商品行明细总数）
   page: number
   pageSize: number
@@ -217,7 +245,39 @@ interface TenantOrder {
 - **角色**：all
 - **说明**：响应中应显式包含 `qrCodeToken`，用于前端生成送货单二维码并打开对应订单 H5 页面。
 
-**响应 data：** `TenantOrder`
+**响应 data：**
+
+```typescript
+{
+  id: string                   // 订单 ID
+  sourceOrderNo?: string       // 原始 ERP 订单号
+  groupKey?: string            // 防重辅键
+  mappingTemplateId?: string   // 关联的导入模板 ID
+  qrCodeToken?: string         // 订单级公开路由标识，前端据此生成送货单二维码并打开 H5 页面
+  customer: string             // 客户名称
+  summary: string              // 商品摘要
+  amount: number               // 订单总金额（元）
+  paid: number                 // 已收金额（元）
+  status: OrderStatus          // 收款状态
+  payType: PayType             // 付款方式
+  prints: number               // 累计打印次数
+  date: string                 // 下单时间
+  lineItems: Array<{
+    itemId?: string            // 行项目 ID
+    skuId?: string | null      // 可选的商品主数据 ID
+    skuName: string            // 商品名称
+    skuSpec?: string           // 商品规格
+    unit: string               // 单位
+    quantity: number           // 数量
+    unitPrice: number          // 单价（元）
+    lineAmount: number         // 行金额（元）
+  }>
+  customFieldValues?: Record<string, string> // 模板映射出的自定义字段键值对
+  voided: boolean              // 是否已作废
+  voidReason?: string          // 作废原因
+  voidedAt?: string            // 作废时间
+}
+```
 
 ### 3.3 创建订单
 
@@ -238,16 +298,103 @@ interface TenantOrder {
 }
 ```
 
-**响应 data：** `TenantOrder`
+**响应 data：**
+
+```typescript
+{
+  id: string
+  sourceOrderNo?: string
+  groupKey?: string
+  mappingTemplateId?: string
+  qrCodeToken?: string
+  customer: string
+  summary: string
+  amount: number
+  paid: number
+  status: OrderStatus
+  payType: PayType
+  prints: number
+  date: string
+  lineItems: Array<{
+    itemId?: string
+    skuId?: string | null
+    skuName: string
+    skuSpec?: string
+    unit: string
+    quantity: number
+    unitPrice: number
+    lineAmount: number
+  }>
+  customFieldValues?: Record<string, string>
+  voided: boolean
+  voidReason?: string
+  voidedAt?: string
+}
+```
 
 ### 3.4 更新订单
 
 - **PUT** `/orders/{id}`
 - **角色**：TENANT_OWNER, TENANT_OPERATOR
 
-**请求参数：** `Partial<TenantOrder>`
+**请求参数：**
 
-**响应 data：** `TenantOrder`
+```typescript
+{
+  customer?: string            // 客户名称
+  summary?: string             // 商品摘要
+  amount?: number              // 订单总金额（元）
+  paid?: number                // 已收金额（元）
+  status?: OrderStatus         // 收款状态
+  payType?: PayType            // 付款方式
+  date?: string                // 下单时间
+  lineItems?: Array<{
+    itemId?: string
+    skuId?: string | null
+    skuName: string
+    skuSpec?: string
+    unit: string
+    quantity: number
+    unitPrice: number
+    lineAmount: number
+  }>
+  customFieldValues?: Record<string, string> // 自定义字段键值对
+}
+```
+
+**响应 data：**
+
+```typescript
+{
+  id: string
+  sourceOrderNo?: string
+  groupKey?: string
+  mappingTemplateId?: string
+  qrCodeToken?: string
+  customer: string
+  summary: string
+  amount: number
+  paid: number
+  status: OrderStatus
+  payType: PayType
+  prints: number
+  date: string
+  lineItems: Array<{
+    itemId?: string
+    skuId?: string | null
+    skuName: string
+    skuSpec?: string
+    unit: string
+    quantity: number
+    unitPrice: number
+    lineAmount: number
+  }>
+  customFieldValues?: Record<string, string>
+  voided: boolean
+  voidReason?: string
+  voidedAt?: string
+}
+```
 
 ### 3.5 作废订单
 
@@ -263,7 +410,39 @@ interface TenantOrder {
 }
 ```
 
-**响应 data：** `TenantOrder`
+**响应 data：**
+
+```typescript
+{
+  id: string
+  sourceOrderNo?: string
+  groupKey?: string
+  mappingTemplateId?: string
+  qrCodeToken?: string
+  customer: string
+  summary: string
+  amount: number
+  paid: number
+  status: OrderStatus
+  payType: PayType
+  prints: number
+  date: string
+  lineItems: Array<{
+    itemId?: string
+    skuId?: string | null
+    skuName: string
+    skuSpec?: string
+    unit: string
+    quantity: number
+    unitPrice: number
+    lineAmount: number
+  }>
+  customFieldValues?: Record<string, string>
+  voided: boolean
+  voidReason?: string
+  voidedAt?: string
+}
+```
 
 ### 3.6 导入-数据预检校验
 
@@ -297,7 +476,35 @@ interface TenantOrder {
     duplicateOrderCount: number     // 与库内已存在订单发生重复的聚合订单数
     errorCount: number              // 错误明细总数；通常与 invalidRows 接近，但允许一行多错
   }
-  aggregatedOrders: TenantOrder[] // 预览用的聚合结果
+  aggregatedOrders: Array<{    // 预览用的聚合结果
+    id: string
+    sourceOrderNo?: string
+    groupKey?: string
+    mappingTemplateId?: string
+    qrCodeToken?: string
+    customer: string
+    summary: string
+    amount: number
+    paid: number
+    status: OrderStatus
+    payType: PayType
+    prints: number
+    date: string
+    lineItems: Array<{
+      itemId?: string
+      skuId?: string | null
+      skuName: string
+      skuSpec?: string
+      unit: string
+      quantity: number
+      unitPrice: number
+      lineAmount: number
+    }>
+    customFieldValues?: Record<string, string>
+    voided: boolean
+    voidReason?: string
+    voidedAt?: string
+  }>
   duplicateOrders: {
     sourceOrderNo: string           // 检测到重复的源订单号
     existingOrderId?: string        // 系统内已存在的订单 ID
@@ -383,7 +590,7 @@ interface TenantOrder {
 **请求参数：**
 
 ```typescript
-interface CreatePrintRecordsRequest {
+{
   orderIds: string[]           // 本次实际打印成功的订单 ID 列表；单张打印时数组长度为 1，必须非空
   requestId?: string           // 请求唯一标识，预留后续幂等控制
   remark?: string              // 备注信息，预留扩展
@@ -393,7 +600,7 @@ interface CreatePrintRecordsRequest {
 **响应 data：**
 
 ```typescript
-interface CreatePrintRecordsResponse {
+{
   totalCount: number           // 本次请求中参与处理的订单总数（服务端去重后）
   successCount: number         // 成功累计打印次数的订单数
   confirmedAt: string          // 服务端确认时间
@@ -441,41 +648,32 @@ interface CreatePrintRecordsResponse {
 **响应 data：**
 
 ```typescript
-interface OrderImportTemplate {
+Array<{
   id: string
   name: string
   isDefault: boolean
   updatedAt: string
-
-  // 1. Excel 原始列头快照（用于前端在配置页回显预览）
-  sourceColumns: {
-    key: string         // 列唯一标识
-    title: string       // Excel 里的真实表头，如 "买家旺旺"
-    index: number       // 所在列索引
-    sampleValue: string // 示例数据，方便排查与预览
-  }[]
-
-  // 2. 当前模板支持的目标字段靶点骨架（定义了系统可用字段）
-  fields: {
-    key: string         // 内部键名，如 "sourceOrderNo", "custom_truck_no"
-    label: string       // 中文展示名，如 "源订单号", "车牌号"
+  sourceColumns: Array<{
+    key: string                 // 列唯一标识
+    title: string               // Excel 原始表头
+    index: number               // 所在列索引
+    sampleValue: string         // 示例数据，方便预览与排查
+  }>
+  fields: Array<{
+    key: string                 // 内部字段 key，如 "sourceOrderNo"
+    label: string               // 中文展示名
     fieldType: 'text' | 'number' | 'money' | 'date' | 'enum'
-    required: boolean   // 是否必填项
-    visible: boolean    // 是否在列表页的列中展示
-    order: number       // 显示序号
-    builtin?: boolean   // 是否是底层表原生自带的字段（原生字段不可删除）
-  }[]
-
-  // 3. 纯粹的映射连线关系（分离后极度解耦）
-  mappings: {
-    sourceColumn: string  // 对应 sourceColumns 的 title
-    targetField: string   // 对应 fields 的 key
-    sampleValue: string   // 连线后的数据样例直观展示
-  }[]
-}
-
-// 返回模板数组
-Array<OrderImportTemplate>
+    required: boolean           // 是否必填
+    visible: boolean            // 是否在列表页展示
+    order: number               // 展示顺序
+    builtin?: boolean           // 是否系统内置字段
+  }>
+  mappings: Array<{
+    sourceColumn: string        // 原始列头
+    targetField: string         // 目标字段 key
+    sampleValue: string         // 映射样例值
+  }>
+}>
 ```
 
 ### 3.12 导入-创建模板
@@ -484,9 +682,65 @@ Array<OrderImportTemplate>
 - **角色**：TENANT_OWNER, TENANT_OPERATOR
 - **关联表**：import_templates
 
-**请求参数：** `Omit<OrderImportTemplate, 'id' | 'updatedAt'>`
+**请求参数：**
 
-**响应 data：** `OrderImportTemplate`
+```typescript
+{
+  name: string
+  isDefault: boolean
+  sourceColumns: Array<{
+    key: string                 // 列唯一标识
+    title: string               // Excel 原始表头
+    index: number               // 列索引
+    sampleValue: string         // 示例值
+  }>
+  fields: Array<{
+    key: string                 // 目标字段 key
+    label: string               // 中文展示名
+    fieldType: 'text' | 'number' | 'money' | 'date' | 'enum'
+    required: boolean           // 是否必填
+    visible: boolean            // 是否在列表页展示
+    order: number               // 展示顺序
+    builtin?: boolean           // 是否系统内置字段
+  }>
+  mappings: Array<{
+    sourceColumn: string        // 原始列头
+    targetField: string         // 目标字段 key
+    sampleValue: string         // 映射样例值
+  }>
+}
+```
+
+**响应 data：**
+
+```typescript
+{
+  id: string
+  name: string
+  isDefault: boolean
+  updatedAt: string
+  sourceColumns: Array<{
+    key: string
+    title: string
+    index: number
+    sampleValue: string
+  }>
+  fields: Array<{
+    key: string
+    label: string
+    fieldType: 'text' | 'number' | 'money' | 'date' | 'enum'
+    required: boolean
+    visible: boolean
+    order: number
+    builtin?: boolean
+  }>
+  mappings: Array<{
+    sourceColumn: string
+    targetField: string
+    sampleValue: string
+  }>
+}
+```
 
 ### 3.13 导入-更新模板
 
@@ -494,9 +748,65 @@ Array<OrderImportTemplate>
 - **角色**：TENANT_OWNER, TENANT_OPERATOR
 - **关联表**：import_templates
 
-**请求参数：** `Partial<OrderImportTemplate>`
+**请求参数：**
 
-**响应 data：** `OrderImportTemplate`
+```typescript
+{
+  name?: string
+  isDefault?: boolean
+  sourceColumns?: Array<{
+    key: string
+    title: string
+    index: number
+    sampleValue: string
+  }>
+  fields?: Array<{
+    key: string
+    label: string
+    fieldType: 'text' | 'number' | 'money' | 'date' | 'enum'
+    required: boolean
+    visible: boolean
+    order: number
+    builtin?: boolean
+  }>
+  mappings?: Array<{
+    sourceColumn: string
+    targetField: string
+    sampleValue: string
+  }>
+}
+```
+
+**响应 data：**
+
+```typescript
+{
+  id: string
+  name: string
+  isDefault: boolean
+  updatedAt: string
+  sourceColumns: Array<{
+    key: string
+    title: string
+    index: number
+    sampleValue: string
+  }>
+  fields: Array<{
+    key: string
+    label: string
+    fieldType: 'text' | 'number' | 'money' | 'date' | 'enum'
+    required: boolean
+    visible: boolean
+    order: number
+    builtin?: boolean
+  }>
+  mappings: Array<{
+    sourceColumn: string
+    targetField: string
+    sampleValue: string
+  }>
+}
+```
 
 ---
 
@@ -540,7 +850,17 @@ interface PaymentRecord {
 
 ```typescript
 {
-  list: PaymentRecord[]
+  list: Array<{
+    id: string
+    orderId: string
+    customer: string
+    amount: number
+    channel: string
+    fee: number
+    net: number
+    status: 'success' | 'partial' | 'pending'
+    paidAt: string
+  }>
   total: number
   page: number
   pageSize: number
@@ -781,7 +1101,15 @@ interface LiveFeedEntry {
 - **角色**：all
 - **描述**：近 7 天的日维度应收/实收趋势
 
-**响应 data：** `DailyTrend[]`
+**响应 data：**
+
+```typescript
+Array<{
+  day: string                  // 格式 'MM-DD'
+  应收: number                 // 应收金额（元）
+  实收: number                 // 实收金额（元）
+}>
+```
 
 ### 8.2 获取月趋势
 
@@ -789,7 +1117,15 @@ interface LiveFeedEntry {
 - **角色**：all
 - **描述**：近 N 个月的月维度应收/实收趋势
 
-**响应 data：** `MonthlyTrend[]`
+**响应 data：**
+
+```typescript
+Array<{
+  month: string                // 格式 'M月'
+  应收: number                 // 应收金额（元）
+  实收: number                 // 实收金额（元）
+}>
+```
 
 ### 8.3 获取实时收款动态
 
@@ -797,7 +1133,16 @@ interface LiveFeedEntry {
 - **角色**：all
 - **描述**：今日实时收款流水列表
 
-**响应 data：** `LiveFeedEntry[]`
+**响应 data：**
+
+```typescript
+Array<{
+  time: string                 // 格式 'HH:mm'
+  customer: string             // 客户名称
+  amount: number               // 支付金额（元）
+  status: string               // 支付状态：paid | partial | pending
+}>
+```
 
 ### 8.4 获取仪表盘聚合数据
 
@@ -928,7 +1273,18 @@ interface UpdatePrintingConfigResponse {
 - **角色**：TENANT_OWNER
 - **描述**：一期使用固化角色，本接口仅提供供UI展示的基础配置字典。
 
-**响应 data：** `TenantRoleAccount[]`
+**响应 data：**
+
+```typescript
+Array<{
+  id: string
+  name: string                 // 角色名称
+  description?: string         // 角色描述
+  permissions: string[]        // 权限 ID 列表
+  isSystem: boolean            // 是否系统内置角色
+  userCount: number            // 关联用户数
+}>
+```
 
 ### 8.2 获取权限树
 
@@ -936,7 +1292,22 @@ interface UpdatePrintingConfigResponse {
 - **角色**：TENANT_OWNER
 - **描述**：返回完整硬编码的权限树结构，仅供展示使用，一期无动态分配权。
 
-**响应 data：** `PermissionNode[]`
+**响应 data：**
+
+```typescript
+Array<{
+  id: string
+  label: string                // 权限名称
+  children?: Array<{
+    id: string
+    label: string
+    children?: Array<{
+      id: string
+      label: string
+    }>                         // 允许继续按相同结构递归展开
+  }>                           // 子权限节点
+}>
+```
 
 **权限树结构示例：**
 
@@ -953,7 +1324,19 @@ interface UpdatePrintingConfigResponse {
 - **GET** `/settings/users`
 - **角色**：TENANT_OWNER
 
-**响应 data：** `TenantSettingsUser[]`
+**响应 data：**
+
+```typescript
+Array<{
+  id: string
+  name: string                 // 姓名
+  account: string              // 登录账号
+  role: Role                   // 主角色
+  phone: string                // 手机号
+  status: 'active' | 'disabled'
+  lastLogin: string            // 最后登录时间
+}>
+```
 
 ### 8.4 创建用户
 
@@ -971,7 +1354,19 @@ interface UpdatePrintingConfigResponse {
 }
 ```
 
-**响应 data：** `TenantSettingsUser`
+**响应 data：**
+
+```typescript
+{
+  id: string
+  name: string
+  account: string
+  role: Role
+  phone: string
+  status: 'active' | 'disabled'
+  lastLogin: string
+}
+```
 
 **校验规则：**
 - `phone` 在本租户内唯一（作为登录账号）
@@ -982,9 +1377,31 @@ interface UpdatePrintingConfigResponse {
 - **PUT** `/settings/users/{id}`
 - **角色**：TENANT_OWNER
 
-**请求参数：** `Partial<TenantSettingsUser>`
+**请求参数：**
 
-**响应 data：** `TenantSettingsUser`
+```typescript
+{
+  name?: string
+  account?: string             // 登录账号
+  role?: Role                  // 主角色
+  phone?: string               // 手机号
+  status?: 'active' | 'disabled'
+}
+```
+
+**响应 data：**
+
+```typescript
+{
+  id: string
+  name: string
+  account: string
+  role: Role
+  phone: string
+  status: 'active' | 'disabled'
+  lastLogin: string
+}
+```
 
 ### 8.6 删除用户
 
@@ -1011,7 +1428,19 @@ interface UpdatePrintingConfigResponse {
 }
 ```
 
-**响应 data：** `TenantSettingsUser`
+**响应 data：**
+
+```typescript
+{
+  id: string
+  name: string
+  account: string
+  role: Role
+  phone: string
+  status: 'active' | 'disabled'
+  lastLogin: string
+}
+```
 
 ### 8.8 获取通用配置
 
@@ -1019,16 +1448,64 @@ interface UpdatePrintingConfigResponse {
 - **角色**：TENANT_OWNER
 - **描述**：获取企业信息 + 通知设置
 
-**响应 data：** `TenantGeneralSettings`
+**响应 data：**
+
+```typescript
+{
+  companyName: string          // 企业名称
+  contactPerson: string        // 联系人
+  contactPhone: string         // 联系电话
+  address: string              // 企业地址
+  licenseNo: string            // 营业执照号
+  qrCodeExpiry: number         // 收款码有效期（天）
+  notifySeller: boolean        // 收款成功通知业务员
+  notifyOwner: boolean         // 收款成功通知老板
+  notifyFinance: boolean       // 收款成功通知财务
+  creditRemindDays: number     // 账期到期提醒提前天数
+  dailyReportPush: boolean     // 每日收款日报推送
+}
+```
 
 ### 8.9 保存通用配置
 
 - **PUT** `/settings/general`
 - **角色**：TENANT_OWNER
 
-**请求参数：** `Partial<TenantGeneralSettings>`
+**请求参数：**
 
-**响应 data：** `TenantGeneralSettings`
+```typescript
+{
+  companyName?: string
+  contactPerson?: string
+  contactPhone?: string
+  address?: string
+  licenseNo?: string
+  qrCodeExpiry?: number
+  notifySeller?: boolean
+  notifyOwner?: boolean
+  notifyFinance?: boolean
+  creditRemindDays?: number
+  dailyReportPush?: boolean
+}
+```
+
+**响应 data：**
+
+```typescript
+{
+  companyName: string
+  contactPerson: string
+  contactPhone: string
+  address: string
+  licenseNo: string
+  qrCodeExpiry: number
+  notifySeller: boolean
+  notifyOwner: boolean
+  notifyFinance: boolean
+  creditRemindDays: number
+  dailyReportPush: boolean
+}
+```
 
 ### 8.10 获取打印配置列表
 
@@ -1039,7 +1516,7 @@ interface UpdatePrintingConfigResponse {
 **响应 data：**
 
 ```typescript
-interface GetPrintingConfigListResponse {
+{
   items: Array<{
     importTemplateId: string     // 绑定的导入映射模板 ID
     importTemplateName: string   // 映射模板名称，供前端列表展示
@@ -1074,7 +1551,7 @@ interface GetPrintingConfigListResponse {
 **响应 data：**
 
 ```typescript
-interface GetPrintingConfigDetailResponse {
+{
   importTemplateId: string       // 绑定的导入映射模板 ID
   importTemplateName?: string    // 映射模板名称
   hasCustomConfig: boolean       // 是否存在自定义打印配置；false 时前端回退本地默认模板
@@ -1108,7 +1585,7 @@ interface GetPrintingConfigDetailResponse {
 **请求参数：**
 
 ```typescript
-interface UpdatePrintingConfigRequest {
+{
   configVersion?: number         // 前端提交时携带的配置版本号，预留并发保护
   config: Record<string, unknown> // 打印配置 JSON；服务端按黑盒配置整包保存
   remark?: string                // 备注信息，预留扩展
@@ -1118,7 +1595,7 @@ interface UpdatePrintingConfigRequest {
 **响应 data：**
 
 ```typescript
-interface UpdatePrintingConfigResponse {
+{
   importTemplateId: string       // 绑定的导入映射模板 ID
   configVersion: number          // 保存成功后的最新配置版本号
   config: Record<string, unknown> // 当前生效的打印配置 JSON
@@ -1165,7 +1642,13 @@ interface AuditLogRecord {
 
 ```typescript
 {
-  list: AuditLogRecord[]
+  list: Array<{
+    id: string
+    action: string             // 操作描述，如 "导入订单"
+    operator: string           // 操作人
+    ip: string                 // 操作 IP
+    createdAt: string          // 操作时间
+  }>
   total: number
 }
 ```
@@ -1207,7 +1690,13 @@ interface NotificationRecord {
 
 ```typescript
 {
-  list: NotificationRecord[]
+  list: Array<{
+    id: string
+    title: string
+    content: string
+    publishAt: string
+    isRead: boolean
+  }>
   total: number
   page: number
   pageSize: number
@@ -1258,7 +1747,17 @@ interface QualificationStatusResult {
 - **描述**：提交当前租户的资质认证材料
 - **关联表**：tenant_certifications
 
-**请求参数：** `QualificationSubmitRequest`
+**请求参数：**
+
+```typescript
+{
+  licenseUrl: string
+  legalPerson: string
+  legalIdCard: string
+  contactPhone: string
+  remark?: string
+}
+```
 
 **响应 data：**
 
@@ -1278,7 +1777,16 @@ interface QualificationStatusResult {
 
 **响应 data：**
 
-**响应 data：** `QualificationStatusResult`
+```typescript
+{
+  certId: string | null
+  status: QualificationStatus | null
+  submittedAt: string | null
+  reviewedAt: string | null
+  reviewComment?: string | null
+  rejectReason: string | null
+}
+```
 
 ---
 
