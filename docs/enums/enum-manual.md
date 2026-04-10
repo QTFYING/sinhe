@@ -18,6 +18,7 @@
 
 | 枚举名 | 取值 | 中文说明 | 主要使用字段 |
 |------|------|------|------|
+| `UserRole` | `OS_SUPER_ADMIN` `TENANT_OWNER` `TENANT_OPERATOR` `TENANT_FINANCE` `TENANT_VIEWER` | 平台超级管理员、老板、打单员、财务、访客 | `users.role` |
 | `TenantRole` | `TENANT_OWNER` `TENANT_OPERATOR` `TENANT_FINANCE` `TENANT_VIEWER` | 老板、打单员、财务、访客 | `users.role` |
 | `TenantStatus` | `active` `onboarding` `attention` `paused` | 正常、待审、关注、停用 | `tenants.status` |
 | `UserStatus` | `active` `invited` `locked` `disabled` | 正常、邀请中、锁定、禁用 | `users.status` |

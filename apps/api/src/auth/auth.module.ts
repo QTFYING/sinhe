@@ -3,6 +3,7 @@ import { JwtModule } from '@nestjs/jwt';
 import { AuthService } from './auth.service';
 import { AuthController } from './auth.controller';
 import { JwtStrategy } from './jwt.strategy';
+import { ACCESS_TOKEN_TTL } from './auth-session.util';
 
 const JWT_SECRET = process.env.JWT_SECRET;
 if (!JWT_SECRET) {
@@ -13,7 +14,7 @@ if (!JWT_SECRET) {
   imports: [
     JwtModule.register({
       secret: JWT_SECRET,
-      signOptions: { expiresIn: '2h' },
+      signOptions: { expiresIn: ACCESS_TOKEN_TTL },
     }),
   ],
   controllers: [AuthController],

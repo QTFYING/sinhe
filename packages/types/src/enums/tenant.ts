@@ -1,6 +1,16 @@
 import type { EnumValue } from './common'
 
 /**
+ * 平台角色
+ */
+export const PlatformRoleEnum = {
+  /** 平台超级管理员 */
+  SUPER_ADMIN: 'OS_SUPER_ADMIN',
+} as const
+
+export type PlatformRole = EnumValue<typeof PlatformRoleEnum>
+
+/**
  * 租户角色
  */
 export const TenantRoleEnum = {
@@ -15,6 +25,24 @@ export const TenantRoleEnum = {
 } as const
 
 export type TenantRole = EnumValue<typeof TenantRoleEnum>
+
+/**
+ * 系统用户角色
+ */
+export const UserRoleEnum = {
+  /** 平台超级管理员 */
+  OS_SUPER_ADMIN: 'OS_SUPER_ADMIN',
+  /** 老板 */
+  TENANT_OWNER: 'TENANT_OWNER',
+  /** 打单员 */
+  TENANT_OPERATOR: 'TENANT_OPERATOR',
+  /** 财务 */
+  TENANT_FINANCE: 'TENANT_FINANCE',
+  /** 访客/只读 */
+  TENANT_VIEWER: 'TENANT_VIEWER',
+} as const
+
+export type UserRole = EnumValue<typeof UserRoleEnum>
 
 /**
  * 租户状态

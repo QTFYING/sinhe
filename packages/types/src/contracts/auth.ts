@@ -1,4 +1,4 @@
-import type { AuthSourceTag, TenantRole } from '../enums'
+import type { AuthSourceTag, UserRole } from '../enums'
 
 export interface LoginRequest {
   username: string
@@ -9,7 +9,7 @@ export interface AuthUserProfile {
   id: string
   username: string
   realName: string
-  role: TenantRole | string
+  role: UserRole
   tenantId: string | null
 }
 
