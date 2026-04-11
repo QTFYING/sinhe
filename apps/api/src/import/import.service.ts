@@ -48,6 +48,13 @@ import {
   resolveImportJobFinalStatus,
   shouldStartImportJobImmediately,
 } from './import-job.worker.helpers';
+import {
+  buildImportOrderSummary,
+  countMatchedImportFields,
+  readImportColumn,
+  resolveImportOrderStatus,
+  resolveImportPayType,
+} from './import.domain';
 
 const IMPORT_PREVIEW_TTL_SECONDS = 3600;
 const IMPORT_JOB_POLL_INTERVAL_MS = 5000;
@@ -401,8 +408,8 @@ export class ImportService implements OnModuleInit, OnModuleDestroy {
       if (order.amount <= 0) {
         order.amount = this.round(order.lineItems.reduce((sum, item) => sum + item.lineAmount, 0));
       }
-      if (!order.summary) order.summary = this.buildSummary(order.lineItems);
-      order.status = this.toStatus(order.status, order.payType, order.paid, order.amount);
+      if (!order.summary) order.summary = buildImportOrderSummary(order.lineItems);
+      order.status = resolveImportOrderStatus(order.status, order.payType, order.paid, order.amount);
 
       if (order.amount <= 0) {
         order.rowNumbers.forEach((row) => {
@@ -460,8 +467,8 @@ export class ImportService implements OnModuleInit, OnModuleDestroy {
     const amount = this.readMoney(input.values.amount) ?? 0;
     const paid = this.readMoney(input.values.paid) ?? 0;
     const creditDays = this.readInt(input.values.creditDays);
-    const payType = this.toPayType(this.readString(input.values.payType), creditDays);
-    const status = this.toStatus(
+    const payType = resolveImportPayType(this.readString(input.values.payType), creditDays);
+    const status = resolveImportOrderStatus(
       this.readString(input.values.status),
       payType,
       paid,
@@ -904,7 +911,7 @@ export class ImportService implements OnModuleInit, OnModuleDestroy {
 
   private extractValues(row: Record<string, unknown>, mappings: TemplateMapping[]): Record<string, unknown> {
     return mappings.reduce<Record<string, unknown>>((acc, mapping) => {
-      acc[mapping.targetField] = this.readColumn(row, mapping.sourceColumn);
+      acc[mapping.targetField] = readImportColumn(row, mapping.sourceColumn);
       return acc;
     }, {});
   }
@@ -925,7 +932,7 @@ export class ImportService implements OnModuleInit, OnModuleDestroy {
   ): Promise<{ template?: OrderImportTemplate; matchedFieldCount?: number }> {
     if (templateId) {
       const template = this.toTemplate(await this.getScopedTemplate(tenantId, templateId));
-      return { template, matchedFieldCount: this.countMatchedFields(rows, template.mappings) };
+      return { template, matchedFieldCount: countMatchedImportFields(rows, template.mappings) };
     }
 
     const templates = await this.prisma.importTemplate.findMany({
@@ -937,7 +944,7 @@ export class ImportService implements OnModuleInit, OnModuleDestroy {
     let bestScore = 0;
     for (const item of templates) {
       const template = this.toTemplate(item);
-      const score = this.countMatchedFields(rows, template.mappings);
+      const score = countMatchedImportFields(rows, template.mappings);
       if (score > bestScore) {
         bestTemplate = template;
         bestScore = score;
@@ -945,13 +952,6 @@ export class ImportService implements OnModuleInit, OnModuleDestroy {
     }
 
     return { template: bestTemplate, matchedFieldCount: bestScore || undefined };
-  }
-
-  private countMatchedFields(rows: Array<Record<string, unknown>>, mappings: TemplateMapping[]): number {
-    return mappings.reduce((count, mapping) => {
-      const matched = rows.some((row) => this.hasValue(this.readColumn(row, mapping.sourceColumn)));
-      return matched ? count + 1 : count;
-    }, 0);
   }
 
   private async loadExistingOrderMap(tenantId: string, sourceOrderNos: string[]): Promise<Map<string, string>> {
@@ -1098,16 +1098,6 @@ export class ImportService implements OnModuleInit, OnModuleDestroy {
     return Array.isArray(value) ? (value as unknown as OrderImportJobConflictDetail[]) : [];
   }
 
-  private readColumn(row: Record<string, unknown>, sourceColumn: string): unknown {
-    const normalized = this.normalize(sourceColumn);
-    const entry = Object.entries(row).find(([key]) => this.normalize(key) === normalized);
-    return entry?.[1];
-  }
-
-  private normalize(value: string): string {
-    return value.trim().toLowerCase().replace(/\s+/g, '');
-  }
-
   private hasValue(value: unknown): boolean {
     return value !== null && value !== undefined && (typeof value !== 'string' || value.trim().length > 0);
   }
@@ -1136,33 +1126,6 @@ export class ImportService implements OnModuleInit, OnModuleDestroy {
     if (!this.hasValue(value)) return undefined;
     const date = new Date(String(value));
     return Number.isNaN(date.getTime()) ? undefined : date;
-  }
-
-  private toPayType(value: string | undefined, creditDays?: number): OrderPayType {
-    if (value === OrderPayTypeEnum.CREDIT) return OrderPayTypeEnum.CREDIT;
-    if (value === OrderPayTypeEnum.CASH) return OrderPayTypeEnum.CASH;
-    return creditDays && creditDays > 0 ? OrderPayTypeEnum.CREDIT : OrderPayTypeEnum.CASH;
-  }
-
-  private toStatus(
-    value: string | OrderStatus | undefined,
-    payType: OrderPayType,
-    paid: number,
-    amount: number,
-  ): OrderStatus {
-    if (
-      value === OrderStatusEnum.PENDING ||
-      value === OrderStatusEnum.PARTIAL ||
-      value === OrderStatusEnum.PAID ||
-      value === OrderStatusEnum.EXPIRED ||
-      value === OrderStatusEnum.CREDIT
-    ) {
-      return value;
-    }
-    if (paid >= amount && amount > 0) return OrderStatusEnum.PAID;
-    if (paid > 0) return OrderStatusEnum.PARTIAL;
-    if (payType === OrderPayTypeEnum.CREDIT) return OrderStatusEnum.CREDIT;
-    return OrderStatusEnum.PENDING;
   }
 
   private toImportJobStatus(status: PrismaImportJobStatusEnum): OrderImportJobStatus {
@@ -1229,13 +1192,6 @@ export class ImportService implements OnModuleInit, OnModuleDestroy {
       default:
         return PrismaOrderPayTypeEnum.CASH;
     }
-  }
-
-  private buildSummary(lineItems: OrderLineItem[]): string {
-    const names = Array.from(new Set(lineItems.map((item) => item.skuName))).filter(Boolean);
-    if (names.length === 0) return '导入订单';
-    if (names.length <= 3) return names.join('、');
-    return `${names.slice(0, 3).join('、')} 等 ${names.length} 项`;
   }
 
   private toCreditDueDate(date: string, creditDays?: number): Date | undefined {

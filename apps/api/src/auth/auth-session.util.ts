@@ -38,12 +38,19 @@ export function getRefreshTokenCookieOptions(req: Request): CookieOptions {
   };
 }
 
+function getRefreshTokenClearCookieOptions(req: Request): CookieOptions {
+  void req;
+  return {
+    path: '/',
+  };
+}
+
 export function setRefreshTokenCookie(res: Response, req: Request, refreshToken: string): void {
   res.cookie(getRefreshTokenCookieName(req), refreshToken, getRefreshTokenCookieOptions(req));
 }
 
 export function clearRefreshTokenCookie(res: Response, req: Request): void {
-  res.clearCookie(getRefreshTokenCookieName(req), getRefreshTokenCookieOptions(req));
+  res.clearCookie(getRefreshTokenCookieName(req), getRefreshTokenClearCookieOptions(req));
 }
 
 export function getRefreshTokenFromCookie(req: Request): string | null {

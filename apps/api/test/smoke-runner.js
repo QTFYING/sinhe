@@ -8,6 +8,13 @@ const {
   shouldStartImportJobImmediately,
 } = require('../dist/import/import-job.worker.helpers');
 const {
+  buildImportOrderSummary,
+  countMatchedImportFields,
+  readImportColumn,
+  resolveImportOrderStatus,
+  resolveImportPayType,
+} = require('../dist/import/import.domain');
+const {
   deriveOrderStatus,
   resolveCreditOrderStatus,
 } = require('../dist/order/order.domain');
@@ -121,6 +128,41 @@ run('构建产物包含导入 Worker 调度 helper', () => {
   assert.equal(fs.existsSync(helperEntry), true);
 });
 
+run('导入模板匹配支持忽略大小写与空格的列头识别', () => {
+  const rows = [
+    { 'Source Order No': 'SO-001', Customer: '张三', 'Line Amount': 120.5 },
+    { ' source  order  no ': 'SO-002', customer: '李四' },
+  ];
+  const mappings = [
+    { sourceColumn: 'sourceOrderNo' },
+    { sourceColumn: 'customer' },
+    { sourceColumn: 'lineAmount' },
+    { sourceColumn: 'notExists' },
+  ];
+
+  assert.equal(readImportColumn(rows[0], 'sourceOrderNo'), 'SO-001');
+  assert.equal(readImportColumn(rows[1], 'customer'), '李四');
+  assert.equal(countMatchedImportFields(rows, mappings), 3);
+});
+
+run('导入订单推导覆盖 payType 回退、状态回退与摘要生成', () => {
+  assert.equal(resolveImportPayType(undefined, 30), OrderPayTypeEnum.CREDIT);
+  assert.equal(resolveImportPayType(undefined, 0), OrderPayTypeEnum.CASH);
+  assert.equal(resolveImportOrderStatus(undefined, OrderPayTypeEnum.CREDIT, 0, 100), OrderStatusEnum.CREDIT);
+  assert.equal(resolveImportOrderStatus(undefined, OrderPayTypeEnum.CASH, 50, 100), OrderStatusEnum.PARTIAL);
+  assert.equal(resolveImportOrderStatus(undefined, OrderPayTypeEnum.CASH, 100, 100), OrderStatusEnum.PAID);
+  assert.equal(resolveImportOrderStatus('expired', OrderPayTypeEnum.CASH, 0, 100), OrderStatusEnum.EXPIRED);
+  assert.equal(
+    buildImportOrderSummary([
+      { skuName: '苹果' },
+      { skuName: '香蕉' },
+      { skuName: '橙子' },
+      { skuName: '葡萄' },
+    ]),
+    '苹果、香蕉、橙子 等 4 项',
+  );
+});
+
 run('订单状态推导覆盖现金、账期、部分支付、全额支付与作废场景', () => {
   assert.equal(deriveOrderStatus(OrderPayTypeEnum.CASH, '100', '0', false), OrderStatusEnum.PENDING);
   assert.equal(deriveOrderStatus(OrderPayTypeEnum.CREDIT, '100', '0', false), OrderStatusEnum.CREDIT);
@@ -200,5 +242,10 @@ run('构建产物包含订单领域规则 helper', () => {
 
 run('构建产物包含支付领域规则 helper', () => {
   const helperEntry = path.join(__dirname, '..', 'dist', 'payment', 'payment.domain.js');
+  assert.equal(fs.existsSync(helperEntry), true);
+});
+
+run('构建产物包含导入领域规则 helper', () => {
+  const helperEntry = path.join(__dirname, '..', 'dist', 'import', 'import.domain.js');
   assert.equal(fs.existsSync(helperEntry), true);
 });
