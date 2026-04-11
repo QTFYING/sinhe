@@ -4,7 +4,7 @@
 
 ## 当前状态
 
-项目目前处于“API 文档先行、后端实现按文档重建”的阶段。
+项目目前已完成首轮后端落地，当前处于“按稳定契约持续迭代、联调补强与技术债收口”的阶段。
 
 当前应以以下内容作为事实源和执行依据：
 
@@ -12,12 +12,14 @@
 2. `packages/types/src/enums`
 3. `packages/types/src/contracts`
 4. `docs/prisma/data-model-reference.md`
-5. `design/*.md`
+5. `design/api-implementation-plan.md`
+6. `design/api-technical-debt.md`
+7. `design/api-regression-checklist.md`
 
 说明：
 
-1. `apps/api` 中部分业务模块仍保留早期 MVP 代码，仅可作为历史实现参考。
-2. `auth` 认证机制可复用，其余核心主域需按当前文档逐步校准或重建。
+1. `apps/api` 中仍有少量早期 MVP 残留代码，仅可作为历史实现参考。
+2. 主链路接口、枚举、contracts 与数据模型已经形成当前稳定基线。
 3. Swagger 是联调产物，不是设计源。
 
 ## 技术栈
@@ -37,7 +39,7 @@
 ├── AGENTS.md                         # 代理执行规则
 ├── apps/
 │   └── api/                          # NestJS 后端服务
-├── design/                           # 实施计划与执行手册
+├── design/                           # 活文档与归档设计手册
 ├── docs/                             # API、枚举、数据模型等正式文档
 ├── packages/
 │   ├── types/                        # 共享枚举与 contracts
@@ -175,9 +177,27 @@ INIT_TENANT_CREDIT_REMINDER_DAYS=
 
 ### 执行手册
 
-- `design/api-implementation-delivery-plan-2026-04-10.md`
-- `design/api-target-model-gap-analysis-2026-04-10.md`
-- `design/api-phase-1-execution-checklist-2026-04-10.md`
+- `design/api-implementation-plan.md`
+- `design/api-technical-debt.md`
+- `design/api-regression-checklist.md`
+
+### 历史归档
+
+- 若后续再次产生阶段性过程文档，统一放入 `design/archived/`
+
+## 阅读顺序
+
+建议按以下顺序阅读本仓库：
+
+1. `README.md`
+2. `AGENTS.md`
+3. `docs/api/api-architecture-overview.md`
+4. `docs/api/*.md`
+5. `docs/enums/enum-manual.md`
+6. `docs/prisma/data-model-reference.md`
+7. `design/api-implementation-plan.md`
+8. `design/api-technical-debt.md`
+9. `design/api-regression-checklist.md`
 
 ## 开发约束
 
@@ -187,3 +207,4 @@ INIT_TENANT_CREDIT_REMINDER_DAYS=
 4. `docs/api` 定业务结构，`enums` 定闭集值，`contracts` 跟随投影，`data-model-reference` 做建模同步。
 
 更严格的代理执行规则见 [AGENTS.md](/D:/Sinhe/api/AGENTS.md)。
+

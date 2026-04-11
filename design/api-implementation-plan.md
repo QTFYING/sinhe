@@ -1,23 +1,22 @@
-# API 文档驱动的后端落地计划
+# API 实施总纲
 
 > 日期：2026-04-10
 > 最近同步：2026-04-11
 > 文档状态：当前生效
-> 文档定位：总纲手册
+> 文档定位：当前生效总纲
 > 适用范围：`docs/api`、`packages/types`、`docs/prisma/data-model-reference.md`、`apps/api`、`design`
 > 目标：以当前标准 API 文档为起点，持续推进后端实现、联调产物与质量收口
 > 配套手册：
-> - `design/api-target-model-gap-analysis-2026-04-10.md`
-> - `design/api-phase-1-execution-checklist-2026-04-10.md`
-> - `design/api-interface-implementation-layer-checklist-2026-04-11.md`
-> - `design/api-technical-debt-checklist-2026-04-11.md`
+> - `design/api-technical-debt.md`
+> - `design/api-regression-checklist.md`
+> - 历史阶段过程文档如有保留，统一放入 `design/archived/`
 
 本手册用于定义事实源顺序、实施边界、阶段目标、当前进度、统一验收标准与下一阶段重点。
 凡与实现顺序、模块优先级、旧链路清退范围和收口动作有关的判断，以本手册为准。
 
 ## 一、当前项目现状
 
-截至 2026-04-11，项目已经从“文档先行、代码待重建”推进到“主链路已重建、进入联调与收口阶段”。
+截至 2026-04-11，项目已经完成首轮后端落地，当前进入“稳态迭代、联调补强、技术债收口”阶段。
 
 当前判断如下：
 
@@ -157,7 +156,7 @@
 
 收口结论：
 
-1. Auth、Settings、Import、Orders、Payment、Notifications、Analytics、Finance、Tenant/Admin 主域已补第一轮 Swagger 注解
+1. Auth、Settings、Import、Orders、Payment、Notifications、Analytics、Finance、Tenant/Admin 主域已完成两轮 Swagger 同步，当前请求/响应 schema 已可直接联调
 2. `POST /orders/{id}/reminders` 已完成持久化建模与实现收口
 3. 已完成 `prisma generate`、`pnpm -F api build` 与 `pnpm -F api test:smoke` 最小验证
 4. 导入可靠性已进一步收口：API 进程默认不再消费导入任务，独立 `import-worker` 入口已落地
@@ -268,21 +267,40 @@ Swagger 继续需要同步，但定位保持不变：它是联调产物，不是
 
 1. `pnpm -F api build`
 2. `pnpm -F api test:smoke`
+3. `pnpm -F api test:backend-regression`
 
 当前 smoke 范围包括：
 
 1. `IMPORT_JOB_WORKER_ENABLED` 开关行为
 2. 导入任务最终状态归并规则
-3. 独立 `import-worker` 构建产物存在性
-4. 订单状态推导规则
-5. 账期状态推导规则
-6. H5 支付状态推导规则
-7. `PAYING -> EXPIRED` 超时过期判定
+3. 导入模板列头匹配规则
+4. 导入订单 `payType / status` 推导规则
+5. 导入订单摘要生成规则
+6. 订单状态推导规则
+7. 账期状态推导规则
+8. H5 支付状态推导规则
+9. `PAYING -> EXPIRED` 超时过期判定
+10. 独立 `import-worker`、导入 helper、订单 helper、支付 helper 构建产物存在性
+
+当前完整链回归基线包括：
+
+1. `auth login / me / refresh / logout`
+2. `settings/general`
+3. `import/templates`
+4. `settings/printing`
+5. `import preview / submit / job poll`
+6. `orders list / detail`
+7. `pay detail / offline-payment / status`
+8. `cash-verifications`
+9. `payments summary / list`
+10. `orders/print-records`
+11. `orders/{id}/reminders`
 
 当前运行约定补充如下：
 
-1. Web API 进程继续使用 `pnpm -F api start:prod`
-2. 导入任务 Worker 使用 `pnpm -F api start:import-worker`
+1. 本地 API 自启使用 `pnpm -F api start:local` 或根目录 `pnpm run dev:api`
+2. 导入任务 Worker 使用 `pnpm run dev:worker` 或 `pnpm -F api start:import-worker`
+3. 后端自检统一使用 `pnpm run check:backend`
 
 ## 十四、预期最终结果
 

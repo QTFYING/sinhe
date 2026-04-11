@@ -11,7 +11,7 @@ description: 统一维护本项目的 Prisma 领域建模。新增或调整 `app
 
 1. 先遵守仓库根目录 `AGENTS.md`。
 2. 先确认当前建模属于哪一阶段，再决定是否进入 `schema.prisma` 改动。
-3. 若 `design/*.md` 已明确某域暂缓或冻结，不提前为该域扩展模型。
+3. 若 `design/api-implementation-plan.md` 已明确某域暂缓或冻结，不提前为该域扩展模型；若相关风险已登记，还需同步参考技术债台账。
 
 ## 建模顺序
 
@@ -46,3 +46,4 @@ description: 统一维护本项目的 Prisma 领域建模。新增或调整 `app
 - schema 字段名与 API 文档一致。
 - 主键、唯一键、索引能支撑主要查询与幂等需求。
 - 生成的 Prisma Client 足够支撑后续模块实现。
+
