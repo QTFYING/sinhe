@@ -12,6 +12,7 @@ import {
   Query,
   UseGuards,
 } from '@nestjs/common';
+import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import type {
   PermissionNode,
   TenantAuditLogListResponse,
@@ -40,17 +41,21 @@ import { UpdatePrintingConfigDto } from './dto/update-printing-config.dto';
 import { UpdateTenantUserDto } from './dto/update-tenant-user.dto';
 import { SettingsService } from './settings.service';
 
+@ApiTags('Tenant Settings')
+@ApiBearerAuth()
 @Controller('settings')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class SettingsController {
   constructor(private readonly settingsService: SettingsService) {}
 
+  @ApiOperation({ summary: '获取通用配置' })
   @Get('general')
   @Roles(UserRoleEnum.TENANT_OWNER)
   async getGeneralSettings(@CurrentUser() currentUser: JwtPayload): Promise<TenantGeneralSettings> {
     return this.settingsService.getGeneralSettings(currentUser);
   }
 
+  @ApiOperation({ summary: '保存通用配置' })
   @Put('general')
   @Roles(UserRoleEnum.TENANT_OWNER)
   async updateGeneralSettings(
@@ -65,24 +70,28 @@ export class SettingsController {
     );
   }
 
+  @ApiOperation({ summary: '获取角色列表' })
   @Get('roles')
   @Roles(UserRoleEnum.TENANT_OWNER)
   async getRoles(@CurrentUser() currentUser: JwtPayload): Promise<TenantRoleAccount[]> {
     return this.settingsService.getRoles(currentUser);
   }
 
+  @ApiOperation({ summary: '获取权限树' })
   @Get('permissions')
   @Roles(UserRoleEnum.TENANT_OWNER)
   async getPermissions(): Promise<PermissionNode[]> {
     return this.settingsService.getPermissions();
   }
 
+  @ApiOperation({ summary: '获取租户用户列表' })
   @Get('users')
   @Roles(UserRoleEnum.TENANT_OWNER)
   async getUsers(@CurrentUser() currentUser: JwtPayload): Promise<TenantSettingsUser[]> {
     return this.settingsService.getUsers(currentUser);
   }
 
+  @ApiOperation({ summary: '创建租户用户' })
   @Post('users')
   @Roles(UserRoleEnum.TENANT_OWNER)
   async createUser(
@@ -93,6 +102,7 @@ export class SettingsController {
     return this.settingsService.createUser(currentUser, request as CreateTenantUserRequest, ip);
   }
 
+  @ApiOperation({ summary: '更新租户用户' })
   @Put('users/:id')
   @Roles(UserRoleEnum.TENANT_OWNER)
   async updateUser(
@@ -109,6 +119,7 @@ export class SettingsController {
     );
   }
 
+  @ApiOperation({ summary: '删除租户用户' })
   @Delete('users/:id')
   @Roles(UserRoleEnum.TENANT_OWNER)
   async deleteUser(
@@ -119,6 +130,7 @@ export class SettingsController {
     return this.settingsService.deleteUser(currentUser, userId, ip);
   }
 
+  @ApiOperation({ summary: '更新租户用户状态' })
   @Patch('users/:id')
   @Roles(UserRoleEnum.TENANT_OWNER)
   async patchUserStatus(
@@ -135,6 +147,7 @@ export class SettingsController {
     );
   }
 
+  @ApiOperation({ summary: '获取打印配置列表' })
   @Get('printing')
   @Roles(UserRoleEnum.TENANT_OWNER)
   async getPrintingConfigList(
@@ -143,6 +156,7 @@ export class SettingsController {
     return this.settingsService.getPrintingConfigList(currentUser);
   }
 
+  @ApiOperation({ summary: '获取单张映射模板打印配置' })
   @Get('printing/:importTemplateId')
   @Roles(UserRoleEnum.TENANT_OWNER)
   async getPrintingConfigDetail(
@@ -152,6 +166,7 @@ export class SettingsController {
     return this.settingsService.getPrintingConfigDetail(currentUser, importTemplateId);
   }
 
+  @ApiOperation({ summary: '保存单张映射模板打印配置' })
   @Put('printing/:importTemplateId')
   @Roles(UserRoleEnum.TENANT_OWNER)
   async updatePrintingConfig(
@@ -168,6 +183,7 @@ export class SettingsController {
     );
   }
 
+  @ApiOperation({ summary: '获取租户操作日志' })
   @Get('audit-logs')
   @Roles(UserRoleEnum.TENANT_OWNER)
   async getAuditLogs(

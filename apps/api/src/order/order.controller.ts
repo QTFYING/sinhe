@@ -10,6 +10,7 @@ import {
   Query,
   UseGuards,
 } from '@nestjs/common';
+import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { UserRoleEnum } from '@prisma/client';
 import type {
   AdminOrderItem,
@@ -40,11 +41,14 @@ import { UpdateOrderDto } from './dto/update-order.dto';
 import { VoidOrderDto } from './dto/void-order.dto';
 import { OrderService } from './order.service';
 
+@ApiTags('Orders')
+@ApiBearerAuth()
 @Controller('orders')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class OrderController {
   constructor(private readonly orderService: OrderService) {}
 
+  @ApiOperation({ summary: '获取账期订单列表' })
   @Get('credit')
   @Roles(UserRoleEnum.TENANT_OWNER, UserRoleEnum.TENANT_FINANCE)
   async getCreditOrders(
@@ -54,6 +58,7 @@ export class OrderController {
     return this.orderService.getCreditOrders(currentUser, query.page, query.pageSize);
   }
 
+  @ApiOperation({ summary: '创建打印回执' })
   @Post('print-records')
   @Roles(UserRoleEnum.TENANT_OWNER, UserRoleEnum.TENANT_OPERATOR)
   async createPrintRecord(
@@ -66,6 +71,7 @@ export class OrderController {
     );
   }
 
+  @ApiOperation({ summary: '获取订单列表' })
   @Get()
   @Roles(
     UserRoleEnum.OS_SUPER_ADMIN,
@@ -81,6 +87,7 @@ export class OrderController {
     return this.orderService.findAll(currentUser, query);
   }
 
+  @ApiOperation({ summary: '获取订单详情' })
   @Get(':id')
   @Roles(
     UserRoleEnum.OS_SUPER_ADMIN,
@@ -96,6 +103,7 @@ export class OrderController {
     return this.orderService.getOrder(id, currentUser);
   }
 
+  @ApiOperation({ summary: '创建订单' })
   @Post()
   @Roles(UserRoleEnum.TENANT_OWNER, UserRoleEnum.TENANT_OPERATOR)
   async createOrder(
@@ -105,6 +113,7 @@ export class OrderController {
     return this.orderService.createOrder(currentUser, request as CreateOrderRequest);
   }
 
+  @ApiOperation({ summary: '更新订单' })
   @Put(':id')
   @Roles(UserRoleEnum.TENANT_OWNER, UserRoleEnum.TENANT_OPERATOR)
   async updateOrder(
@@ -115,6 +124,7 @@ export class OrderController {
     return this.orderService.updateOrder(currentUser, id, request as UpdateOrderRequest);
   }
 
+  @ApiOperation({ summary: '更新订单作废状态' })
   @Patch(':id')
   @Roles(UserRoleEnum.TENANT_OWNER, UserRoleEnum.TENANT_OPERATOR)
   async voidOrder(
@@ -125,6 +135,7 @@ export class OrderController {
     return this.orderService.voidOrder(currentUser, id, request as VoidOrderRequest);
   }
 
+  @ApiOperation({ summary: '创建催款提醒记录' })
   @Post(':id/reminders')
   @Roles(UserRoleEnum.TENANT_OWNER, UserRoleEnum.TENANT_FINANCE)
   async createReminder(
@@ -139,6 +150,7 @@ export class OrderController {
     );
   }
 
+  @ApiOperation({ summary: '创建回款记录' })
   @Post(':id/receipts')
   @Roles(UserRoleEnum.TENANT_OWNER, UserRoleEnum.TENANT_FINANCE)
   async createReceipt(

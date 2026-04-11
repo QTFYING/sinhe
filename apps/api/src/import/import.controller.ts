@@ -8,6 +8,7 @@ import {
   Put,
   UseGuards,
 } from '@nestjs/common';
+import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { UserRoleEnum } from '@prisma/client';
 import type {
   CreateOrderImportTemplateRequest,
@@ -28,17 +29,21 @@ import { CreateImportTemplateDto, UpdateImportTemplateDto } from './dto/import-t
 import { SubmitOrderImportDto } from './dto/submit-order-import.dto';
 import { ImportService } from './import.service';
 
+@ApiTags('Import')
+@ApiBearerAuth()
 @Controller()
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class ImportController {
   constructor(private readonly importService: ImportService) {}
 
+  @ApiOperation({ summary: '获取导入模板列表' })
   @Get('import/templates')
   @Roles(UserRoleEnum.TENANT_OWNER, UserRoleEnum.TENANT_OPERATOR)
   async getImportTemplates(@CurrentUser() currentUser: JwtPayload): Promise<OrderImportTemplate[]> {
     return this.importService.getImportTemplates(currentUser);
   }
 
+  @ApiOperation({ summary: '创建导入模板' })
   @Post('import/templates')
   @Roles(UserRoleEnum.TENANT_OWNER, UserRoleEnum.TENANT_OPERATOR)
   async createImportTemplate(
@@ -51,6 +56,7 @@ export class ImportController {
     );
   }
 
+  @ApiOperation({ summary: '更新导入模板' })
   @Put('import/templates/:id')
   @Roles(UserRoleEnum.TENANT_OWNER, UserRoleEnum.TENANT_OPERATOR)
   async updateImportTemplate(
@@ -65,6 +71,7 @@ export class ImportController {
     );
   }
 
+  @ApiOperation({ summary: '导入预检' })
   @Post('import/preview')
   @Roles(UserRoleEnum.TENANT_OWNER, UserRoleEnum.TENANT_OPERATOR)
   async previewImport(
@@ -74,6 +81,7 @@ export class ImportController {
     return this.importService.previewImport(currentUser, request as OrderImportPreviewRequest);
   }
 
+  @ApiOperation({ summary: '正式导入订单' })
   @Post('orders/import')
   @Roles(UserRoleEnum.TENANT_OWNER, UserRoleEnum.TENANT_OPERATOR)
   async submitOrderImport(
@@ -83,6 +91,7 @@ export class ImportController {
     return this.importService.submitOrderImport(currentUser, request as OrderImportSubmitRequest);
   }
 
+  @ApiOperation({ summary: '查询导入任务进度' })
   @Get('orders/import/jobs/:jobId')
   @Roles(UserRoleEnum.TENANT_OWNER, UserRoleEnum.TENANT_OPERATOR)
   async getImportJob(

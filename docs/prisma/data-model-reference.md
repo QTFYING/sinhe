@@ -455,6 +455,21 @@
 }
 ```
 
+**order_reminders 表**
+
+```typescript
+{
+  id: string                // 催款记录 ID
+  tenantId: string          // 关联租户 ID
+  orderId: string           // 关联订单 ID
+  operatorId: string | null // 操作人 ID
+  channels: string[]        // 实际发送渠道，如 ["sms", "wechat"]
+  status: 'sent' | 'failed' // 发送结果状态
+  sentAt: string            // 发送时间
+  createdAt: string         // 创建时间
+}
+```
+
 **alert_rules 表**
 
 ```typescript

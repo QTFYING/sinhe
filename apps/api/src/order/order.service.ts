@@ -6,7 +6,10 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import {
+  AuditResultEnum as PrismaAuditResultEnum,
+  AuditTargetTypeEnum as PrismaAuditTargetTypeEnum,
   OrderPayTypeEnum as PrismaOrderPayTypeEnum,
+  OrderReminderStatusEnum as PrismaOrderReminderStatusEnum,
   OrderStatusEnum as PrismaOrderStatusEnum,
   PaymentOrderStatusEnum,
   PaymentRecordStatusEnum,
@@ -341,11 +344,43 @@ export class OrderService {
     request: CreateOrderReminderRequest,
   ): Promise<CreateOrderReminderResponse> {
     const tenantId = this.getTenantId(currentUser);
-    await this.assertOrderExists(tenantId, orderId);
+    const channels = this.normalizeReminderChannels(request.channels);
+    const actor = await this.getActorName(currentUser.userId);
+
+    await this.prisma.$transaction(async (tx) => {
+      const count = await tx.order.count({
+        where: { id: orderId, tenantId, deletedAt: null },
+      });
+      if (count === 0) {
+        throw new NotFoundException('订单不存在');
+      }
+
+      await tx.orderReminder.create({
+        data: {
+          tenantId,
+          orderId,
+          operatorId: currentUser.userId,
+          channels,
+          status: PrismaOrderReminderStatusEnum.SENT,
+          sentAt: new Date(),
+        },
+      });
+
+      await tx.auditLog.create({
+        data: {
+          actor,
+          action: '创建催款提醒记录',
+          target: orderId,
+          targetType: PrismaAuditTargetTypeEnum.TENANT,
+          tenantId,
+          result: PrismaAuditResultEnum.SUCCESS,
+        },
+      });
+    });
 
     return {
       sent: true,
-      channels: this.normalizeReminderChannels(request.channels),
+      channels,
     };
   }
 
@@ -569,6 +604,18 @@ export class OrderService {
     if (count === 0) {
       throw new NotFoundException('订单不存在');
     }
+  }
+
+  private async getActorName(userId: string): Promise<string> {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        realName: true,
+        account: true,
+      },
+    });
+
+    return user?.realName || user?.account || userId;
   }
 
   private async hasSettledFlow(

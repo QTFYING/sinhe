@@ -99,6 +99,11 @@ enum PaymentRecordStatusEnum {
   FAILED  @map("failed")
 }
 
+enum OrderReminderStatusEnum {
+  SENT   @map("sent")
+  FAILED @map("failed")
+}
+
 enum PublishTimingEnum {
   IMMEDIATE @map("immediate")
   SCHEDULED @map("scheduled")
@@ -136,6 +141,7 @@ model Tenant {
   payments           Payment[]
   paymentOrders      PaymentOrder[]
   printRecordBatches PrintRecordBatch[]
+  orderReminders     OrderReminder[]
   noticeReads        NoticeRead[]
   certifications     TenantCertification[]
   auditLogs          AuditLog[]
@@ -162,6 +168,7 @@ model User {
   tenant             Tenant?            @relation(fields: [tenantId], references: [id])
   printRecordBatches PrintRecordBatch[] @relation("PrintRecordBatchOperator")
   noticeReads        NoticeRead[]
+  orderReminders     OrderReminder[]    @relation("OrderReminderOperator")
 
   @@index([tenantId])
   @@index([status])
@@ -290,6 +297,7 @@ model Order {
   lineItems       OrderItem[]
   payments        Payment[]
   paymentOrders   PaymentOrder[]
+  reminders       OrderReminder[]
 
   @@unique([tenantId, sourceOrderNo])
   @@index([tenantId, status])
@@ -382,6 +390,25 @@ model PrintRecordBatch {
 
   @@unique([tenantId, requestId])
   @@map("print_record_batches")
+}
+
+model OrderReminder {
+  id         String                  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId   String                  @db.Uuid
+  orderId    String                  @db.Uuid
+  operatorId String?                 @db.Uuid
+  channels   String[]
+  status     OrderReminderStatusEnum @default(SENT)
+  sentAt     DateTime                @default(now())
+  createdAt  DateTime                @default(now())
+
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  order    Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  operator User?  @relation("OrderReminderOperator", fields: [operatorId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, sentAt])
+  @@index([orderId, sentAt])
+  @@map("order_reminders")
 }
 
 model Notice {

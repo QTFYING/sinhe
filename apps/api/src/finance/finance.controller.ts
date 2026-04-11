@@ -7,6 +7,7 @@ import {
   StreamableFile,
   UseGuards,
 } from '@nestjs/common';
+import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Response } from 'express';
 import { UserRoleEnum } from '@prisma/client';
 import type {
@@ -23,17 +24,21 @@ import { RolesGuard } from '../auth/guards/roles.guard';
 import { ListReconciliationQueryDto } from './dto/list-reconciliation.query.dto';
 import { FinanceService } from './finance.service';
 
+@ApiTags('Tenant Finance')
+@ApiBearerAuth()
 @Controller('finance')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class TenantFinanceController {
   constructor(private readonly financeService: FinanceService) {}
 
+  @ApiOperation({ summary: '获取财务汇总' })
   @Get('summary')
   @Roles(UserRoleEnum.TENANT_OWNER, UserRoleEnum.TENANT_FINANCE)
   async getSummary(@CurrentUser() currentUser: JwtPayload): Promise<FinanceSummaryResponse> {
     return this.financeService.getTenantSummary(currentUser);
   }
 
+  @ApiOperation({ summary: '获取租户对账明细' })
   @Get('reconciliation')
   @Roles(UserRoleEnum.TENANT_OWNER, UserRoleEnum.TENANT_FINANCE)
   async getReconciliation(
@@ -43,6 +48,7 @@ export class TenantFinanceController {
     return this.financeService.getTenantReconciliation(currentUser, query.page, query.pageSize);
   }
 
+  @ApiOperation({ summary: '导出租户对账单' })
   @Get('reconciliation/export')
   @Header('Content-Type', 'application/octet-stream')
   @Roles(UserRoleEnum.TENANT_OWNER, UserRoleEnum.TENANT_FINANCE)
@@ -56,17 +62,21 @@ export class TenantFinanceController {
   }
 }
 
+@ApiTags('Admin Reconciliation')
+@ApiBearerAuth()
 @Controller('reconciliation')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class AdminReconciliationController {
   constructor(private readonly financeService: FinanceService) {}
 
+  @ApiOperation({ summary: '获取平台对账汇总' })
   @Get('summary')
   @Roles(UserRoleEnum.OS_SUPER_ADMIN)
   async getSummary(): Promise<AdminReconciliationSummaryResponse> {
     return this.financeService.getAdminSummary();
   }
 
+  @ApiOperation({ summary: '获取平台对账日报明细' })
   @Get('daily')
   @Roles(UserRoleEnum.OS_SUPER_ADMIN)
   async getDaily(
@@ -75,6 +85,7 @@ export class AdminReconciliationController {
     return this.financeService.getAdminDaily(query.page, query.pageSize);
   }
 
+  @ApiOperation({ summary: '导出平台对账单' })
   @Get('export')
   @Header('Content-Type', 'application/octet-stream')
   @Roles(UserRoleEnum.OS_SUPER_ADMIN)

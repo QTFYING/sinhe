@@ -12,6 +12,7 @@ import {
   Query,
   UseGuards,
 } from '@nestjs/common';
+import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { UserRoleEnum } from '@prisma/client';
 import type {
   CreateUserPasswordResetRequest,
@@ -32,17 +33,21 @@ import { PatchUserStatusDto } from './dto/patch-user-status.dto';
 import { UpsertUserDto } from './dto/upsert-user.dto';
 import { TenantService } from './tenant.service';
 
+@ApiTags('Admin Users')
+@ApiBearerAuth()
 @Controller('users')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class AdminUserController {
   constructor(private readonly tenantService: TenantService) {}
 
+  @ApiOperation({ summary: '获取平台用户列表' })
   @Get()
   @Roles(UserRoleEnum.OS_SUPER_ADMIN)
   async getUsers(@Query() query: ListUsersQueryDto): Promise<PaginatedResponse<UserRecordItem>> {
     return this.tenantService.getAdminUsers(query as UserListQuery);
   }
 
+  @ApiOperation({ summary: '创建平台用户' })
   @Post()
   @Roles(UserRoleEnum.OS_SUPER_ADMIN)
   async createUser(
@@ -53,6 +58,7 @@ export class AdminUserController {
     return this.tenantService.createAdminUser(currentUser, request as UserUpsertRequest, ip);
   }
 
+  @ApiOperation({ summary: '更新平台用户' })
   @Put(':id')
   @Roles(UserRoleEnum.OS_SUPER_ADMIN)
   async updateUser(
@@ -69,6 +75,7 @@ export class AdminUserController {
     );
   }
 
+  @ApiOperation({ summary: '删除平台用户' })
   @Delete(':id')
   @Roles(UserRoleEnum.OS_SUPER_ADMIN)
   async deleteUser(
@@ -79,6 +86,7 @@ export class AdminUserController {
     return this.tenantService.deleteAdminUser(currentUser, userId, ip);
   }
 
+  @ApiOperation({ summary: '更新平台用户状态' })
   @Patch(':id')
   @Roles(UserRoleEnum.OS_SUPER_ADMIN)
   async patchUserStatus(
@@ -95,6 +103,7 @@ export class AdminUserController {
     );
   }
 
+  @ApiOperation({ summary: '创建密码重置记录' })
   @Post(':id/password-resets')
   @Roles(UserRoleEnum.OS_SUPER_ADMIN)
   async resetPassword(

@@ -10,6 +10,7 @@ import {
   Query,
   UseGuards,
 } from '@nestjs/common';
+import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { UserRoleEnum } from '@prisma/client';
 import type {
   CreateTenantAuditBatchRequest,
@@ -43,11 +44,14 @@ import { ListTenantsQueryDto } from './dto/list-tenants.query.dto';
 import { PatchTenantStatusDto } from './dto/patch-tenant-status.dto';
 import { TenantService } from './tenant.service';
 
+@ApiTags('Admin Tenants')
+@ApiBearerAuth()
 @Controller('tenants')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class TenantAdminController {
   constructor(private readonly tenantService: TenantService) {}
 
+  @ApiOperation({ summary: '获取租户列表' })
   @Get()
   @Roles(UserRoleEnum.OS_SUPER_ADMIN)
   async getTenants(
@@ -56,6 +60,7 @@ export class TenantAdminController {
     return this.tenantService.getTenants(query as TenantListQuery);
   }
 
+  @ApiOperation({ summary: '创建租户' })
   @Post()
   @Roles(UserRoleEnum.OS_SUPER_ADMIN)
   async createTenant(
@@ -70,6 +75,7 @@ export class TenantAdminController {
     );
   }
 
+  @ApiOperation({ summary: '创建租户审核决议' })
   @Post(':id/audit-decisions')
   @Roles(UserRoleEnum.OS_SUPER_ADMIN)
   async createAuditDecision(
@@ -86,6 +92,7 @@ export class TenantAdminController {
     );
   }
 
+  @ApiOperation({ summary: '创建租户批量审核批次' })
   @Post('audit-batches')
   @Roles(UserRoleEnum.OS_SUPER_ADMIN)
   async createAuditBatch(
@@ -100,6 +107,7 @@ export class TenantAdminController {
     );
   }
 
+  @ApiOperation({ summary: '创建租户续费记录' })
   @Post(':id/renewals')
   @Roles(UserRoleEnum.OS_SUPER_ADMIN)
   async createRenewal(
@@ -116,6 +124,7 @@ export class TenantAdminController {
     );
   }
 
+  @ApiOperation({ summary: '更新租户状态' })
   @Patch(':id')
   @Roles(UserRoleEnum.OS_SUPER_ADMIN)
   async patchStatus(
@@ -132,6 +141,7 @@ export class TenantAdminController {
     );
   }
 
+  @ApiOperation({ summary: '创建租户批量状态变更批次' })
   @Post('status-change-batches')
   @Roles(UserRoleEnum.OS_SUPER_ADMIN)
   async createStatusChangeBatch(
@@ -146,6 +156,7 @@ export class TenantAdminController {
     );
   }
 
+  @ApiOperation({ summary: '获取组织架构成员列表' })
   @Get('members')
   @Roles(UserRoleEnum.OS_SUPER_ADMIN)
   async getMembers(
@@ -154,12 +165,14 @@ export class TenantAdminController {
     return this.tenantService.getTenantMembers(query as TenantMemberListQuery);
   }
 
+  @ApiOperation({ summary: '获取资质审核队列' })
   @Get('certifications')
   @Roles(UserRoleEnum.OS_SUPER_ADMIN)
   async getCertificationQueue(): Promise<TenantCertificationRecordItem[]> {
     return this.tenantService.getCertificationQueue();
   }
 
+  @ApiOperation({ summary: '创建资质审核决议' })
   @Post('certifications/:id/review-decisions')
   @Roles(UserRoleEnum.OS_SUPER_ADMIN)
   async createCertificationReviewDecision(

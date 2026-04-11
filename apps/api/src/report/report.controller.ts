@@ -1,4 +1,5 @@
 import { Controller, Get, Query, UseGuards } from '@nestjs/common';
+import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import type {
   AnalyticsDashboardResponse,
   DailyTrendItem,
@@ -13,11 +14,14 @@ import { RolesGuard } from '../auth/guards/roles.guard';
 import { AnalyticsRangeQueryDto } from './dto/analytics-range.query.dto';
 import { ReportService } from './report.service';
 
+@ApiTags('Analytics')
+@ApiBearerAuth()
 @Controller('analytics')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class ReportController {
   constructor(private readonly reportService: ReportService) {}
 
+  @ApiOperation({ summary: '获取每日收款趋势' })
   @Get('daily-trend')
   @Roles(
     UserRoleEnum.TENANT_OWNER,
@@ -29,6 +33,7 @@ export class ReportController {
     return this.reportService.getDailyTrend(currentUser);
   }
 
+  @ApiOperation({ summary: '获取月度收款趋势' })
   @Get('monthly-trend')
   @Roles(
     UserRoleEnum.TENANT_OWNER,
@@ -43,6 +48,7 @@ export class ReportController {
     return this.reportService.getMonthlyTrend(currentUser, query.months);
   }
 
+  @ApiOperation({ summary: '获取实时收款动态' })
   @Get('payments/live')
   @Roles(
     UserRoleEnum.TENANT_OWNER,
@@ -54,6 +60,7 @@ export class ReportController {
     return this.reportService.getLivePayments(currentUser);
   }
 
+  @ApiOperation({ summary: '获取首页仪表盘指标' })
   @Get('dashboard')
   @Roles(
     UserRoleEnum.TENANT_OWNER,
