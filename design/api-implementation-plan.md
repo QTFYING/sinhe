@@ -298,7 +298,7 @@ Swagger 继续需要同步，但定位保持不变：它是联调产物，不是
 
 当前运行约定补充如下：
 
-1. 本地 API 自启使用 `pnpm -F api start:local` 或根目录 `pnpm run dev:api`
+1. 本地 API 自启使用根目录 `pnpm run dev:api`，或手工执行 `pnpm -F api start:dev`
 2. 导入任务 Worker 使用 `pnpm run dev:worker` 或 `pnpm -F api start:import-worker`
 3. 后端自检统一使用 `pnpm run check:backend`
 

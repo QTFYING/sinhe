@@ -19,8 +19,9 @@
 1. PostgreSQL 可连接
 2. Redis 可连接
 3. `JWT_SECRET` 已配置
-4. `@shou/types` 已构建为运行时产物
-5. `apps/api/dist` 已构建完成
+4. `apps/api/.env` 已按 `apps/api/.env.example` 完成填充
+5. `@shou/types` 已构建为运行时产物
+6. `apps/api/dist` 已构建完成
 
 本地默认口径：
 
@@ -88,12 +89,6 @@ pnpm run dev
 
 ```powershell
 pnpm run dev:worker
-```
-
-如果只是想在本地打开 Swagger，也可以直接使用：
-
-```powershell
-pnpm -F api start:local
 ```
 
 若不用一键脚本，也可按以下顺序手工执行：
@@ -167,11 +162,13 @@ CORS_ORIGINS=http://localhost:5001,http://localhost:5002,http://localhost:5003
 
 ```env
 AUTH_COOKIE_SECURE=false
+IMPORT_JOB_WORKER_ENABLED=false
 ```
 
 说明：
 
 - 本地 HTTP 环境建议显式关闭 secure cookie
+- API 进程默认建议保持 `IMPORT_JOB_WORKER_ENABLED=false`
 - 若通过 HTTPS 反代，可按实际情况改为 `true`
 
 ## 七、本次已经踩过的关键问题

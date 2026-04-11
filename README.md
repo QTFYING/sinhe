@@ -138,7 +138,14 @@ DATABASE_URL=
 REDIS_URL=
 JWT_SECRET=
 CORS_ORIGINS=
+PORT=
+NODE_ENV=
+AUTH_COOKIE_SECURE=
+IMPORT_JOB_WORKER_ENABLED=
+LAKALA_CASHIER_URL_PREFIX=
 ```
+
+建议以 `apps/api/.env.example` 作为本地配置模板。
 
 生产初始化脚本 `pnpm db:init` 还会读取以下变量：
 
