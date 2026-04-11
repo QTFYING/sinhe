@@ -45,6 +45,7 @@ import { randomBytes } from 'crypto';
 import { JwtPayload } from '../auth/decorators/current-user.decorator';
 import { PrismaService } from '../prisma/prisma.service';
 import { ListOrdersQueryDto } from './dto/list-orders.query.dto';
+import { deriveOrderStatus, resolveCreditOrderStatus } from './order.domain';
 
 @Injectable()
 export class OrderService {
@@ -714,11 +715,7 @@ export class OrderService {
     paid: Decimal,
     voided: boolean,
   ): OrderStatus {
-    if (voided) return OrderStatusEnum.EXPIRED;
-    if (amount.gt(0) && paid.gte(amount)) return OrderStatusEnum.PAID;
-    if (paid.gt(0)) return OrderStatusEnum.PARTIAL;
-    if (payType === OrderPayTypeEnum.CREDIT) return OrderStatusEnum.CREDIT;
-    return OrderStatusEnum.PENDING;
+    return deriveOrderStatus(payType, amount, paid, voided);
   }
 
   private toTenantOrder(order: {
@@ -862,13 +859,7 @@ export class OrderService {
   }
 
   private resolveCreditStatus(dueDate: Date): CreditOrderStatus {
-    const today = dayjs().startOf('day');
-    const target = dayjs(dueDate).startOf('day');
-
-    if (target.isBefore(today)) return CreditOrderStatusEnum.OVERDUE;
-    if (target.isSame(today)) return CreditOrderStatusEnum.TODAY;
-    if (target.diff(today, 'day') <= 7) return CreditOrderStatusEnum.SOON;
-    return CreditOrderStatusEnum.NORMAL;
+    return resolveCreditOrderStatus(dueDate);
   }
 
   private toLineItemCreateInput(item: OrderLineItem): Prisma.OrderItemCreateWithoutOrderInput {

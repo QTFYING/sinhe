@@ -51,9 +51,13 @@ import { JwtPayload } from '../auth/decorators/current-user.decorator';
 import { BusinessException } from '../common/exceptions/business.exception';
 import { PrismaService } from '../prisma/prisma.service';
 import { RedisService } from '../redis/redis.service';
+import {
+  PAYMENT_PAYING_EXPIRE_MINUTES,
+  resolvePaymentOrderStatus,
+  shouldExpirePayingPaymentOrder,
+} from './payment.domain';
 
 const PAYMENT_REQUEST_LOCK_SECONDS = 10;
-const PAYMENT_PAYING_EXPIRE_MINUTES = 5;
 
 @Injectable()
 export class PaymentService {
@@ -70,7 +74,7 @@ export class PaymentService {
 
     const latestPaymentOrder = await this.getLatestPaymentOrder(order.id);
     const currentPaymentOrder = await this.expireIfNeeded(latestPaymentOrder);
-    const status = this.resolvePaymentOrderStatus(order, currentPaymentOrder);
+    const status = resolvePaymentOrderStatus(order, currentPaymentOrder);
 
     return {
       orderNo: order.id,
@@ -121,7 +125,7 @@ export class PaymentService {
 
         const latest = await this.getLatestPaymentOrder(order.id, tx);
         const currentPaymentOrder = await this.expireIfNeeded(latest, tx);
-        const paymentStatus = this.resolvePaymentOrderStatus(currentOrder, currentPaymentOrder);
+        const paymentStatus = resolvePaymentOrderStatus(currentOrder, currentPaymentOrder);
         const payableAmount = this.getRemainingAmount(currentOrder);
 
         if (payableAmount.lte(0) || currentOrder.status === PrismaOrderStatusEnum.PAID) {
@@ -194,7 +198,7 @@ export class PaymentService {
 
         const latest = await this.getLatestPaymentOrder(currentOrder.id, tx);
         const currentPaymentOrder = await this.expireIfNeeded(latest, tx);
-        const paymentStatus = this.resolvePaymentOrderStatus(currentOrder, currentPaymentOrder);
+        const paymentStatus = resolvePaymentOrderStatus(currentOrder, currentPaymentOrder);
         if (paymentStatus !== PaymentOrderStatusEnum.UNPAID) {
           throw new BusinessException(40402, '订单状态不是 unpaid，不允许登记线下支付', 400);
         }
@@ -260,7 +264,7 @@ export class PaymentService {
 
     const latestPaymentOrder = await this.getLatestPaymentOrder(order.id);
     const currentPaymentOrder = await this.expireIfNeeded(latestPaymentOrder);
-    const status = this.resolvePaymentOrderStatus(order, currentPaymentOrder);
+    const status = resolvePaymentOrderStatus(order, currentPaymentOrder);
     const latestPayment =
       status === PaymentOrderStatusEnum.PAID
         ? await this.prisma.payment.findFirst({
@@ -571,42 +575,18 @@ export class PaymentService {
     paymentOrder: Awaited<ReturnType<PaymentService['getLatestPaymentOrder']>>,
     client: Prisma.TransactionClient | PrismaService = this.prisma,
   ) {
-    if (
-      paymentOrder &&
-      paymentOrder.status === PrismaPaymentOrderStatusEnum.PAYING &&
-      paymentOrder.lastInitiatedAt &&
-      dayjs().diff(dayjs(paymentOrder.lastInitiatedAt), 'minute') >= PAYMENT_PAYING_EXPIRE_MINUTES
-    ) {
-      return client.paymentOrder.update({
-        where: { id: paymentOrder.id },
-        data: {
-          status: PrismaPaymentOrderStatusEnum.EXPIRED,
-          statusMessage: '支付超时，请重新发起',
-        },
-      });
+    if (!paymentOrder || !shouldExpirePayingPaymentOrder(paymentOrder)) {
+      return paymentOrder;
     }
 
-    return paymentOrder;
+    return client.paymentOrder.update({
+      where: { id: paymentOrder.id },
+      data: {
+        status: PrismaPaymentOrderStatusEnum.EXPIRED,
+        statusMessage: '支付超时，请重新发起',
+      },
+    });
   }
-
-  private resolvePaymentOrderStatus(
-    order: { status: PrismaOrderStatusEnum; voided: boolean; amount: Prisma.Decimal; paid: Prisma.Decimal },
-    paymentOrder: {
-      status: PrismaPaymentOrderStatusEnum;
-    } | null,
-  ): PaymentOrderStatus {
-    if (order.voided || order.status === PrismaOrderStatusEnum.EXPIRED) {
-      return PaymentOrderStatusEnum.EXPIRED;
-    }
-    if (this.decimal(order.paid).gte(this.decimal(order.amount)) || order.status === PrismaOrderStatusEnum.PAID) {
-      return PaymentOrderStatusEnum.PAID;
-    }
-    if (paymentOrder) {
-      return this.fromPrismaPaymentOrderStatus(paymentOrder.status);
-    }
-    return PaymentOrderStatusEnum.UNPAID;
-  }
-
   private toOfflinePaymentInfo(
     paymentOrder: {
       paymentMethod: PrismaPaymentMethodEnum | null;
