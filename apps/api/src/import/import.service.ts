@@ -913,9 +913,9 @@ export class ImportService {
     ) {
       return value;
     }
-    if (payType === OrderPayTypeEnum.CREDIT) return OrderStatusEnum.CREDIT;
     if (paid >= amount && amount > 0) return OrderStatusEnum.PAID;
     if (paid > 0) return OrderStatusEnum.PARTIAL;
+    if (payType === OrderPayTypeEnum.CREDIT) return OrderStatusEnum.CREDIT;
     return OrderStatusEnum.PENDING;
   }
 
