@@ -4,7 +4,6 @@ import { NestFactory } from '@nestjs/core';
 import { ImportWorkerModule } from './import/import-worker.module';
 
 async function bootstrap() {
-  process.env.IMPORT_JOB_WORKER_ENABLED = 'true';
   const logger = new Logger('ImportWorker');
   const app = await NestFactory.createApplicationContext(ImportWorkerModule, {
     logger: ['log', 'error', 'warn'],

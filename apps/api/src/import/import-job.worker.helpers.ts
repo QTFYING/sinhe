@@ -7,7 +7,11 @@ export interface ImportJobProgressSnapshot {
   failedCount: number;
 }
 
-export function isImportWorkerEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
+export interface ImportWorkerEnvLike {
+  IMPORT_JOB_WORKER_ENABLED?: string;
+}
+
+export function isImportWorkerEnabled(env: ImportWorkerEnvLike): boolean {
   return env.IMPORT_JOB_WORKER_ENABLED === 'true';
 }
 
@@ -22,6 +26,6 @@ export function resolveImportJobFinalStatus(
     : PrismaImportJobStatusEnum.COMPLETED;
 }
 
-export function shouldStartImportJobImmediately(env: NodeJS.ProcessEnv = process.env): boolean {
+export function shouldStartImportJobImmediately(env: ImportWorkerEnvLike): boolean {
   return isImportWorkerEnabled(env);
 }

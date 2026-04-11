@@ -1,15 +1,20 @@
-import { Injectable, OnModuleDestroy, OnModuleInit, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import { ConfigType } from '@nestjs/config';
 import { createClient, RedisClientType } from 'redis';
 import * as crypto from 'crypto';
+import { redisConfig } from '../config/redis.config';
 
 @Injectable()
 export class RedisService implements OnModuleInit, OnModuleDestroy {
   private client: RedisClientType;
   private readonly logger = new Logger(RedisService.name);
 
-  constructor() {
+  constructor(
+    @Inject(redisConfig.KEY)
+    redisSettings: ConfigType<typeof redisConfig>,
+  ) {
     this.client = createClient({
-      url: process.env.REDIS_URL || 'redis://localhost:6379',
+      url: redisSettings.url,
     });
   }
 

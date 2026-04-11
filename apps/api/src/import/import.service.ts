@@ -1,12 +1,14 @@
 import {
   BadRequestException,
   ForbiddenException,
+  Inject,
   Injectable,
   Logger,
   NotFoundException,
   OnModuleDestroy,
   OnModuleInit,
 } from '@nestjs/common';
+import { ConfigType } from '@nestjs/config';
 import {
   OrderImportConflictPolicyEnum as PrismaImportConflictPolicyEnum,
   OrderImportJobStatusEnum as PrismaImportJobStatusEnum,
@@ -41,10 +43,10 @@ import {
 } from '@shou/types/enums';
 import { randomBytes, randomUUID } from 'crypto';
 import { JwtPayload } from '../auth/decorators/current-user.decorator';
+import { importConfig } from '../config/import.config';
 import { PrismaService } from '../prisma/prisma.service';
 import { RedisService } from '../redis/redis.service';
 import {
-  isImportWorkerEnabled,
   resolveImportJobFinalStatus,
   shouldStartImportJobImmediately,
 } from './import-job.worker.helpers';
@@ -55,6 +57,7 @@ import {
   resolveImportOrderStatus,
   resolveImportPayType,
 } from './import.domain';
+import { IMPORT_RUNTIME_MODE, type ImportRuntimeMode } from './import.constants';
 
 const IMPORT_PREVIEW_TTL_SECONDS = 3600;
 const IMPORT_JOB_POLL_INTERVAL_MS = 5000;
@@ -126,10 +129,14 @@ export class ImportService implements OnModuleInit, OnModuleDestroy {
   constructor(
     private readonly prisma: PrismaService,
     private readonly redis: RedisService,
+    @Inject(importConfig.KEY)
+    private readonly importSettings: ConfigType<typeof importConfig>,
+    @Inject(IMPORT_RUNTIME_MODE)
+    private readonly runtimeMode: ImportRuntimeMode,
   ) {}
 
   onModuleInit(): void {
-    if (isImportWorkerEnabled()) {
+    if (this.runtimeMode === 'worker' || this.importSettings.workerEnabled) {
       this.startImportJobPolling();
     }
   }
@@ -279,7 +286,11 @@ export class ImportService implements OnModuleInit, OnModuleDestroy {
       },
     });
 
-    if (shouldStartImportJobImmediately()) {
+    if (
+      shouldStartImportJobImmediately({
+        IMPORT_JOB_WORKER_ENABLED: String(this.importSettings.workerEnabled),
+      })
+    ) {
       this.enqueueImportJob(job.id);
     }
 

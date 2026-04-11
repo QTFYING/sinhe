@@ -1,4 +1,5 @@
-import { Controller, Post, Get, Body, Req, Res, HttpCode, HttpStatus, UseGuards, UnauthorizedException } from '@nestjs/common';
+import { Controller, Post, Get, Body, Req, Res, HttpCode, HttpStatus, UseGuards, UnauthorizedException, Inject } from '@nestjs/common';
+import { ConfigType } from '@nestjs/config';
 import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
@@ -11,6 +12,7 @@ import {
   getRefreshTokenFromCookie,
   setRefreshTokenCookie,
 } from './auth-session.util';
+import { authConfig } from '../config/auth.config';
 import {
   AuthMeResponseSwagger,
   LoginResponseSwagger,
@@ -20,7 +22,11 @@ import {
 @ApiTags('Auth - 鉴权中心')
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(
+    private readonly authService: AuthService,
+    @Inject(authConfig.KEY)
+    private readonly authSettings: ConfigType<typeof authConfig>,
+  ) {}
 
   @Post('login')
   @HttpCode(HttpStatus.OK)
@@ -30,7 +36,7 @@ export class AuthController {
   async login(@Body() loginDto: LoginDto, @Req() req: Request, @Res({ passthrough: true }) res: Response) {
     const session = await this.authService.login(loginDto);
 
-    setRefreshTokenCookie(res, req, session.refreshToken);
+    setRefreshTokenCookie(res, req, session.refreshToken, this.authSettings);
 
     return {
       accessToken: session.accessToken,
@@ -44,13 +50,13 @@ export class AuthController {
   @ApiOperation({ summary: '刷新令牌 (Refresh Token)', description: '当 accessToken 过期时，使用长效 refreshToken 换取新的凭证' })
   @ApiOkResponse({ description: '刷新成功', type: RefreshTokenResponseSwagger })
   async refresh(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
-    const refreshToken = getRefreshTokenFromCookie(req);
+    const refreshToken = getRefreshTokenFromCookie(req, this.authSettings);
     if (!refreshToken) {
       throw new UnauthorizedException('Refresh Token 已失效，请重新登录');
     }
 
     const session = await this.authService.refresh(refreshToken);
-    setRefreshTokenCookie(res, req, session.refreshToken);
+    setRefreshTokenCookie(res, req, session.refreshToken, this.authSettings);
 
     return {
       accessToken: session.accessToken,
@@ -73,9 +79,9 @@ export class AuthController {
   @ApiOkResponse({ description: '注销成功', schema: { type: 'null' } })
   async logout(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
     const accessToken = extractBearerToken(req.headers.authorization);
-    const refreshToken = getRefreshTokenFromCookie(req) ?? undefined;
+    const refreshToken = getRefreshTokenFromCookie(req, this.authSettings) ?? undefined;
     await this.authService.logout(accessToken, refreshToken);
-    clearRefreshTokenCookie(res, req);
+    clearRefreshTokenCookie(res, req, this.authSettings);
     return null;
   }
 }

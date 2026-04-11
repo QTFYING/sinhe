@@ -11,15 +11,15 @@ const {
 } = require('@prisma/client');
 const { DocumentBuilder, SwaggerModule } = require('@nestjs/swagger');
 
-const { AppModule } = require('../dist/app.module');
-const { ResponseInterceptor } = require('../dist/common/interceptors/response.interceptor');
-const { GlobalExceptionFilter } = require('../dist/common/filters/business-exception.filter');
-
 loadEnvFromFile(path.join(__dirname, '..', '.env'));
 process.env.AUTH_COOKIE_SECURE = 'false';
 process.env.NODE_ENV = process.env.NODE_ENV || 'development';
 process.env.REDIS_URL = process.env.REDIS_URL || 'redis://localhost:6379';
 process.env.IMPORT_JOB_WORKER_ENABLED = 'true';
+
+const { AppModule } = require('../dist/app.module');
+const { ResponseInterceptor } = require('../dist/common/interceptors/response.interceptor');
+const { GlobalExceptionFilter } = require('../dist/common/filters/business-exception.filter');
 
 const prisma = new PrismaClient();
 

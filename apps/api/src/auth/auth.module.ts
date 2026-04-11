@@ -1,20 +1,19 @@
 import { Module } from '@nestjs/common';
+import { ConfigType } from '@nestjs/config';
 import { JwtModule } from '@nestjs/jwt';
 import { AuthService } from './auth.service';
 import { AuthController } from './auth.controller';
 import { JwtStrategy } from './jwt.strategy';
-import { ACCESS_TOKEN_TTL } from './auth-session.util';
-
-const JWT_SECRET = process.env.JWT_SECRET;
-if (!JWT_SECRET) {
-  throw new Error('JWT_SECRET environment variable is required');
-}
+import { authConfig } from '../config/auth.config';
 
 @Module({
   imports: [
-    JwtModule.register({
-      secret: JWT_SECRET,
-      signOptions: { expiresIn: ACCESS_TOKEN_TTL },
+    JwtModule.registerAsync({
+      inject: [authConfig.KEY],
+      useFactory: (settings: ConfigType<typeof authConfig>) => ({
+        secret: settings.jwtSecret,
+        signOptions: { expiresIn: settings.accessTokenTtlSeconds },
+      }),
     }),
   ],
   controllers: [AuthController],

@@ -2,9 +2,11 @@ import {
   BadRequestException,
   ConflictException,
   ForbiddenException,
+  Inject,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { ConfigType } from '@nestjs/config';
 import {
   CashVerifyStatusEnum as PrismaCashVerifyStatusEnum,
   OrderPayTypeEnum as PrismaOrderPayTypeEnum,
@@ -49,6 +51,7 @@ import dayjs from 'dayjs';
 import { randomBytes } from 'crypto';
 import { JwtPayload } from '../auth/decorators/current-user.decorator';
 import { BusinessException } from '../common/exceptions/business.exception';
+import { paymentConfig } from '../config/payment.config';
 import { PrismaService } from '../prisma/prisma.service';
 import { RedisService } from '../redis/redis.service';
 import {
@@ -64,6 +67,8 @@ export class PaymentService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly redis: RedisService,
+    @Inject(paymentConfig.KEY)
+    private readonly paymentSettings: ConfigType<typeof paymentConfig>,
   ) {}
 
   async getPaymentDetail(token: string): Promise<PaymentOrderDetailResponse> {
@@ -786,7 +791,7 @@ export class PaymentService {
   }
 
   private buildCashierUrl(gatewayTradeNo: string): string {
-    const prefix = process.env.LAKALA_CASHIER_URL_PREFIX ?? 'https://cashier.lakala.com/pay?tradeNo=';
+    const prefix = this.paymentSettings.lakalaCashierUrlPrefix;
     return `${prefix}${encodeURIComponent(gatewayTradeNo)}`;
   }
 

@@ -1,4 +1,5 @@
 import { NestFactory } from '@nestjs/core';
+import { ConfigService } from '@nestjs/config';
 import { AppModule } from './app.module';
 import { ValidationPipe } from '@nestjs/common';
 import { ResponseInterceptor } from './common/interceptors/response.interceptor';
@@ -7,6 +8,9 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+  const configService = app.get(ConfigService);
+  const corsOrigins = configService.get<string[]>('app.corsOrigins') ?? [];
+  const port = configService.get<number>('app.port') ?? 3000;
 
   app.setGlobalPrefix('api');
 
@@ -19,13 +23,10 @@ async function bootstrap() {
   app.useGlobalInterceptors(new ResponseInterceptor());
   app.useGlobalFilters(new GlobalExceptionFilter());
 
-  // 1. 设置跨域：除了环境变量配置的，默认放行所有本地开发环境的跨域请求
   app.enableCors({
     origin: (origin, callback) => {
-      // 在本地开发环境中，允许所有本地不同端口的测试请求（解决预检报错），或者从环境变量中获取指定域名
       const isLocalhost = !origin || origin.includes('localhost') || origin.includes('127.0.0.1');
-      const configuredOrigins = process.env.CORS_ORIGINS?.split(',') || [];
-      if (isLocalhost || configuredOrigins.includes(origin)) {
+      if (isLocalhost || corsOrigins.includes(origin)) {
         callback(null, true);
       } else {
         callback(new Error('不允许的 CORS 跨域请求: ' + origin), false);
@@ -47,6 +48,6 @@ async function bootstrap() {
     jsonDocumentUrl: 'api/docs-json', // 提供给前端的一键拉取生成 JSON 端点
   });
 
-  await app.listen(3000);
+  await app.listen(port);
 }
 bootstrap();
