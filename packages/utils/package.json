@@ -9,7 +9,7 @@
     "test": "jest"
   },
   "dependencies": {
-    "bignumber.js": "^9.1.2",
+    "decimal.js": "^10.6.0",
     "dayjs": "^1.11.10"
   },
   "devDependencies": {

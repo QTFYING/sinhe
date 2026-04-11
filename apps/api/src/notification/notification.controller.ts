@@ -1,47 +1,44 @@
-import { Controller, Get, Patch, Post, Param, Query, UseGuards } from '@nestjs/common';
-import { NotificationService } from './notification.service';
+import { Controller, Get, Param, ParseUUIDPipe, Post, Query, UseGuards } from '@nestjs/common';
+import type { TenantNotificationRecordItem } from '@shou/types/contracts';
+import type { PaginatedResponse } from '@shou/types/common';
+import { UserRoleEnum } from '@prisma/client';
+import { CurrentUser, JwtPayload } from '../auth/decorators/current-user.decorator';
+import { Roles } from '../auth/decorators/roles.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
-import { Roles } from '../auth/decorators/roles.decorator';
-import { CurrentUser, JwtPayload } from '../auth/decorators/current-user.decorator';
-import { UserRoleEnum } from '@prisma/client';
+import { ListNotificationsQueryDto } from './dto/list-notifications.query.dto';
+import { NotificationService } from './notification.service';
 
 @Controller('notifications')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class NotificationController {
   constructor(private readonly notificationService: NotificationService) {}
 
-  @Get('unread-count')
-  @Roles(UserRoleEnum.TENANT_OWNER, UserRoleEnum.TENANT_FINANCE)
-  async getUnreadCount(@CurrentUser() currentUser: JwtPayload) {
-    return this.notificationService.getUnreadCount(currentUser);
-  }
-
   @Get()
-  @Roles(UserRoleEnum.TENANT_OWNER, UserRoleEnum.TENANT_FINANCE)
+  @Roles(
+    UserRoleEnum.TENANT_OWNER,
+    UserRoleEnum.TENANT_OPERATOR,
+    UserRoleEnum.TENANT_FINANCE,
+    UserRoleEnum.TENANT_VIEWER,
+  )
   async getNotifications(
     @CurrentUser() currentUser: JwtPayload,
-    @Query('page') page?: string,
-    @Query('pageSize') pageSize?: string,
-    @Query('isRead') isRead?: string,
-  ) {
-    return this.notificationService.getNotifications(
-      currentUser,
-      page ? parseInt(page, 10) : 1,
-      pageSize ? Math.min(parseInt(pageSize, 10), 100) : 20,
-      isRead !== undefined ? isRead === 'true' : undefined,
-    );
+    @Query() query: ListNotificationsQueryDto,
+  ): Promise<PaginatedResponse<TenantNotificationRecordItem>> {
+    return this.notificationService.getNotifications(currentUser, query.page, query.pageSize);
   }
 
-  @Patch(':id/read')
-  @Roles(UserRoleEnum.TENANT_OWNER, UserRoleEnum.TENANT_FINANCE)
-  async markRead(@Param('id') id: string, @CurrentUser() currentUser: JwtPayload) {
-    return this.notificationService.markAsRead(id, currentUser);
-  }
-
-  @Post('read-all')
-  @Roles(UserRoleEnum.TENANT_OWNER, UserRoleEnum.TENANT_FINANCE)
-  async markAllRead(@CurrentUser() currentUser: JwtPayload) {
-    return this.notificationService.markAllAsRead(currentUser);
+  @Post(':id/read-records')
+  @Roles(
+    UserRoleEnum.TENANT_OWNER,
+    UserRoleEnum.TENANT_OPERATOR,
+    UserRoleEnum.TENANT_FINANCE,
+    UserRoleEnum.TENANT_VIEWER,
+  )
+  async markAsRead(
+    @CurrentUser() currentUser: JwtPayload,
+    @Param('id', new ParseUUIDPipe()) noticeId: string,
+  ): Promise<null> {
+    return this.notificationService.markAsRead(currentUser, noticeId);
   }
 }

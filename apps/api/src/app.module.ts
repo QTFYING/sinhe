@@ -7,7 +7,6 @@ import { SettingsModule } from './settings/settings.module';
 import { OrderModule } from './order/order.module';
 import { ImportModule } from './import/import.module';
 import { PaymentModule } from './payment/payment.module';
-import { PrintModule } from './print/print.module';
 import { ReportModule } from './report/report.module';
 import { NotificationModule } from './notification/notification.module';
 
@@ -21,7 +20,6 @@ import { NotificationModule } from './notification/notification.module';
     OrderModule, 
     ImportModule, 
     PaymentModule,
-    PrintModule,
     ReportModule,
     NotificationModule
   ],

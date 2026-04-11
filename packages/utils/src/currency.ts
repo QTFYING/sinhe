@@ -1,21 +1,29 @@
-import BigNumber from 'bignumber.js';
+import Decimal from 'decimal.js';
 
 /**
  * Validates if the string is a valid amount format
  */
 export const isValidAmount = (val: string): boolean => {
-  const bn = new BigNumber(val);
-  return !bn.isNaN() && bn.isFinite() && bn.isPositive();
+  try {
+    const decimal = new Decimal(val);
+    return decimal.isFinite() && decimal.gt(0);
+  } catch {
+    return false;
+  }
 };
 
 /**
  * Validate identity: totalAmount = paidAmount + discountAmount
  */
 export const validateOrderEquation = (totalAmount: string, paidAmount: string, discountAmount: string): boolean => {
-  const total = new BigNumber(totalAmount || '0');
-  const paid = new BigNumber(paidAmount || '0');
-  const discount = new BigNumber(discountAmount || '0');
-  return total.isEqualTo(paid.plus(discount));
+  try {
+    const total = new Decimal(totalAmount || '0');
+    const paid = new Decimal(paidAmount || '0');
+    const discount = new Decimal(discountAmount || '0');
+    return total.eq(paid.plus(discount));
+  } catch {
+    return false;
+  }
 };
 
 /**
@@ -23,7 +31,11 @@ export const validateOrderEquation = (totalAmount: string, paidAmount: string, d
  */
 export const formatAmount = (val: string | null | undefined): string => {
   if (!val) return '0.00';
-  const bn = new BigNumber(val);
-  if (bn.isNaN()) return '0.00';
-  return bn.toFormat(2);
+  try {
+    const decimal = new Decimal(val);
+    if (!decimal.isFinite()) return '0.00';
+    return decimal.toFixed(2);
+  } catch {
+    return '0.00';
+  }
 };
