@@ -9,7 +9,12 @@
   },
   "scripts": {
     "build": "turbo run build",
-    "dev": "turbo run dev",
+    "dev": "pnpm -F @shou/types build && turbo run dev --filter=@shou/types --filter=api",
+    "dev:api": "pnpm -F @shou/types build && pnpm -F api start:dev",
+    "dev:types": "pnpm -F @shou/types dev",
+    "dev:worker": "pnpm -F @shou/types build && pnpm -F api start:import-worker",
+    "dev:swagger": "pnpm run dev:api",
+    "check:backend": "pnpm -F @shou/types build && pnpm -F api build && pnpm -F api test:smoke && pnpm -F api test:backend-regression",
     "lint": "turbo run lint",
     "format": "prettier --write \"**/*.{ts,tsx,md}\"",
     "db:init": "node scripts/db-init.js",

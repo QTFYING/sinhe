@@ -9,10 +9,12 @@
     "start": "nest start",
     "start:dev": "nest start --watch",
     "start:debug": "nest start --debug --watch",
+    "start:local": "cmd /c scripts\\start-local-api.cmd",
     "start:prod": "node dist/main",
     "start:import-worker": "node dist/import-worker.main",
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\"",
     "test:smoke": "node test/smoke-runner.js",
+    "test:backend-regression": "node test/backend-regression-runner.js",
     "prisma:generate": "prisma generate",
     "prisma:push": "prisma db push",
     "prisma:init-prod": "node ../../scripts/db-init.js"
