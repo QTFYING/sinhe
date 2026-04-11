@@ -30,6 +30,25 @@ enum UserStatusEnum {
   DISABLED @map("disabled")
 }
 
+enum TenantCertificationStatusEnum {
+  PENDING_INITIAL_REVIEW   @map("pending_initial_review")
+  PENDING_SECONDARY_REVIEW @map("pending_secondary_review")
+  PENDING_CONFIRMATION     @map("pending_confirmation")
+  APPROVED                 @map("approved")
+  REJECTED                 @map("rejected")
+}
+
+enum AuditTargetTypeEnum {
+  ACCOUNT @map("account")
+  ROLE    @map("role")
+  TENANT  @map("tenant")
+}
+
+enum AuditResultEnum {
+  SUCCESS @map("success")
+  PENDING @map("pending")
+}
+
 enum OrderStatusEnum {
   PENDING @map("pending")
   PARTIAL @map("partial")
@@ -99,6 +118,8 @@ model Tenant {
   adminName          String?          @db.VarChar(50)
   region             String?          @db.VarChar(100)
   status             TenantStatusEnum @default(ACTIVE)
+  rejectReason       String?          @db.VarChar(255)
+  freezeReason       String?          @db.VarChar(255)
   expireAt           DateTime?
   maxCreditDays      Int              @default(30)
   creditReminderDays Int              @default(3)
@@ -116,6 +137,8 @@ model Tenant {
   paymentOrders      PaymentOrder[]
   printRecordBatches PrintRecordBatch[]
   noticeReads        NoticeRead[]
+  certifications     TenantCertification[]
+  auditLogs          AuditLog[]
 
   @@map("tenants")
 }
@@ -396,4 +419,46 @@ model NoticeRead {
   @@unique([noticeId, tenantId, userId])
   @@index([tenantId, userId, isRead])
   @@map("notice_reads")
+}
+
+model TenantCertification {
+  id           String                       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId     String                       @db.Uuid
+  type         String                       @db.VarChar(50)
+  licenseUrl   String                       @db.VarChar(500)
+  legalPerson  String                       @db.VarChar(50)
+  legalIdCard  String                       @db.VarChar(50)
+  contactPhone String                       @db.VarChar(20)
+  remark       String?                      @db.VarChar(255)
+  status       TenantCertificationStatusEnum @default(PENDING_INITIAL_REVIEW)
+  comment      String?                      @db.VarChar(255)
+  rejectReason String?                      @db.VarChar(255)
+  submitAt     DateTime                     @default(now())
+  reviewedAt   DateTime?
+  createdAt    DateTime                     @default(now())
+  updatedAt    DateTime                     @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, submitAt])
+  @@index([status, submitAt])
+  @@map("tenant_certifications")
+}
+
+model AuditLog {
+  id         String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  actor      String              @db.VarChar(50)
+  action     String              @db.VarChar(100)
+  target     String              @db.VarChar(100)
+  targetType AuditTargetTypeEnum
+  tenantId   String?             @db.Uuid
+  result     AuditResultEnum     @default(SUCCESS)
+  ip         String?             @db.VarChar(64)
+  time       DateTime            @default(now())
+
+  tenant Tenant? @relation(fields: [tenantId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, time])
+  @@index([targetType, time])
+  @@map("audit_logs")
 }

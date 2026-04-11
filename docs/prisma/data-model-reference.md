@@ -91,11 +91,18 @@
   id: string                // 资质记录 ID
   tenantId: string          // 关联租户 ID
   type: string              // "企业实名认证" | "经营资质补充" | "法人身份证更新"
+  licenseUrl: string        // 营业执照或资质文件地址
+  legalPerson: string       // 法人姓名
+  legalIdCard: string       // 法人身份证号
+  contactPhone: string      // 联系电话
+  remark: string | null     // 提交备注
   submitAt: string          // 提交时间
   status: TenantCertificationStatus // 审核状态
   comment: string | null    // 审核备注
   rejectReason: string | null // 驳回原因
   reviewedAt: string | null // 最近审核时间
+  createdAt: string         // 创建时间
+  updatedAt: string         // 更新时间
 }
 ```
 
@@ -443,6 +450,7 @@
   targetType: AuditTargetType // 操作对象类型
   tenantId: string | null   // 关联租户 ID；平台操作可为空
   result: AuditResult // 执行结果
+  ip: string | null         // 操作来源 IP
   time: string              // 操作时间
 }
 ```

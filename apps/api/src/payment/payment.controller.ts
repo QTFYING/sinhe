@@ -1,6 +1,7 @@
 import { Body, Controller, Get, Param, ParseUUIDPipe, Post, Query, UseGuards } from '@nestjs/common';
 import { UserRoleEnum } from '@prisma/client';
 import type {
+  AdminPaymentRecordItem,
   CreateCashVerificationResponse,
   InitiatePaymentResponse,
   PaymentListQuery,
@@ -64,16 +65,16 @@ export class TenantPaymentController {
   constructor(private readonly paymentService: PaymentService) {}
 
   @Get('payments')
-  @Roles(UserRoleEnum.TENANT_OWNER, UserRoleEnum.TENANT_FINANCE)
+  @Roles(UserRoleEnum.OS_SUPER_ADMIN, UserRoleEnum.TENANT_OWNER, UserRoleEnum.TENANT_FINANCE)
   async getPayments(
     @CurrentUser() currentUser: JwtPayload,
     @Query() query: ListPaymentsQueryDto,
-  ): Promise<PaginatedResponse<TenantPaymentRecordItem>> {
+  ): Promise<PaginatedResponse<TenantPaymentRecordItem | AdminPaymentRecordItem>> {
     return this.paymentService.getPayments(currentUser, query as PaymentListQuery);
   }
 
   @Get('payments/summary')
-  @Roles(UserRoleEnum.TENANT_OWNER, UserRoleEnum.TENANT_FINANCE)
+  @Roles(UserRoleEnum.OS_SUPER_ADMIN, UserRoleEnum.TENANT_OWNER, UserRoleEnum.TENANT_FINANCE)
   async getPaymentSummary(@CurrentUser() currentUser: JwtPayload): Promise<PaymentSummaryResponse> {
     return this.paymentService.getPaymentSummary(currentUser);
   }

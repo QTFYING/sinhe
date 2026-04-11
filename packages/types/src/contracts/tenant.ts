@@ -174,6 +174,11 @@ export interface CreateTenantStatusChangeBatchRequest {
   reason: string
 }
 
+export interface TenantBatchActionResponse {
+  successCount: number
+  failedIds: string[]
+}
+
 export interface TenantMemberItem {
   id: string
   name: string
@@ -200,7 +205,41 @@ export interface TenantCertificationRecordItem {
   comment?: string
 }
 
+export interface TenantCertificationSubmitRequest {
+  licenseUrl: string
+  legalPerson: string
+  legalIdCard: string
+  contactPhone: string
+  remark?: string
+}
+
+export interface TenantCertificationSubmitResponse {
+  certId: string
+  status: TenantCertificationStatus
+  submittedAt: string
+}
+
+export interface TenantCertificationStatusResult {
+  certId: string | null
+  status: TenantCertificationStatus | null
+  submittedAt: string | null
+  reviewedAt: string | null
+  reviewComment?: string | null
+  rejectReason: string | null
+}
+
 export interface CreateTenantCertificationReviewDecisionRequest {
   action: ReviewAction
   comment?: string
+}
+
+export interface TenantCertificationReviewDecisionResponse {
+  id: string
+  tenant: string
+  type: string
+  submitAt: string
+  previousStatus: TenantCertificationStatus
+  status: TenantCertificationStatus
+  comment?: string
+  reviewedAt: string
 }

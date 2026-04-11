@@ -9,6 +9,7 @@ import { ImportModule } from './import/import.module';
 import { PaymentModule } from './payment/payment.module';
 import { ReportModule } from './report/report.module';
 import { NotificationModule } from './notification/notification.module';
+import { FinanceModule } from './finance/finance.module';
 
 @Module({
   imports: [
@@ -20,6 +21,7 @@ import { NotificationModule } from './notification/notification.module';
     OrderModule, 
     ImportModule, 
     PaymentModule,
+    FinanceModule,
     ReportModule,
     NotificationModule
   ],

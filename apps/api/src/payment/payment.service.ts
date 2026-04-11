@@ -16,6 +16,7 @@ import {
   Prisma,
 } from '@prisma/client';
 import type {
+  AdminPaymentRecordItem,
   CreateCashVerificationResponse,
   InitiatePaymentResponse,
   OfflinePaymentInfo,
@@ -283,7 +284,11 @@ export class PaymentService {
   async getPayments(
     currentUser: JwtPayload,
     query: PaymentListQuery,
-  ): Promise<PaginatedResponse<TenantPaymentRecordItem>> {
+  ): Promise<PaginatedResponse<TenantPaymentRecordItem | AdminPaymentRecordItem>> {
+    if (!currentUser.tenantId) {
+      return this.getAdminPayments(query);
+    }
+
     const tenantId = this.getTenantId(currentUser);
     const page = this.normalizePage(query.page);
     const pageSize = this.normalizePageSize(query.pageSize);
@@ -334,6 +339,10 @@ export class PaymentService {
   }
 
   async getPaymentSummary(currentUser: JwtPayload): Promise<PaymentSummaryResponse> {
+    if (!currentUser.tenantId) {
+      return this.getAdminPaymentSummary();
+    }
+
     const tenantId = this.getTenantId(currentUser);
     const start = dayjs().startOf('day').toDate();
     const end = dayjs().endOf('day').toDate();
@@ -692,6 +701,95 @@ export class PaymentService {
 
   private getRemainingAmount(order: { amount: Prisma.Decimal; paid: Prisma.Decimal }): Decimal {
     return this.decimal(order.amount).minus(this.decimal(order.paid));
+  }
+
+  private async getAdminPayments(
+    query: PaymentListQuery,
+  ): Promise<PaginatedResponse<AdminPaymentRecordItem>> {
+    const page = this.normalizePage(query.page);
+    const pageSize = this.normalizePageSize(query.pageSize);
+    const where: Prisma.PaymentWhereInput = {};
+
+    if (query.keyword?.trim()) {
+      const keyword = query.keyword.trim();
+      const orConditions: Prisma.PaymentWhereInput[] = [
+        { customer: { contains: keyword, mode: 'insensitive' } },
+        { tenant: { name: { contains: keyword, mode: 'insensitive' } } },
+      ];
+      if (this.isUuid(keyword)) {
+        orConditions.push({ orderId: keyword });
+      }
+      where.OR = orConditions;
+    }
+    if (query.channel?.trim()) {
+      where.channel = query.channel.trim();
+    }
+
+    const [records, total] = await Promise.all([
+      this.prisma.payment.findMany({
+        where,
+        include: { tenant: true },
+        orderBy: [{ paidAt: 'desc' }, { createdAt: 'desc' }],
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+      }),
+      this.prisma.payment.count({ where }),
+    ]);
+
+    return {
+      list: records.map((item) => ({
+        id: item.id,
+        tenant: item.tenant.name,
+        orderId: item.orderId,
+        customer: item.customer,
+        amount: this.toMoneyNumber(item.amount),
+        channel: item.channel,
+        fee: this.toMoneyNumber(item.fee),
+        net: this.toMoneyNumber(item.net),
+        time: item.paidAt.toISOString(),
+        status: this.fromPrismaPaymentRecordStatus(item.status),
+      })),
+      total,
+      page,
+      pageSize,
+    };
+  }
+
+  private async getAdminPaymentSummary(): Promise<PaymentSummaryResponse> {
+    const start = dayjs().startOf('day').toDate();
+    const end = dayjs().endOf('day').toDate();
+    const where: Prisma.PaymentWhereInput = {
+      paidAt: {
+        gte: start,
+        lte: end,
+      },
+    };
+
+    const [aggregate, totalCount, abnormalCount] = await Promise.all([
+      this.prisma.payment.aggregate({
+        where,
+        _sum: {
+          amount: true,
+          fee: true,
+          net: true,
+        },
+      }),
+      this.prisma.payment.count({ where }),
+      this.prisma.payment.count({
+        where: {
+          ...where,
+          status: { not: PrismaPaymentRecordStatusEnum.SUCCESS },
+        },
+      }),
+    ]);
+
+    return {
+      totalAmount: this.toMoneyNumber(aggregate._sum.amount ?? 0),
+      totalFee: this.toMoneyNumber(aggregate._sum.fee ?? 0),
+      totalNet: this.toMoneyNumber(aggregate._sum.net ?? 0),
+      totalCount,
+      abnormalCount,
+    };
   }
 
   private deriveOrderStatus(payType: OrderPayType, amount: Decimal, paid: Decimal): OrderStatus {

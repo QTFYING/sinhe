@@ -12,6 +12,7 @@ import {
 } from '@nestjs/common';
 import { UserRoleEnum } from '@prisma/client';
 import type {
+  AdminOrderItem,
   CreateOrderReceiptRequest,
   CreateOrderReceiptResponse,
   CreateOrderReminderRequest,
@@ -67,6 +68,7 @@ export class OrderController {
 
   @Get()
   @Roles(
+    UserRoleEnum.OS_SUPER_ADMIN,
     UserRoleEnum.TENANT_OWNER,
     UserRoleEnum.TENANT_OPERATOR,
     UserRoleEnum.TENANT_FINANCE,
@@ -75,12 +77,13 @@ export class OrderController {
   async findAll(
     @CurrentUser() currentUser: JwtPayload,
     @Query() query: ListOrdersQueryDto,
-  ): Promise<PaginatedResponse<TenantOrderItem>> {
+  ): Promise<PaginatedResponse<TenantOrderItem | AdminOrderItem>> {
     return this.orderService.findAll(currentUser, query);
   }
 
   @Get(':id')
   @Roles(
+    UserRoleEnum.OS_SUPER_ADMIN,
     UserRoleEnum.TENANT_OWNER,
     UserRoleEnum.TENANT_OPERATOR,
     UserRoleEnum.TENANT_FINANCE,
@@ -89,7 +92,7 @@ export class OrderController {
   async getOrder(
     @Param('id', new ParseUUIDPipe()) id: string,
     @CurrentUser() currentUser: JwtPayload,
-  ): Promise<TenantOrderItem> {
+  ): Promise<TenantOrderItem | AdminOrderItem> {
     return this.orderService.getOrder(id, currentUser);
   }
 

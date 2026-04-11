@@ -13,6 +13,7 @@ import {
   Prisma,
 } from '@prisma/client';
 import type {
+  AdminOrderItem,
   CreateOrderReceiptRequest,
   CreateOrderReceiptResponse,
   CreateOrderReminderRequest,
@@ -49,7 +50,11 @@ export class OrderService {
   async findAll(
     currentUser: JwtPayload,
     query: ListOrdersQueryDto,
-  ): Promise<PaginatedResponse<TenantOrderItem>> {
+  ): Promise<PaginatedResponse<TenantOrderItem | AdminOrderItem>> {
+    if (!currentUser.tenantId) {
+      return this.getAdminOrders(query);
+    }
+
     const tenantId = this.getTenantId(currentUser);
     const page = this.normalizePage(query.page);
     const pageSize = this.normalizePageSize(query.pageSize);
@@ -74,7 +79,11 @@ export class OrderService {
     };
   }
 
-  async getOrder(orderId: string, currentUser: JwtPayload): Promise<TenantOrderItem> {
+  async getOrder(orderId: string, currentUser: JwtPayload): Promise<TenantOrderItem | AdminOrderItem> {
+    if (!currentUser.tenantId) {
+      return this.getAdminOrder(orderId);
+    }
+
     const tenantId = this.getTenantId(currentUser);
     const order = await this.prisma.order.findFirst({
       where: { id: orderId, tenantId, deletedAt: null },
@@ -488,6 +497,58 @@ export class OrderService {
     return where;
   }
 
+  private async getAdminOrders(
+    query: ListOrdersQueryDto,
+  ): Promise<PaginatedResponse<AdminOrderItem>> {
+    const page = this.normalizePage(query.page);
+    const pageSize = this.normalizePageSize(query.pageSize);
+    const where: Prisma.OrderWhereInput = {
+      deletedAt: null,
+    };
+
+    if (query.keyword?.trim()) {
+      const keyword = query.keyword.trim();
+      where.OR = [
+        { id: keyword },
+        { sourceOrderNo: { contains: keyword, mode: 'insensitive' } },
+        { groupKey: { contains: keyword, mode: 'insensitive' } },
+        { customer: { contains: keyword, mode: 'insensitive' } },
+        { tenant: { name: { contains: keyword, mode: 'insensitive' } } },
+      ];
+    }
+
+    const [orders, total] = await Promise.all([
+      this.prisma.order.findMany({
+        where,
+        include: { lineItems: true, tenant: true },
+        orderBy: [{ date: 'desc' }, { createdAt: 'desc' }],
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+      }),
+      this.prisma.order.count({ where }),
+    ]);
+
+    return {
+      list: orders.map((order) => this.toAdminOrder(order)),
+      total,
+      page,
+      pageSize,
+    };
+  }
+
+  private async getAdminOrder(orderId: string): Promise<AdminOrderItem> {
+    const order = await this.prisma.order.findFirst({
+      where: { id: orderId, deletedAt: null },
+      include: { lineItems: true, tenant: true },
+    });
+
+    if (!order) {
+      throw new NotFoundException('订单不存在');
+    }
+
+    return this.toAdminOrder(order);
+  }
+
   private async assertAllOrdersOwned(
     client: Prisma.TransactionClient | PrismaService,
     tenantId: string,
@@ -690,6 +751,66 @@ export class OrderService {
       creditDays: order.creditDays ?? 0,
       dueDate: dueDate.toISOString(),
       creditStatus: this.resolveCreditStatus(dueDate),
+    };
+  }
+
+  private toAdminOrder(order: {
+    id: string;
+    sourceOrderNo: string | null;
+    groupKey: string | null;
+    mappingTemplateId: string | null;
+    qrCodeToken: string;
+    customer: string;
+    amount: Prisma.Decimal;
+    paid: Prisma.Decimal;
+    customFieldValues: Prisma.JsonValue | null;
+    status: PrismaOrderStatusEnum;
+    payType: PrismaOrderPayTypeEnum;
+    date: Date;
+    voided: boolean;
+    voidReason: string | null;
+    voidedAt: Date | null;
+    lineItems: Array<{
+      id: string;
+      skuId: string | null;
+      skuName: string;
+      skuSpec: string | null;
+      unit: string;
+      quantity: Prisma.Decimal;
+      unitPrice: Prisma.Decimal;
+      lineAmount: Prisma.Decimal;
+    }>;
+    tenant: {
+      name: string;
+    };
+  }): AdminOrderItem {
+    return {
+      id: order.id,
+      tenant: order.tenant.name,
+      sourceOrderNo: order.sourceOrderNo ?? undefined,
+      groupKey: order.groupKey ?? undefined,
+      mappingTemplateId: order.mappingTemplateId ?? undefined,
+      qrCodeToken: order.qrCodeToken,
+      customer: order.customer,
+      lineItems: order.lineItems.map((item) => ({
+        itemId: item.id,
+        skuId: item.skuId,
+        skuName: item.skuName,
+        skuSpec: item.skuSpec ?? undefined,
+        unit: item.unit,
+        quantity: this.toDecimalNumber(item.quantity, 3),
+        unitPrice: this.toMoneyNumber(item.unitPrice),
+        lineAmount: this.toMoneyNumber(item.lineAmount),
+      })),
+      customFieldValues: this.toCustomFieldValues(order.customFieldValues),
+      amount: this.toMoneyNumber(order.amount),
+      paid: this.toMoneyNumber(order.paid),
+      status: this.fromPrismaOrderStatus(order.status),
+      payType: this.fromPrismaOrderPayType(order.payType),
+      date: order.date.toISOString(),
+      voided: order.voided,
+      voidReason: order.voidReason ?? undefined,
+      voidedAt: order.voidedAt?.toISOString(),
     };
   }
 

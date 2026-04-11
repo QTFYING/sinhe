@@ -128,6 +128,11 @@ export interface AuditLogRecord {
   createdAt: string
 }
 
+export interface TenantAuditLogListResponse {
+  list: AuditLogRecord[]
+  total: number
+}
+
 export interface TenantNotificationRecordItem {
   id: string
   title: string
