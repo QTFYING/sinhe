@@ -160,7 +160,7 @@
 1. Auth、Settings、Import、Orders、Payment、Notifications、Analytics、Finance、Tenant/Admin 主域已补第一轮 Swagger 注解
 2. `POST /orders/{id}/reminders` 已完成持久化建模与实现收口
 3. 已完成 `prisma generate` 与 `pnpm -F api build` 最小验证
-4. 导入可靠性增强仍保留在技术债清单，不阻塞当前阶段收口
+4. 导入可靠性已完成第一阶段收口：正式导入快照持久化、任务恢复调度与 Redis 锁串行已落地；独立 Worker 仍保留在技术债清单
 
 阶段验收结果：
 
@@ -250,8 +250,8 @@ Swagger 继续需要同步，但定位保持不变：它是联调产物，不是
 
 在完成本次 `design` 文档同步后，建议按以下顺序继续推进：
 
-1. 导入可靠性技术债，例如任务队列化与预检快照策略
-2. Swagger 第二轮细化，补请求/响应 schema 级展示
+1. Swagger 第二轮细化，补请求/响应 schema 级展示
+2. 导入独立 Worker / 专用队列化收口
 3. 关键链路补更完整的自测、回归与联调记录
 4. 若进入下一批外围域，继续沿用当前事实源与执行手册节奏
 

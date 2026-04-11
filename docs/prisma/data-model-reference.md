@@ -228,6 +228,8 @@
   id: string                // 导入任务 ID
   tenantId: string          // 关联租户 ID
   status: OrderImportJobStatus // 任务状态
+  conflictPolicy: OrderImportConflictPolicy // 冲突处理策略：skip | overwrite
+  snapshot: any | null      // JSON: 正式导入使用的快照，供任务恢复与重试复用
   submittedCount: number    // 提交处理的订单数
   processedCount: number    // 已处理订单数
   successCount: number      // 成功入库数
@@ -236,6 +238,10 @@
   failedCount: number       // 失败数量
   failedRows: any           // JSON: 行级报错日志
   conflictDetails: any      // JSON: 重复冲突判定策略与结果追溯
+  startedAt: string | null  // 开始执行时间
+  heartbeatAt: string | null // 最近心跳时间，用于识别卡死任务
+  completedAt: string | null // 完成时间
+  lastError: string | null  // 最近一次任务级错误
   createdAt: string         // 创建时间
   updatedAt: string         // 更新时间
 }

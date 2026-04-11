@@ -69,6 +69,11 @@ enum OrderImportJobStatusEnum {
   FAILED     @map("failed")
 }
 
+enum OrderImportConflictPolicyEnum {
+  SKIP      @map("skip")
+  OVERWRITE @map("overwrite")
+}
+
 enum PaymentMethodEnum {
   ONLINE     @map("online")
   CASH       @map("cash")
@@ -250,6 +255,8 @@ model ImportJob {
   id               String                   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   tenantId         String                   @db.Uuid
   status           OrderImportJobStatusEnum @default(PENDING)
+  conflictPolicy   OrderImportConflictPolicyEnum @default(SKIP)
+  snapshot         Json?
   submittedCount   Int                      @default(0)
   processedCount   Int                      @default(0)
   successCount     Int                      @default(0)
@@ -257,13 +264,18 @@ model ImportJob {
   overwrittenCount Int                      @default(0)
   failedCount      Int                      @default(0)
   failedRows       Json?                    @default("[]")
-  conflictDetails  Json?                    @default("{}")
+  conflictDetails  Json?                    @default("[]")
+  startedAt        DateTime?
+  heartbeatAt      DateTime?
+  completedAt      DateTime?
+  lastError        String?                  @db.VarChar(500)
   createdAt        DateTime                 @default(now())
   updatedAt        DateTime                 @updatedAt
 
   tenant Tenant @relation(fields: [tenantId], references: [id])
 
   @@index([tenantId, status])
+  @@index([status, heartbeatAt])
   @@map("import_jobs")
 }
 

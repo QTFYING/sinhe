@@ -2,9 +2,13 @@ import {
   BadRequestException,
   ForbiddenException,
   Injectable,
+  Logger,
   NotFoundException,
+  OnModuleDestroy,
+  OnModuleInit,
 } from '@nestjs/common';
 import {
+  OrderImportConflictPolicyEnum as PrismaImportConflictPolicyEnum,
   OrderImportJobStatusEnum as PrismaImportJobStatusEnum,
   OrderPayTypeEnum as PrismaOrderPayTypeEnum,
   OrderStatusEnum as PrismaOrderStatusEnum,
@@ -41,6 +45,9 @@ import { PrismaService } from '../prisma/prisma.service';
 import { RedisService } from '../redis/redis.service';
 
 const IMPORT_PREVIEW_TTL_SECONDS = 3600;
+const IMPORT_JOB_POLL_INTERVAL_MS = 5000;
+const IMPORT_JOB_LOCK_TTL_SECONDS = 1800;
+const IMPORT_JOB_STALE_SECONDS = 120;
 const DEFAULT_UNIT = '件';
 const BUILTIN_KEYS = new Set([
   'sourceOrderNo',
@@ -83,12 +90,41 @@ interface PreviewSnapshot {
   invalidRows: OrderImportPreviewRowError[];
 }
 
+interface ImportJobProgress {
+  processedCount: number;
+  successCount: number;
+  skippedCount: number;
+  overwrittenCount: number;
+  failedRows: OrderImportJobFailure[];
+  conflictDetails: OrderImportJobConflictDetail[];
+}
+
+interface ImportOrderOutcome {
+  type: 'created' | 'skipped' | 'overwritten';
+  existingOrderId?: string;
+  reason?: string;
+}
+
 @Injectable()
-export class ImportService {
+export class ImportService implements OnModuleInit, OnModuleDestroy {
+  private readonly logger = new Logger(ImportService.name);
+  private readonly queuedJobIds = new Set<string>();
+  private jobPollingTimer?: NodeJS.Timeout;
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly redis: RedisService,
   ) {}
+
+  onModuleInit(): void {
+    this.startImportJobPolling();
+  }
+
+  onModuleDestroy(): void {
+    if (this.jobPollingTimer) {
+      clearInterval(this.jobPollingTimer);
+    }
+  }
 
   async getImportTemplates(currentUser: JwtPayload): Promise<OrderImportTemplate[]> {
     const tenantId = this.getTenantId(currentUser);
@@ -216,6 +252,8 @@ export class ImportService {
       data: {
         tenantId,
         status: PrismaImportJobStatusEnum.PENDING,
+        conflictPolicy: this.toPrismaImportConflictPolicy(conflictPolicy),
+        snapshot: snapshot as unknown as Prisma.InputJsonValue,
         submittedCount: snapshot.aggregatedOrders.length,
         processedCount: 0,
         successCount: 0,
@@ -227,9 +265,7 @@ export class ImportService {
       },
     });
 
-    setImmediate(() => {
-      void this.processImportJob(job.id, tenantId, snapshot, conflictPolicy);
-    });
+    this.enqueueImportJob(job.id);
 
     return {
       jobId: job.id,
@@ -259,11 +295,7 @@ export class ImportService {
       failedCount: job.failedCount,
       failedRows: this.asJobFailures(job.failedRows),
       conflictDetails: this.asConflictDetails(job.conflictDetails),
-      completedAt:
-        job.status === PrismaImportJobStatusEnum.COMPLETED ||
-        job.status === PrismaImportJobStatusEnum.FAILED
-          ? job.updatedAt.toISOString()
-          : undefined,
+      completedAt: job.completedAt?.toISOString(),
     };
   }
 
@@ -466,95 +498,293 @@ export class ImportService {
     if (!aggregate.creditDays && creditDays) aggregate.creditDays = creditDays;
   }
 
+  private enqueueImportJob(jobId: string): void {
+    if (this.queuedJobIds.has(jobId)) {
+      return;
+    }
+
+    this.queuedJobIds.add(jobId);
+    setImmediate(() => {
+      void this.runQueuedImportJob(jobId).finally(() => {
+        this.queuedJobIds.delete(jobId);
+      });
+    });
+  }
+
+  private startImportJobPolling(): void {
+    void this.pollRunnableImportJobs().catch((error) => {
+      this.logger.error('导入任务轮询初始化失败', error instanceof Error ? error.stack : undefined);
+    });
+    this.jobPollingTimer = setInterval(() => {
+      void this.pollRunnableImportJobs().catch((error) => {
+        this.logger.error('导入任务轮询失败', error instanceof Error ? error.stack : undefined);
+      });
+    }, IMPORT_JOB_POLL_INTERVAL_MS);
+  }
+
+  private async pollRunnableImportJobs(): Promise<void> {
+    const staleBefore = new Date(Date.now() - IMPORT_JOB_STALE_SECONDS * 1000);
+    const jobs = await this.prisma.importJob.findMany({
+      where: {
+        OR: [
+          { status: PrismaImportJobStatusEnum.PENDING },
+          {
+            status: PrismaImportJobStatusEnum.PROCESSING,
+            OR: [{ heartbeatAt: null }, { heartbeatAt: { lt: staleBefore } }],
+          },
+        ],
+      },
+      select: { id: true },
+      orderBy: { createdAt: 'asc' },
+      take: 20,
+    });
+
+    for (const job of jobs) {
+      this.enqueueImportJob(job.id);
+    }
+  }
+
+  private async runQueuedImportJob(jobId: string): Promise<void> {
+    const lockKey = this.getImportJobLockKey(jobId);
+    const lockValue = await this.redis.acquireLock(lockKey, IMPORT_JOB_LOCK_TTL_SECONDS);
+    if (!lockValue) {
+      return;
+    }
+
+    try {
+      const job = await this.prisma.importJob.findUnique({ where: { id: jobId } });
+      if (!job || job.status === PrismaImportJobStatusEnum.COMPLETED || job.status === PrismaImportJobStatusEnum.FAILED) {
+        return;
+      }
+
+      const snapshot = this.asPreviewSnapshot(job.snapshot);
+      if (!snapshot) {
+        await this.markImportJobFailed(jobId, '导入任务缺少可恢复快照，无法继续执行');
+        return;
+      }
+
+      const progress = this.readJobProgress(job);
+      await this.prisma.importJob.update({
+        where: { id: jobId },
+        data: {
+          status: PrismaImportJobStatusEnum.PROCESSING,
+          startedAt: job.startedAt ?? new Date(),
+          heartbeatAt: new Date(),
+          lastError: null,
+        },
+      });
+
+      await this.processImportJob(
+        job.id,
+        job.tenantId,
+        snapshot,
+        this.toImportConflictPolicy(job.conflictPolicy),
+        progress,
+      );
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '导入任务执行失败';
+      this.logger.error(`导入任务执行失败: ${jobId}`, error instanceof Error ? error.stack : undefined);
+      await this.markImportJobFailed(jobId, message);
+    } finally {
+      await this.redis.releaseLock(lockKey, lockValue).catch(() => false);
+    }
+  }
+
   private async processImportJob(
     jobId: string,
     tenantId: string,
     snapshot: PreviewSnapshot,
     conflictPolicy: (typeof OrderImportConflictPolicyEnum)[keyof typeof OrderImportConflictPolicyEnum],
+    initialProgress: ImportJobProgress,
   ): Promise<void> {
-    await this.prisma.importJob.update({
-      where: { id: jobId },
-      data: { status: PrismaImportJobStatusEnum.PROCESSING },
-    });
+    let progress = initialProgress;
 
-    const failedRows: OrderImportJobFailure[] = [];
-    const conflictDetails: OrderImportJobConflictDetail[] = [];
-    let processedCount = 0;
-    let successCount = 0;
-    let skippedCount = 0;
-    let overwrittenCount = 0;
+    for (let index = progress.processedCount; index < snapshot.aggregatedOrders.length; index += 1) {
+      const order = snapshot.aggregatedOrders[index];
 
-    for (const order of snapshot.aggregatedOrders) {
       try {
-        const existing = await this.findExistingOrder(tenantId, order.sourceOrderNo);
-        if (existing) {
-          if (conflictPolicy === OrderImportConflictPolicyEnum.SKIP) {
-            skippedCount += 1;
-            processedCount += 1;
-            conflictDetails.push({
-              sourceOrderNo: order.sourceOrderNo as string,
-              existingOrderId: existing.id,
-              action: OrderImportConflictPolicyEnum.SKIP,
-              reason: '命中重复订单，按 skip 跳过',
-            });
-            continue;
-          }
-
-          if (await this.hasSettledFlow(existing.id)) {
-            skippedCount += 1;
-            processedCount += 1;
-            conflictDetails.push({
-              sourceOrderNo: order.sourceOrderNo as string,
-              existingOrderId: existing.id,
-              action: OrderImportConflictPolicyEnum.SKIP,
-              reason: '已有支付记录或支付单，禁止覆盖',
-            });
-            continue;
-          }
-
-          await this.prisma.order.update({
-            where: { id: existing.id },
-            data: this.toOrderUpdateInput(order),
+        progress = await this.prisma.$transaction(async (tx) => {
+          const outcome = await this.applyImportOrder(tx, tenantId, order, conflictPolicy);
+          const nextProgress = this.nextProgressForOutcome(progress, order, outcome);
+          await tx.importJob.update({
+            where: { id: jobId },
+            data: this.toImportJobProgressUpdate(nextProgress),
           });
-          overwrittenCount += 1;
-          processedCount += 1;
-          conflictDetails.push({
-            sourceOrderNo: order.sourceOrderNo as string,
-            existingOrderId: existing.id,
-            action: OrderImportConflictPolicyEnum.OVERWRITE,
-            reason: '覆盖已有订单成功',
-          });
-          continue;
-        }
-
-        await this.prisma.order.create({ data: this.toOrderCreateInput(tenantId, order) });
-        successCount += 1;
-        processedCount += 1;
-      } catch (error) {
-        processedCount += 1;
-        failedRows.push({
-          row: order.rowNumbers[0] ?? 0,
-          sourceOrderNo: order.sourceOrderNo,
-          reason: error instanceof Error ? error.message : '导入处理失败',
+          return nextProgress;
         });
+      } catch (error) {
+        const nextProgress = this.nextProgressForFailure(progress, order, error);
+        await this.prisma.importJob.update({
+          where: { id: jobId },
+          data: this.toImportJobProgressUpdate(nextProgress),
+        });
+        progress = nextProgress;
       }
     }
 
-    const failedCount = failedRows.length;
     await this.prisma.importJob.update({
       where: { id: jobId },
       data: {
-        status:
-          failedCount > 0 && successCount === 0 && overwrittenCount === 0 && skippedCount === 0
-            ? PrismaImportJobStatusEnum.FAILED
-            : PrismaImportJobStatusEnum.COMPLETED,
-        processedCount,
-        successCount,
-        skippedCount,
-        overwrittenCount,
-        failedCount,
-        failedRows: failedRows as unknown as Prisma.InputJsonValue,
-        conflictDetails: conflictDetails as unknown as Prisma.InputJsonValue,
+        ...this.toImportJobProgressUpdate(progress),
+        status: this.resolveFinalImportJobStatus(progress),
+        completedAt: new Date(),
+        lastError: null,
+      },
+    });
+  }
+
+  private async applyImportOrder(
+    client: Prisma.TransactionClient,
+    tenantId: string,
+    order: NormalizedImportOrder,
+    conflictPolicy: (typeof OrderImportConflictPolicyEnum)[keyof typeof OrderImportConflictPolicyEnum],
+  ): Promise<ImportOrderOutcome> {
+    const existing = await this.findExistingOrder(client, tenantId, order.sourceOrderNo);
+    if (existing) {
+      if (conflictPolicy === OrderImportConflictPolicyEnum.SKIP) {
+        return {
+          type: 'skipped',
+          existingOrderId: existing.id,
+          reason: '命中重复订单，按 skip 跳过',
+        };
+      }
+
+      if (await this.hasSettledFlow(client, existing.id)) {
+        return {
+          type: 'skipped',
+          existingOrderId: existing.id,
+          reason: '已有支付记录或支付单，禁止覆盖',
+        };
+      }
+
+      await client.order.update({
+        where: { id: existing.id },
+        data: this.toOrderUpdateInput(order),
+      });
+
+      return {
+        type: 'overwritten',
+        existingOrderId: existing.id,
+        reason: '覆盖已有订单成功',
+      };
+    }
+
+    await client.order.create({ data: this.toOrderCreateInput(tenantId, order) });
+    return { type: 'created' };
+  }
+
+  private nextProgressForOutcome(
+    current: ImportJobProgress,
+    order: NormalizedImportOrder,
+    outcome: ImportOrderOutcome,
+  ): ImportJobProgress {
+    const next: ImportJobProgress = {
+      processedCount: current.processedCount + 1,
+      successCount: current.successCount,
+      skippedCount: current.skippedCount,
+      overwrittenCount: current.overwrittenCount,
+      failedRows: [...current.failedRows],
+      conflictDetails: [...current.conflictDetails],
+    };
+
+    if (outcome.type === 'created') {
+      next.successCount += 1;
+      return next;
+    }
+
+    if (!order.sourceOrderNo) {
+      throw new BadRequestException('重复订单处理缺少 sourceOrderNo');
+    }
+
+    next.conflictDetails.push({
+      sourceOrderNo: order.sourceOrderNo,
+      existingOrderId: outcome.existingOrderId,
+      action:
+        outcome.type === 'overwritten'
+          ? OrderImportConflictPolicyEnum.OVERWRITE
+          : OrderImportConflictPolicyEnum.SKIP,
+      reason: outcome.reason ?? '导入任务处理完成',
+    });
+
+    if (outcome.type === 'overwritten') {
+      next.overwrittenCount += 1;
+    } else {
+      next.skippedCount += 1;
+    }
+
+    return next;
+  }
+
+  private nextProgressForFailure(
+    current: ImportJobProgress,
+    order: NormalizedImportOrder,
+    error: unknown,
+  ): ImportJobProgress {
+    return {
+      processedCount: current.processedCount + 1,
+      successCount: current.successCount,
+      skippedCount: current.skippedCount,
+      overwrittenCount: current.overwrittenCount,
+      failedRows: [
+        ...current.failedRows,
+        {
+          row: order.rowNumbers[0] ?? 0,
+          sourceOrderNo: order.sourceOrderNo,
+          reason: error instanceof Error ? error.message : '导入处理失败',
+        },
+      ],
+      conflictDetails: [...current.conflictDetails],
+    };
+  }
+
+  private readJobProgress(job: {
+    processedCount: number;
+    successCount: number;
+    skippedCount: number;
+    overwrittenCount: number;
+    failedRows: Prisma.JsonValue | null;
+    conflictDetails: Prisma.JsonValue | null;
+  }): ImportJobProgress {
+    return {
+      processedCount: job.processedCount,
+      successCount: job.successCount,
+      skippedCount: job.skippedCount,
+      overwrittenCount: job.overwrittenCount,
+      failedRows: this.asJobFailures(job.failedRows),
+      conflictDetails: this.asConflictDetails(job.conflictDetails),
+    };
+  }
+
+  private toImportJobProgressUpdate(progress: ImportJobProgress): Prisma.ImportJobUpdateInput {
+    return {
+      processedCount: progress.processedCount,
+      successCount: progress.successCount,
+      skippedCount: progress.skippedCount,
+      overwrittenCount: progress.overwrittenCount,
+      failedCount: progress.failedRows.length,
+      failedRows: progress.failedRows as unknown as Prisma.InputJsonValue,
+      conflictDetails: progress.conflictDetails as unknown as Prisma.InputJsonValue,
+      heartbeatAt: new Date(),
+    };
+  }
+
+  private resolveFinalImportJobStatus(progress: ImportJobProgress): PrismaImportJobStatusEnum {
+    return progress.failedRows.length > 0 &&
+      progress.successCount === 0 &&
+      progress.overwrittenCount === 0 &&
+      progress.skippedCount === 0
+      ? PrismaImportJobStatusEnum.FAILED
+      : PrismaImportJobStatusEnum.COMPLETED;
+  }
+
+  private async markImportJobFailed(jobId: string, message: string): Promise<void> {
+    await this.prisma.importJob.update({
+      where: { id: jobId },
+      data: {
+        status: PrismaImportJobStatusEnum.FAILED,
+        completedAt: new Date(),
+        heartbeatAt: new Date(),
+        lastError: this.cut(message, 500),
       },
     });
   }
@@ -736,18 +966,25 @@ export class ImportService {
     return snapshot;
   }
 
-  private async findExistingOrder(tenantId: string, sourceOrderNo?: string) {
+  private async findExistingOrder(
+    client: Prisma.TransactionClient | PrismaService,
+    tenantId: string,
+    sourceOrderNo?: string,
+  ) {
     if (!sourceOrderNo) return null;
-    return this.prisma.order.findUnique({
+    return client.order.findUnique({
       where: { tenantId_sourceOrderNo: { tenantId, sourceOrderNo } },
       select: { id: true },
     });
   }
 
-  private async hasSettledFlow(orderId: string): Promise<boolean> {
+  private async hasSettledFlow(
+    client: Prisma.TransactionClient | PrismaService,
+    orderId: string,
+  ): Promise<boolean> {
     const [payments, paymentOrders] = await Promise.all([
-      this.prisma.payment.count({ where: { orderId } }),
-      this.prisma.paymentOrder.count({
+      client.payment.count({ where: { orderId } }),
+      client.paymentOrder.count({
         where: {
           orderId,
           status: {
@@ -934,6 +1171,30 @@ export class ImportService {
     }
   }
 
+  private toPrismaImportConflictPolicy(
+    conflictPolicy: (typeof OrderImportConflictPolicyEnum)[keyof typeof OrderImportConflictPolicyEnum],
+  ): PrismaImportConflictPolicyEnum {
+    switch (conflictPolicy) {
+      case OrderImportConflictPolicyEnum.OVERWRITE:
+        return PrismaImportConflictPolicyEnum.OVERWRITE;
+      case OrderImportConflictPolicyEnum.SKIP:
+      default:
+        return PrismaImportConflictPolicyEnum.SKIP;
+    }
+  }
+
+  private toImportConflictPolicy(
+    conflictPolicy: PrismaImportConflictPolicyEnum,
+  ): (typeof OrderImportConflictPolicyEnum)[keyof typeof OrderImportConflictPolicyEnum] {
+    switch (conflictPolicy) {
+      case PrismaImportConflictPolicyEnum.OVERWRITE:
+        return OrderImportConflictPolicyEnum.OVERWRITE;
+      case PrismaImportConflictPolicyEnum.SKIP:
+      default:
+        return OrderImportConflictPolicyEnum.SKIP;
+    }
+  }
+
   private toPrismaOrderStatus(status: OrderStatus): PrismaOrderStatusEnum {
     switch (status) {
       case OrderStatusEnum.PENDING:
@@ -988,8 +1249,18 @@ export class ImportService {
     return randomBytes(32).toString('hex');
   }
 
+  private asPreviewSnapshot(value: Prisma.JsonValue | null): PreviewSnapshot | null {
+    return value && typeof value === 'object' && !Array.isArray(value)
+      ? (value as unknown as PreviewSnapshot)
+      : null;
+  }
+
   private getPreviewKey(previewId: string): string {
     return `import:preview:${previewId}`;
+  }
+
+  private getImportJobLockKey(jobId: string): string {
+    return `import:job:lock:${jobId}`;
   }
 
   private getTenantId(currentUser: JwtPayload): string {
