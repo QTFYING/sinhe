@@ -10,7 +10,15 @@ import {
   Query,
   UseGuards,
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiExtraModels,
+  ApiOkResponse,
+  ApiOperation,
+  ApiParam,
+  ApiTags,
+  getSchemaPath,
+} from '@nestjs/swagger';
 import { UserRoleEnum } from '@prisma/client';
 import type {
   AdminOrderItem,
@@ -40,15 +48,36 @@ import { ListOrdersQueryDto } from './dto/list-orders.query.dto';
 import { UpdateOrderDto } from './dto/update-order.dto';
 import { VoidOrderDto } from './dto/void-order.dto';
 import { OrderService } from './order.service';
+import {
+  AdminOrderItemSwagger,
+  AdminOrderListResponseSwagger,
+  CreateOrderReceiptResponseSwagger,
+  CreateOrderReminderResponseSwagger,
+  CreditOrderListResponseSwagger,
+  OrderPrintRecordResponseSwagger,
+  TenantOrderItemSwagger,
+  TenantOrderListResponseSwagger,
+} from './order.swagger';
 
 @ApiTags('Orders')
 @ApiBearerAuth()
+@ApiExtraModels(
+  CreditOrderListResponseSwagger,
+  OrderPrintRecordResponseSwagger,
+  TenantOrderItemSwagger,
+  AdminOrderItemSwagger,
+  TenantOrderListResponseSwagger,
+  AdminOrderListResponseSwagger,
+  CreateOrderReminderResponseSwagger,
+  CreateOrderReceiptResponseSwagger,
+)
 @Controller('orders')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class OrderController {
   constructor(private readonly orderService: OrderService) {}
 
   @ApiOperation({ summary: '获取账期订单列表' })
+  @ApiOkResponse({ type: CreditOrderListResponseSwagger })
   @Get('credit')
   @Roles(UserRoleEnum.TENANT_OWNER, UserRoleEnum.TENANT_FINANCE)
   async getCreditOrders(
@@ -59,6 +88,7 @@ export class OrderController {
   }
 
   @ApiOperation({ summary: '创建打印回执' })
+  @ApiOkResponse({ type: OrderPrintRecordResponseSwagger })
   @Post('print-records')
   @Roles(UserRoleEnum.TENANT_OWNER, UserRoleEnum.TENANT_OPERATOR)
   async createPrintRecord(
@@ -72,6 +102,14 @@ export class OrderController {
   }
 
   @ApiOperation({ summary: '获取订单列表' })
+  @ApiOkResponse({
+    schema: {
+      oneOf: [
+        { $ref: getSchemaPath(TenantOrderListResponseSwagger) },
+        { $ref: getSchemaPath(AdminOrderListResponseSwagger) },
+      ],
+    },
+  })
   @Get()
   @Roles(
     UserRoleEnum.OS_SUPER_ADMIN,
@@ -88,6 +126,15 @@ export class OrderController {
   }
 
   @ApiOperation({ summary: '获取订单详情' })
+  @ApiParam({ name: 'id', description: '订单 ID', format: 'uuid' })
+  @ApiOkResponse({
+    schema: {
+      oneOf: [
+        { $ref: getSchemaPath(TenantOrderItemSwagger) },
+        { $ref: getSchemaPath(AdminOrderItemSwagger) },
+      ],
+    },
+  })
   @Get(':id')
   @Roles(
     UserRoleEnum.OS_SUPER_ADMIN,
@@ -104,6 +151,7 @@ export class OrderController {
   }
 
   @ApiOperation({ summary: '创建订单' })
+  @ApiOkResponse({ type: TenantOrderItemSwagger })
   @Post()
   @Roles(UserRoleEnum.TENANT_OWNER, UserRoleEnum.TENANT_OPERATOR)
   async createOrder(
@@ -114,6 +162,8 @@ export class OrderController {
   }
 
   @ApiOperation({ summary: '更新订单' })
+  @ApiParam({ name: 'id', description: '订单 ID', format: 'uuid' })
+  @ApiOkResponse({ type: TenantOrderItemSwagger })
   @Put(':id')
   @Roles(UserRoleEnum.TENANT_OWNER, UserRoleEnum.TENANT_OPERATOR)
   async updateOrder(
@@ -125,6 +175,8 @@ export class OrderController {
   }
 
   @ApiOperation({ summary: '更新订单作废状态' })
+  @ApiParam({ name: 'id', description: '订单 ID', format: 'uuid' })
+  @ApiOkResponse({ type: TenantOrderItemSwagger })
   @Patch(':id')
   @Roles(UserRoleEnum.TENANT_OWNER, UserRoleEnum.TENANT_OPERATOR)
   async voidOrder(
@@ -136,6 +188,8 @@ export class OrderController {
   }
 
   @ApiOperation({ summary: '创建催款提醒记录' })
+  @ApiParam({ name: 'id', description: '订单 ID', format: 'uuid' })
+  @ApiOkResponse({ type: CreateOrderReminderResponseSwagger })
   @Post(':id/reminders')
   @Roles(UserRoleEnum.TENANT_OWNER, UserRoleEnum.TENANT_FINANCE)
   async createReminder(
@@ -151,6 +205,8 @@ export class OrderController {
   }
 
   @ApiOperation({ summary: '创建回款记录' })
+  @ApiParam({ name: 'id', description: '订单 ID', format: 'uuid' })
+  @ApiOkResponse({ type: CreateOrderReceiptResponseSwagger })
   @Post(':id/receipts')
   @Roles(UserRoleEnum.TENANT_OWNER, UserRoleEnum.TENANT_FINANCE)
   async createReceipt(

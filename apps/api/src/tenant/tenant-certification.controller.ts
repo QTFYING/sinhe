@@ -1,5 +1,5 @@
 import { Body, Controller, Get, Ip, Post, UseGuards } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiExtraModels, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { UserRoleEnum } from '@prisma/client';
 import type {
   TenantCertificationStatusResult,
@@ -12,15 +12,21 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { CreateTenantCertificationDto } from './dto/create-tenant-certification.dto';
 import { TenantService } from './tenant.service';
+import {
+  TenantCertificationStatusResultSwagger,
+  TenantCertificationSubmitResponseSwagger,
+} from './tenant.swagger';
 
 @ApiTags('Tenant Certification')
 @ApiBearerAuth()
+@ApiExtraModels(TenantCertificationSubmitResponseSwagger, TenantCertificationStatusResultSwagger)
 @Controller('tenants')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class TenantCertificationController {
   constructor(private readonly tenantService: TenantService) {}
 
   @ApiOperation({ summary: '提交当前租户资质材料' })
+  @ApiOkResponse({ type: TenantCertificationSubmitResponseSwagger })
   @Post('certification')
   @Roles(UserRoleEnum.TENANT_OWNER)
   async submitCertification(
@@ -36,6 +42,7 @@ export class TenantCertificationController {
   }
 
   @ApiOperation({ summary: '查询当前租户资质状态' })
+  @ApiOkResponse({ type: TenantCertificationStatusResultSwagger })
   @Get('certification')
   @Roles(UserRoleEnum.TENANT_OWNER)
   async getCertificationStatus(

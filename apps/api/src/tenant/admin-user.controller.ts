@@ -12,7 +12,7 @@ import {
   Query,
   UseGuards,
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiExtraModels, ApiOkResponse, ApiOperation, ApiParam, ApiTags } from '@nestjs/swagger';
 import { UserRoleEnum } from '@prisma/client';
 import type {
   CreateUserPasswordResetRequest,
@@ -32,15 +32,22 @@ import { ListUsersQueryDto } from './dto/list-users.query.dto';
 import { PatchUserStatusDto } from './dto/patch-user-status.dto';
 import { UpsertUserDto } from './dto/upsert-user.dto';
 import { TenantService } from './tenant.service';
+import {
+  CreateUserPasswordResetResponseSwagger,
+  UserListResponseSwagger,
+  UserRecordItemSwagger,
+} from './tenant.swagger';
 
 @ApiTags('Admin Users')
 @ApiBearerAuth()
+@ApiExtraModels(UserListResponseSwagger, UserRecordItemSwagger, CreateUserPasswordResetResponseSwagger)
 @Controller('users')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class AdminUserController {
   constructor(private readonly tenantService: TenantService) {}
 
   @ApiOperation({ summary: '获取平台用户列表' })
+  @ApiOkResponse({ type: UserListResponseSwagger })
   @Get()
   @Roles(UserRoleEnum.OS_SUPER_ADMIN)
   async getUsers(@Query() query: ListUsersQueryDto): Promise<PaginatedResponse<UserRecordItem>> {
@@ -48,6 +55,7 @@ export class AdminUserController {
   }
 
   @ApiOperation({ summary: '创建平台用户' })
+  @ApiOkResponse({ type: UserRecordItemSwagger })
   @Post()
   @Roles(UserRoleEnum.OS_SUPER_ADMIN)
   async createUser(
@@ -59,6 +67,8 @@ export class AdminUserController {
   }
 
   @ApiOperation({ summary: '更新平台用户' })
+  @ApiParam({ name: 'id', description: '用户 ID', format: 'uuid' })
+  @ApiOkResponse({ type: UserRecordItemSwagger })
   @Put(':id')
   @Roles(UserRoleEnum.OS_SUPER_ADMIN)
   async updateUser(
@@ -76,6 +86,8 @@ export class AdminUserController {
   }
 
   @ApiOperation({ summary: '删除平台用户' })
+  @ApiParam({ name: 'id', description: '用户 ID', format: 'uuid' })
+  @ApiOkResponse({ description: '删除成功', schema: { type: 'null' } })
   @Delete(':id')
   @Roles(UserRoleEnum.OS_SUPER_ADMIN)
   async deleteUser(
@@ -87,6 +99,8 @@ export class AdminUserController {
   }
 
   @ApiOperation({ summary: '更新平台用户状态' })
+  @ApiParam({ name: 'id', description: '用户 ID', format: 'uuid' })
+  @ApiOkResponse({ type: UserRecordItemSwagger })
   @Patch(':id')
   @Roles(UserRoleEnum.OS_SUPER_ADMIN)
   async patchUserStatus(
@@ -104,6 +118,8 @@ export class AdminUserController {
   }
 
   @ApiOperation({ summary: '创建密码重置记录' })
+  @ApiParam({ name: 'id', description: '用户 ID', format: 'uuid' })
+  @ApiOkResponse({ type: CreateUserPasswordResetResponseSwagger })
   @Post(':id/password-resets')
   @Roles(UserRoleEnum.OS_SUPER_ADMIN)
   async resetPassword(

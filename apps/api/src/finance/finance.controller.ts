@@ -7,7 +7,7 @@ import {
   StreamableFile,
   UseGuards,
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiExtraModels, ApiOkResponse, ApiOperation, ApiProduces, ApiTags } from '@nestjs/swagger';
 import { Response } from 'express';
 import { UserRoleEnum } from '@prisma/client';
 import type {
@@ -23,15 +23,23 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { ListReconciliationQueryDto } from './dto/list-reconciliation.query.dto';
 import { FinanceService } from './finance.service';
+import {
+  AdminReconciliationDailyListResponseSwagger,
+  AdminReconciliationSummaryResponseSwagger,
+  FinanceReconciliationListResponseSwagger,
+  FinanceSummaryResponseSwagger,
+} from './finance.swagger';
 
 @ApiTags('Tenant Finance')
 @ApiBearerAuth()
+@ApiExtraModels(FinanceSummaryResponseSwagger, FinanceReconciliationListResponseSwagger)
 @Controller('finance')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class TenantFinanceController {
   constructor(private readonly financeService: FinanceService) {}
 
   @ApiOperation({ summary: '获取财务汇总' })
+  @ApiOkResponse({ type: FinanceSummaryResponseSwagger })
   @Get('summary')
   @Roles(UserRoleEnum.TENANT_OWNER, UserRoleEnum.TENANT_FINANCE)
   async getSummary(@CurrentUser() currentUser: JwtPayload): Promise<FinanceSummaryResponse> {
@@ -39,6 +47,7 @@ export class TenantFinanceController {
   }
 
   @ApiOperation({ summary: '获取租户对账明细' })
+  @ApiOkResponse({ type: FinanceReconciliationListResponseSwagger })
   @Get('reconciliation')
   @Roles(UserRoleEnum.TENANT_OWNER, UserRoleEnum.TENANT_FINANCE)
   async getReconciliation(
@@ -49,6 +58,8 @@ export class TenantFinanceController {
   }
 
   @ApiOperation({ summary: '导出租户对账单' })
+  @ApiProduces('application/octet-stream')
+  @ApiOkResponse({ description: '导出成功，返回文件流', schema: { type: 'string', format: 'binary' } })
   @Get('reconciliation/export')
   @Header('Content-Type', 'application/octet-stream')
   @Roles(UserRoleEnum.TENANT_OWNER, UserRoleEnum.TENANT_FINANCE)
@@ -64,12 +75,14 @@ export class TenantFinanceController {
 
 @ApiTags('Admin Reconciliation')
 @ApiBearerAuth()
+@ApiExtraModels(AdminReconciliationSummaryResponseSwagger, AdminReconciliationDailyListResponseSwagger)
 @Controller('reconciliation')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class AdminReconciliationController {
   constructor(private readonly financeService: FinanceService) {}
 
   @ApiOperation({ summary: '获取平台对账汇总' })
+  @ApiOkResponse({ type: AdminReconciliationSummaryResponseSwagger })
   @Get('summary')
   @Roles(UserRoleEnum.OS_SUPER_ADMIN)
   async getSummary(): Promise<AdminReconciliationSummaryResponse> {
@@ -77,6 +90,7 @@ export class AdminReconciliationController {
   }
 
   @ApiOperation({ summary: '获取平台对账日报明细' })
+  @ApiOkResponse({ type: AdminReconciliationDailyListResponseSwagger })
   @Get('daily')
   @Roles(UserRoleEnum.OS_SUPER_ADMIN)
   async getDaily(
@@ -86,6 +100,8 @@ export class AdminReconciliationController {
   }
 
   @ApiOperation({ summary: '导出平台对账单' })
+  @ApiProduces('application/octet-stream')
+  @ApiOkResponse({ description: '导出成功，返回文件流', schema: { type: 'string', format: 'binary' } })
   @Get('export')
   @Header('Content-Type', 'application/octet-stream')
   @Roles(UserRoleEnum.OS_SUPER_ADMIN)

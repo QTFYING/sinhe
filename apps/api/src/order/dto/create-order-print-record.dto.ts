@@ -1,16 +1,20 @@
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { ArrayNotEmpty, IsArray, IsOptional, IsString, IsUUID, MaxLength } from 'class-validator';
 
 export class CreateOrderPrintRecordDto {
+  @ApiProperty({ description: '本次实际打印成功的订单 ID 列表', type: [String] })
   @IsArray()
   @ArrayNotEmpty()
   @IsUUID('4', { each: true })
   orderIds!: string[];
 
+  @ApiPropertyOptional({ description: '批次请求号，预留幂等', example: 'print-batch-20260411-001' })
   @IsOptional()
   @IsString()
   @MaxLength(100)
   requestId?: string;
 
+  @ApiPropertyOptional({ description: '备注', example: '一联打印成功' })
   @IsOptional()
   @IsString()
   @MaxLength(255)

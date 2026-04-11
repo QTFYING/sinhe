@@ -10,7 +10,14 @@ import {
   Query,
   UseGuards,
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiExtraModels,
+  ApiOkResponse,
+  ApiOperation,
+  ApiParam,
+  ApiTags,
+} from '@nestjs/swagger';
 import { UserRoleEnum } from '@prisma/client';
 import type {
   CreateTenantAuditBatchRequest,
@@ -43,15 +50,32 @@ import { ListTenantMembersQueryDto } from './dto/list-tenant-members.query.dto';
 import { ListTenantsQueryDto } from './dto/list-tenants.query.dto';
 import { PatchTenantStatusDto } from './dto/patch-tenant-status.dto';
 import { TenantService } from './tenant.service';
+import {
+  TenantBatchActionResponseSwagger,
+  TenantCertificationRecordItemSwagger,
+  TenantCertificationReviewDecisionResponseSwagger,
+  TenantListResponseSwagger,
+  TenantMemberListResponseSwagger,
+  TenantRecordItemSwagger,
+} from './tenant.swagger';
 
 @ApiTags('Admin Tenants')
 @ApiBearerAuth()
+@ApiExtraModels(
+  TenantListResponseSwagger,
+  TenantRecordItemSwagger,
+  TenantBatchActionResponseSwagger,
+  TenantMemberListResponseSwagger,
+  TenantCertificationRecordItemSwagger,
+  TenantCertificationReviewDecisionResponseSwagger,
+)
 @Controller('tenants')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class TenantAdminController {
   constructor(private readonly tenantService: TenantService) {}
 
   @ApiOperation({ summary: '获取租户列表' })
+  @ApiOkResponse({ type: TenantListResponseSwagger })
   @Get()
   @Roles(UserRoleEnum.OS_SUPER_ADMIN)
   async getTenants(
@@ -61,6 +85,7 @@ export class TenantAdminController {
   }
 
   @ApiOperation({ summary: '创建租户' })
+  @ApiOkResponse({ type: TenantRecordItemSwagger })
   @Post()
   @Roles(UserRoleEnum.OS_SUPER_ADMIN)
   async createTenant(
@@ -76,6 +101,8 @@ export class TenantAdminController {
   }
 
   @ApiOperation({ summary: '创建租户审核决议' })
+  @ApiParam({ name: 'id', description: '租户 ID', format: 'uuid' })
+  @ApiOkResponse({ type: TenantRecordItemSwagger })
   @Post(':id/audit-decisions')
   @Roles(UserRoleEnum.OS_SUPER_ADMIN)
   async createAuditDecision(
@@ -93,6 +120,7 @@ export class TenantAdminController {
   }
 
   @ApiOperation({ summary: '创建租户批量审核批次' })
+  @ApiOkResponse({ type: TenantBatchActionResponseSwagger })
   @Post('audit-batches')
   @Roles(UserRoleEnum.OS_SUPER_ADMIN)
   async createAuditBatch(
@@ -108,6 +136,8 @@ export class TenantAdminController {
   }
 
   @ApiOperation({ summary: '创建租户续费记录' })
+  @ApiParam({ name: 'id', description: '租户 ID', format: 'uuid' })
+  @ApiOkResponse({ type: TenantRecordItemSwagger })
   @Post(':id/renewals')
   @Roles(UserRoleEnum.OS_SUPER_ADMIN)
   async createRenewal(
@@ -125,6 +155,8 @@ export class TenantAdminController {
   }
 
   @ApiOperation({ summary: '更新租户状态' })
+  @ApiParam({ name: 'id', description: '租户 ID', format: 'uuid' })
+  @ApiOkResponse({ type: TenantRecordItemSwagger })
   @Patch(':id')
   @Roles(UserRoleEnum.OS_SUPER_ADMIN)
   async patchStatus(
@@ -142,6 +174,7 @@ export class TenantAdminController {
   }
 
   @ApiOperation({ summary: '创建租户批量状态变更批次' })
+  @ApiOkResponse({ type: TenantBatchActionResponseSwagger })
   @Post('status-change-batches')
   @Roles(UserRoleEnum.OS_SUPER_ADMIN)
   async createStatusChangeBatch(
@@ -157,6 +190,7 @@ export class TenantAdminController {
   }
 
   @ApiOperation({ summary: '获取组织架构成员列表' })
+  @ApiOkResponse({ type: TenantMemberListResponseSwagger })
   @Get('members')
   @Roles(UserRoleEnum.OS_SUPER_ADMIN)
   async getMembers(
@@ -166,6 +200,7 @@ export class TenantAdminController {
   }
 
   @ApiOperation({ summary: '获取资质审核队列' })
+  @ApiOkResponse({ type: [TenantCertificationRecordItemSwagger] })
   @Get('certifications')
   @Roles(UserRoleEnum.OS_SUPER_ADMIN)
   async getCertificationQueue(): Promise<TenantCertificationRecordItem[]> {
@@ -173,6 +208,8 @@ export class TenantAdminController {
   }
 
   @ApiOperation({ summary: '创建资质审核决议' })
+  @ApiParam({ name: 'id', description: '资质记录 ID', format: 'uuid' })
+  @ApiOkResponse({ type: TenantCertificationReviewDecisionResponseSwagger })
   @Post('certifications/:id/review-decisions')
   @Roles(UserRoleEnum.OS_SUPER_ADMIN)
   async createCertificationReviewDecision(

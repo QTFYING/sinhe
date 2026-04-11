@@ -4,13 +4,18 @@ import { LoginDto } from './dto/login.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { CurrentUser, JwtPayload } from './decorators/current-user.decorator';
 import { Request, Response } from 'express';
-import { ApiTags, ApiOperation, ApiBearerAuth, ApiResponse } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiBearerAuth, ApiOkResponse, ApiUnauthorizedResponse } from '@nestjs/swagger';
 import {
   clearRefreshTokenCookie,
   extractBearerToken,
   getRefreshTokenFromCookie,
   setRefreshTokenCookie,
 } from './auth-session.util';
+import {
+  AuthMeResponseSwagger,
+  LoginResponseSwagger,
+  RefreshTokenResponseSwagger,
+} from './auth.swagger';
 
 @ApiTags('Auth - 鉴权中心')
 @Controller('auth')
@@ -20,8 +25,8 @@ export class AuthController {
   @Post('login')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: '用户身份登录 (Login)', description: 'OS运营端人员或租户员工登录系统，获取访问 Token。前台通过判断 tenantId 进行区分。' })
-  @ApiResponse({ status: 200, description: '登录成功，返回 accessToken 与用户信息' })
-  @ApiResponse({ status: 401, description: '账号或密码错误' })
+  @ApiOkResponse({ description: '登录成功，返回 accessToken 与用户信息', type: LoginResponseSwagger })
+  @ApiUnauthorizedResponse({ description: '账号或密码错误' })
   async login(@Body() loginDto: LoginDto, @Req() req: Request, @Res({ passthrough: true }) res: Response) {
     const session = await this.authService.login(loginDto);
 
@@ -37,6 +42,7 @@ export class AuthController {
   @Post('refresh')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: '刷新令牌 (Refresh Token)', description: '当 accessToken 过期时，使用长效 refreshToken 换取新的凭证' })
+  @ApiOkResponse({ description: '刷新成功', type: RefreshTokenResponseSwagger })
   async refresh(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
     const refreshToken = getRefreshTokenFromCookie(req);
     if (!refreshToken) {
@@ -56,7 +62,7 @@ export class AuthController {
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: '获取当前用户信息 (Me)', description: '返回当前已登录用户的基本信息，用于前端初始化用户状态' })
-  @ApiResponse({ status: 200, description: '返回用户信息' })
+  @ApiOkResponse({ description: '返回用户信息', type: AuthMeResponseSwagger })
   async me(@CurrentUser() currentUser: JwtPayload) {
     return this.authService.getProfile(currentUser.userId);
   }
@@ -64,6 +70,7 @@ export class AuthController {
   @Post('logout')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: '注销退出 (Logout)', description: '吊销当前会话的 refresh cookie；若请求中携带 accessToken，则一并加入黑名单' })
+  @ApiOkResponse({ description: '注销成功', schema: { type: 'null' } })
   async logout(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
     const accessToken = extractBearerToken(req.headers.authorization);
     const refreshToken = getRefreshTokenFromCookie(req) ?? undefined;

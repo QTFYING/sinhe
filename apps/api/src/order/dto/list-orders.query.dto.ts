@@ -1,4 +1,5 @@
 import { Type } from 'class-transformer';
+import { ApiPropertyOptional } from '@nestjs/swagger';
 import {
   IsDateString,
   IsEnum,
@@ -12,12 +13,14 @@ import {
 import { OrderPayTypeEnum, OrderStatusEnum } from '@shou/types/enums';
 
 export class ListOrdersQueryDto {
+  @ApiPropertyOptional({ description: '页码', example: 1 })
   @IsOptional()
   @Type(() => Number)
   @IsInt()
   @Min(1)
   page?: number;
 
+  @ApiPropertyOptional({ description: '每页条数', example: 20 })
   @IsOptional()
   @Type(() => Number)
   @IsInt()
@@ -25,26 +28,32 @@ export class ListOrdersQueryDto {
   @Max(200)
   pageSize?: number;
 
+  @ApiPropertyOptional({ description: '关键字，支持客户名/原始订单号等', example: 'ERP20260410' })
   @IsOptional()
   @IsString()
   keyword?: string;
 
+  @ApiPropertyOptional({ description: '订单状态', enum: Object.values(OrderStatusEnum), example: OrderStatusEnum.PAID })
   @IsOptional()
   @IsEnum(OrderStatusEnum)
   status?: (typeof OrderStatusEnum)[keyof typeof OrderStatusEnum];
 
+  @ApiPropertyOptional({ description: '付款方式', enum: Object.values(OrderPayTypeEnum), example: OrderPayTypeEnum.CREDIT })
   @IsOptional()
   @IsEnum(OrderPayTypeEnum)
   payType?: (typeof OrderPayTypeEnum)[keyof typeof OrderPayTypeEnum];
 
+  @ApiPropertyOptional({ description: '导入模板 ID', example: 'c92a1e5b-87f0-4d61-9c26-6141d81df7fa' })
   @IsOptional()
   @IsUUID()
   templateId?: string;
 
+  @ApiPropertyOptional({ description: '开始日期', example: '2026-04-01' })
   @IsOptional()
   @IsDateString()
   dateFrom?: string;
 
+  @ApiPropertyOptional({ description: '结束日期', example: '2026-04-30' })
   @IsOptional()
   @IsDateString()
   dateTo?: string;

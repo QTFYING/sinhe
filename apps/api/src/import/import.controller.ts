@@ -8,7 +8,7 @@ import {
   Put,
   UseGuards,
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiExtraModels, ApiOkResponse, ApiOperation, ApiParam, ApiTags } from '@nestjs/swagger';
 import { UserRoleEnum } from '@prisma/client';
 import type {
   CreateOrderImportTemplateRequest,
@@ -28,15 +28,28 @@ import { ImportPreviewDto } from './dto/import-preview.dto';
 import { CreateImportTemplateDto, UpdateImportTemplateDto } from './dto/import-template.dto';
 import { SubmitOrderImportDto } from './dto/submit-order-import.dto';
 import { ImportService } from './import.service';
+import {
+  OrderImportJobResponseSwagger,
+  OrderImportPreviewResponseSwagger,
+  OrderImportSubmitResponseSwagger,
+  OrderImportTemplateSwagger,
+} from './import.swagger';
 
 @ApiTags('Import')
 @ApiBearerAuth()
+@ApiExtraModels(
+  OrderImportTemplateSwagger,
+  OrderImportPreviewResponseSwagger,
+  OrderImportSubmitResponseSwagger,
+  OrderImportJobResponseSwagger,
+)
 @Controller()
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class ImportController {
   constructor(private readonly importService: ImportService) {}
 
   @ApiOperation({ summary: '获取导入模板列表' })
+  @ApiOkResponse({ type: [OrderImportTemplateSwagger] })
   @Get('import/templates')
   @Roles(UserRoleEnum.TENANT_OWNER, UserRoleEnum.TENANT_OPERATOR)
   async getImportTemplates(@CurrentUser() currentUser: JwtPayload): Promise<OrderImportTemplate[]> {
@@ -44,6 +57,7 @@ export class ImportController {
   }
 
   @ApiOperation({ summary: '创建导入模板' })
+  @ApiOkResponse({ type: OrderImportTemplateSwagger })
   @Post('import/templates')
   @Roles(UserRoleEnum.TENANT_OWNER, UserRoleEnum.TENANT_OPERATOR)
   async createImportTemplate(
@@ -57,6 +71,8 @@ export class ImportController {
   }
 
   @ApiOperation({ summary: '更新导入模板' })
+  @ApiParam({ name: 'id', description: '导入模板 ID', format: 'uuid' })
+  @ApiOkResponse({ type: OrderImportTemplateSwagger })
   @Put('import/templates/:id')
   @Roles(UserRoleEnum.TENANT_OWNER, UserRoleEnum.TENANT_OPERATOR)
   async updateImportTemplate(
@@ -72,6 +88,7 @@ export class ImportController {
   }
 
   @ApiOperation({ summary: '导入预检' })
+  @ApiOkResponse({ type: OrderImportPreviewResponseSwagger })
   @Post('import/preview')
   @Roles(UserRoleEnum.TENANT_OWNER, UserRoleEnum.TENANT_OPERATOR)
   async previewImport(
@@ -82,6 +99,7 @@ export class ImportController {
   }
 
   @ApiOperation({ summary: '正式导入订单' })
+  @ApiOkResponse({ type: OrderImportSubmitResponseSwagger })
   @Post('orders/import')
   @Roles(UserRoleEnum.TENANT_OWNER, UserRoleEnum.TENANT_OPERATOR)
   async submitOrderImport(
@@ -92,6 +110,8 @@ export class ImportController {
   }
 
   @ApiOperation({ summary: '查询导入任务进度' })
+  @ApiParam({ name: 'jobId', description: '导入任务 ID', format: 'uuid' })
+  @ApiOkResponse({ type: OrderImportJobResponseSwagger })
   @Get('orders/import/jobs/:jobId')
   @Roles(UserRoleEnum.TENANT_OWNER, UserRoleEnum.TENANT_OPERATOR)
   async getImportJob(

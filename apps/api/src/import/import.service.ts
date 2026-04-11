@@ -43,6 +43,11 @@ import { randomBytes, randomUUID } from 'crypto';
 import { JwtPayload } from '../auth/decorators/current-user.decorator';
 import { PrismaService } from '../prisma/prisma.service';
 import { RedisService } from '../redis/redis.service';
+import {
+  isImportWorkerEnabled,
+  resolveImportJobFinalStatus,
+  shouldStartImportJobImmediately,
+} from './import-job.worker.helpers';
 
 const IMPORT_PREVIEW_TTL_SECONDS = 3600;
 const IMPORT_JOB_POLL_INTERVAL_MS = 5000;
@@ -117,7 +122,9 @@ export class ImportService implements OnModuleInit, OnModuleDestroy {
   ) {}
 
   onModuleInit(): void {
-    this.startImportJobPolling();
+    if (isImportWorkerEnabled()) {
+      this.startImportJobPolling();
+    }
   }
 
   onModuleDestroy(): void {
@@ -265,7 +272,9 @@ export class ImportService implements OnModuleInit, OnModuleDestroy {
       },
     });
 
-    this.enqueueImportJob(job.id);
+    if (shouldStartImportJobImmediately()) {
+      this.enqueueImportJob(job.id);
+    }
 
     return {
       jobId: job.id,
@@ -769,12 +778,12 @@ export class ImportService implements OnModuleInit, OnModuleDestroy {
   }
 
   private resolveFinalImportJobStatus(progress: ImportJobProgress): PrismaImportJobStatusEnum {
-    return progress.failedRows.length > 0 &&
-      progress.successCount === 0 &&
-      progress.overwrittenCount === 0 &&
-      progress.skippedCount === 0
-      ? PrismaImportJobStatusEnum.FAILED
-      : PrismaImportJobStatusEnum.COMPLETED;
+    return resolveImportJobFinalStatus({
+      successCount: progress.successCount,
+      skippedCount: progress.skippedCount,
+      overwrittenCount: progress.overwrittenCount,
+      failedCount: progress.failedRows.length,
+    });
   }
 
   private async markImportJobFailed(jobId: string, message: string): Promise<void> {

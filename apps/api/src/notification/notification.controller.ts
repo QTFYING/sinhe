@@ -1,5 +1,5 @@
 import { Controller, Get, Param, ParseUUIDPipe, Post, Query, UseGuards } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiExtraModels, ApiOkResponse, ApiOperation, ApiParam, ApiTags } from '@nestjs/swagger';
 import type { TenantNotificationRecordItem } from '@shou/types/contracts';
 import type { PaginatedResponse } from '@shou/types/common';
 import { UserRoleEnum } from '@prisma/client';
@@ -9,15 +9,21 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { ListNotificationsQueryDto } from './dto/list-notifications.query.dto';
 import { NotificationService } from './notification.service';
+import {
+  NotificationListResponseSwagger,
+  TenantNotificationRecordItemSwagger,
+} from './notification.swagger';
 
 @ApiTags('Notifications')
 @ApiBearerAuth()
+@ApiExtraModels(NotificationListResponseSwagger, TenantNotificationRecordItemSwagger)
 @Controller('notifications')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class NotificationController {
   constructor(private readonly notificationService: NotificationService) {}
 
   @ApiOperation({ summary: '获取平台公告列表' })
+  @ApiOkResponse({ type: NotificationListResponseSwagger })
   @Get()
   @Roles(
     UserRoleEnum.TENANT_OWNER,
@@ -33,6 +39,8 @@ export class NotificationController {
   }
 
   @ApiOperation({ summary: '标记公告已读' })
+  @ApiParam({ name: 'id', description: '公告 ID', format: 'uuid' })
+  @ApiOkResponse({ description: '标记成功', schema: { type: 'null' } })
   @Post(':id/read-records')
   @Roles(
     UserRoleEnum.TENANT_OWNER,
