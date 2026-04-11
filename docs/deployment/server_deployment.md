@@ -4,7 +4,7 @@
 
 ## 1. 部署范围
 
-当前生产部署包含以下 4 个容器服务：
+当前仓库内 `docker-compose.yml` 直接定义了以下 4 个容器服务：
 
 | 服务 | 容器名 | 说明 |
 | --- | --- | --- |
@@ -12,6 +12,11 @@
 | Redis | `shou-redis` | 缓存与分布式锁 |
 | API | `shou-api` | NestJS 后端服务，容器内端口 `3000` |
 | Nginx | `shou-nginx` | 托管三个前端并反向代理 `/api` |
+
+补充说明：
+
+- 若生产环境需要完整支持“正式导入提交 -> Worker 消费 -> 任务完成”链路，还需要额外部署 `import-worker`。
+- 当前仓库里的 `docker-compose.yml` 尚未包含 `import-worker` 服务，因此它不是“完整业务链路”的最终形态。
 
 对外访问入口以 `docker-compose.yml` 为准，当前端口如下：
 
@@ -111,6 +116,7 @@ openssl rand -hex 32
 - `POSTGRES_PASSWORD`、`JWT_SECRET` 必须使用生产专用值，禁止把真实密钥写入仓库文档。
 - 当前 `docker-compose.yml` 会自动拼装 `DATABASE_URL`、`REDIS_URL`，无需手工填写。
 - `.env` 属于服务器本地私有文件，不要提交到 Git。
+- 若你采用“裸进程启动 API/Worker”的方式，则还需要准备 `apps/api/.env`，其格式应与 `apps/api/.env.example` 对齐。
 
 ### 4.2 首次上线前的敏感信息管理
 
@@ -158,8 +164,28 @@ docker compose logs -f api
 
 - API 容器启动命令中会自动执行 `prisma db push --skip-generate`，即容器启动时会自动同步当前 Prisma 表结构到数据库。
 - 这属于“直接推表”模式，不是受控 migration 发布。生产发版前必须先做数据库备份，再执行升级。
+- 当前 compose 启动后只会有 `api` 容器，不会自动拉起独立 `import-worker`。
+- 因此若业务侧需要正式导入，你必须补充独立 Worker 部署。
 
-### 5.3 访问验证
+### 5.3 当前 compose 方式的边界
+
+按当前仓库内配置，以下能力可以直接工作：
+
+1. 前端静态站点访问
+2. API 基础请求
+3. 登录、设置、订单查询、H5 支付、打印回执等 API 链路
+
+以下能力不能仅靠当前 compose 自动覆盖：
+
+1. 正式导入任务的异步消费
+
+原因：
+
+- `POST /orders/import` 只会创建导入任务
+- 没有独立 `import-worker` 进程时，任务不会自动完成
+- 当前 `docker-compose.yml` 没有定义 `import-worker` 服务
+
+### 5.4 访问验证
 
 若服务器公网 IP 为 `<ECS_PUBLIC_IP>`，则默认访问地址如下：
 
@@ -177,7 +203,7 @@ curl -I http://127.0.0.1:5002
 curl -I http://127.0.0.1:5003
 ```
 
-### 5.4 服务器重启后的自动拉起
+### 5.5 服务器重启后的自动拉起
 
 当前仓库的 [`docker-compose.yml`](/D:/Sinhe/api/docker-compose.yml) 已为 `db`、`redis`、`api`、`nginx` 四个服务统一配置 `restart: always`，这意味着：
 
