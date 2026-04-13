@@ -1,5 +1,15 @@
-const { PrismaClient } = require('@prisma/client');
-const bcrypt = require('bcrypt');
+const path = require('node:path');
+const { createRequire } = require('node:module');
+
+const apiRequire = createRequire(path.join(__dirname, '../apps/api/package.json'));
+
+const {
+  PrismaClient,
+  TenantStatusEnum,
+  UserRoleEnum,
+  UserStatusEnum,
+} = apiRequire('@prisma/client');
+const bcrypt = apiRequire('bcrypt');
 const prisma = new PrismaClient();
 
 const GENERAL_SETTINGS_CONFIG_GROUP = 'tenant_general_defaults';
@@ -47,10 +57,18 @@ async function main() {
   const defaultHash = bcrypt.hashSync('123456', 10);
   
   // 1. OS 超级管理员账号
-  let osAdmin = await prisma.user.findFirst({ where: { account: 'admin', role: 'OS_SUPER_ADMIN' } });
+  let osAdmin = await prisma.user.findFirst({
+    where: { account: 'admin', role: UserRoleEnum.OS_SUPER_ADMIN },
+  });
   if (!osAdmin) {
     osAdmin = await prisma.user.create({
-      data: { account: 'admin', passwordHash: defaultHash, realName: 'OS超级运营管理员', role: 'OS_SUPER_ADMIN', status: 'active' }
+      data: {
+        account: 'admin',
+        passwordHash: defaultHash,
+        realName: 'OS超级运营管理员',
+        role: UserRoleEnum.OS_SUPER_ADMIN,
+        status: UserStatusEnum.ACTIVE,
+      }
     });
   } else {
     await prisma.user.update({ where: { id: osAdmin.id }, data: { passwordHash: defaultHash } });
@@ -60,7 +78,13 @@ async function main() {
   let tenant = await prisma.tenant.findFirst({ where: { name: '华东区饮料总代(测试)' }});
   if (!tenant) {
     tenant = await prisma.tenant.create({
-      data: { name: '华东区饮料总代(测试)', contactPhone: '13888888888', maxCreditDays: 45, creditReminderDays: 7, status: 'active' }
+      data: {
+        name: '华东区饮料总代(测试)',
+        contactPhone: '13888888888',
+        maxCreditDays: 45,
+        creditReminderDays: 7,
+        status: TenantStatusEnum.ACTIVE,
+      }
     });
   }
 
@@ -68,7 +92,14 @@ async function main() {
   let boss = await prisma.user.findFirst({ where: { account: 'boss', tenantId: tenant.id } });
   if (!boss) {
     boss = await prisma.user.create({
-      data: { tenantId: tenant.id, account: 'boss', passwordHash: defaultHash, realName: '经销商李老板', role: 'TENANT_OWNER', status: 'active' }
+      data: {
+        tenantId: tenant.id,
+        account: 'boss',
+        passwordHash: defaultHash,
+        realName: '经销商李老板',
+        role: UserRoleEnum.TENANT_OWNER,
+        status: UserStatusEnum.ACTIVE,
+      }
     });
   } else {
     await prisma.user.update({ where: { id: boss.id }, data: { passwordHash: defaultHash } });

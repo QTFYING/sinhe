@@ -11,10 +11,10 @@
 # 数据库基础凭证
 POSTGRES_USER=postgres
 POSTGRES_PASSWORD=postgres
-POSTGRES_DB=shou
+POSTGRES_DB=shou_db
 
 # Prisma 核心连接串 (注意：原密码中的 @ 已经智能转义为 %40 以兼容连接串)
-DATABASE_URL="postgresql://postgres:postgres@localhost:5432/shou?schema=public"
+DATABASE_URL="postgresql://postgres:postgres@localhost:5432/shou_db?schema=public"
 
 # JWT 签名密钥
 JWT_SECRET=7f8b9d2a1c4e6f5a3c2b1d4e7f8a9c0b1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a
@@ -46,7 +46,7 @@ LAKALA_CASHIER_URL_PREFIX=https://cashier.lakala.com/pay?tradeNo=
 ``` shell
 POSTGRES_USER=postgres
 POSTGRES_PASSWORD=Sinhe@db_2026_Secure!
-POSTGRES_DB=shou
+POSTGRES_DB=shou_db
 JWT_SECRET=7f8b9d2a1c4e6f5a3c2b1d4e7f8a9c0b1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a
 REDIS_URL=redis://127.0.0.1:6379
 PORT=3000

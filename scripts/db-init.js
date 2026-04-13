@@ -1,5 +1,15 @@
-const { PrismaClient, UserRoleEnum } = require('@prisma/client');
-const bcrypt = require('bcrypt');
+const path = require('node:path');
+const { createRequire } = require('node:module');
+
+const apiRequire = createRequire(path.join(__dirname, '../apps/api/package.json'));
+
+const {
+  PrismaClient,
+  TenantStatusEnum,
+  UserRoleEnum,
+  UserStatusEnum,
+} = apiRequire('@prisma/client');
+const bcrypt = apiRequire('bcrypt');
 
 const prisma = new PrismaClient();
 
@@ -87,7 +97,7 @@ async function ensureOsAdmin() {
       passwordHash,
       realName,
       role: UserRoleEnum.OS_SUPER_ADMIN,
-      status: 'active',
+      status: UserStatusEnum.ACTIVE,
     },
   });
 
@@ -157,7 +167,7 @@ async function ensureTenantAndOwner() {
         contactPhone: tenantContactPhone,
         maxCreditDays,
         creditReminderDays,
-        status: 'active',
+        status: TenantStatusEnum.ACTIVE,
       },
     });
     console.log(`[ok] 已创建租户: ${tenantName}`);
@@ -187,7 +197,7 @@ async function ensureTenantAndOwner() {
       passwordHash,
       realName: ownerRealName,
       role: UserRoleEnum.TENANT_OWNER,
-      status: 'active',
+        status: UserStatusEnum.ACTIVE,
     },
   });
 

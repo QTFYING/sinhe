@@ -186,7 +186,7 @@ pnpm run check:backend
 本地至少需要：
 
 ```env
-DATABASE_URL=postgresql://postgres:postgres@localhost:5432/distributor_pay?schema=public
+DATABASE_URL=postgresql://postgres:postgres@localhost:5432/shou_db?schema=public
 JWT_SECRET=<本地固定密钥>
 REDIS_URL=redis://localhost:6379
 CORS_ORIGINS=http://localhost:5001,http://localhost:5002,http://localhost:5003

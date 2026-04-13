@@ -124,7 +124,7 @@ psql -h 127.0.0.1 -p 5432 -U virgo -d postgres -c "select version();"
 
 - Host：`127.0.0.1`
 - Port：`5432`
-- Database：`shou`
+- Database：`shou_db`
 - Username：`postgres`
 - Password：`postgres`
 
@@ -146,13 +146,13 @@ ports:
 
 - 用户：`postgres`
 - 密码：`postgres`
-- 数据库：`shou`
+- 数据库：`shou_db`
 
 ### 本机 Homebrew PostgreSQL 这次排查到的情况
 
 - 角色为 `virgo`
 - 原本不存在 `postgres` 角色
-- 原本不存在 `shou` 数据库
+- 原本不存在 `shou_db` 数据库
 
 ## 8. Prisma 常见问题
 

@@ -100,7 +100,7 @@ cd /data/www/sinhe
 cat > .env <<'EOF'
 POSTGRES_USER=postgres
 POSTGRES_PASSWORD=<请替换为强密码>
-POSTGRES_DB=shou
+POSTGRES_DB=shou_db
 JWT_SECRET=<请替换为长度至少 64 位的随机密钥>
 EOF
 ```
@@ -336,15 +336,15 @@ mkdir -p /data/backup/postgres
 
 docker exec shou-db \
   pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" \
-  > /data/backup/postgres/shou_$(date +%F_%H%M%S).sql
+  > /data/backup/postgres/shou_db_$(date +%F_%H%M%S).sql
 ```
 
 如果宿主机环境变量未导出，可直接写明用户名和库名：
 
 ```bash
 docker exec shou-db \
-  pg_dump -U postgres -d shou \
-  > /data/backup/postgres/shou_$(date +%F_%H%M%S).sql
+  pg_dump -U postgres -d shou_db \
+  > /data/backup/postgres/shou_db_$(date +%F_%H%M%S).sql
 ```
 
 ### 8.2 PostgreSQL 恢复
@@ -352,7 +352,7 @@ docker exec shou-db \
 恢复前请先停业务并确认目标库是否允许覆盖：
 
 ```bash
-cat /data/backup/postgres/<备份文件>.sql | docker exec -i shou-db psql -U postgres -d shou
+cat /data/backup/postgres/<备份文件>.sql | docker exec -i shou-db psql -U postgres -d shou_db
 ```
 
 ### 8.3 Redis 备份
@@ -445,7 +445,7 @@ docker compose up -d --build
 
 ```bash
 docker compose logs -f db
-docker exec -it shou-db psql -U postgres -d shou
+docker exec -it shou-db psql -U postgres -d shou_db
 ```
 
 常见原因：
