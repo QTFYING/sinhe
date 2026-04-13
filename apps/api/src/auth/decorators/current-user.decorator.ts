@@ -6,6 +6,8 @@ export interface JwtPayload {
   tenantId: string | null;
   role: UserRoleEnum;
   side: 'platform' | 'tenant';
+  sessionId: string;
+  tokenVersion: number;
 }
 
 export const CurrentUser = createParamDecorator(

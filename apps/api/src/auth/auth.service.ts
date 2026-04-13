@@ -31,11 +31,22 @@ export class AuthService {
   async login(loginDto: LoginDto) {
     const { account, password } = loginDto;
     const user = await this.findLoginUser(account, password);
-    const accessToken = this.jwtService.sign(this.buildAccessTokenPayload(user));
-
-    // 生成 Refresh Token（随机字符串），存入 Redis
+    const tokenVersion = await this.redis.getUserTokenVersion(user.id);
+    const sessionId = crypto.randomUUID();
     const refreshToken = crypto.randomBytes(48).toString('hex');
-    await this.redis.setRefreshToken(refreshToken, user.id, REFRESH_TOKEN_TTL);
+    await this.redis.createAuthSession(
+      {
+        sessionId,
+        userId: user.id,
+        account: user.account,
+        role: user.role as UserRoleEnum,
+        tenantId: user.tenantId,
+      },
+      refreshToken,
+      ACCESS_TOKEN_TTL,
+      REFRESH_TOKEN_TTL,
+    );
+    const accessToken = this.jwtService.sign(this.buildAccessTokenPayload(user, sessionId, tokenVersion));
 
     return {
       accessToken,
@@ -46,18 +57,33 @@ export class AuthService {
   }
 
   async refresh(refreshToken: string) {
-    const userId = await this.redis.getRefreshTokenUser(refreshToken);
-    if (!userId) {
+    const session = await this.redis.getAuthSessionByRefreshToken(refreshToken);
+    if (!session || session.status !== 'active') {
       throw new UnauthorizedException('Refresh Token 已失效，请重新登录');
     }
 
-    const user = await this.getAvailableUserById(userId);
-    const accessToken = this.jwtService.sign(this.buildAccessTokenPayload(user));
-
-    // Refresh Token Rotation: invalidate old token, issue new one
-    await this.redis.deleteRefreshToken(refreshToken);
+    const user = await this.getAvailableUserById(session.userId);
+    const tokenVersion = await this.redis.getUserTokenVersion(user.id);
     const newRefreshToken = crypto.randomBytes(48).toString('hex');
-    await this.redis.setRefreshToken(newRefreshToken, user.id, REFRESH_TOKEN_TTL);
+    const nextSession = await this.redis.refreshAuthSession(
+      session.sessionId,
+      {
+        userId: user.id,
+        account: user.account,
+        role: user.role as UserRoleEnum,
+        tenantId: user.tenantId,
+      },
+      newRefreshToken,
+      ACCESS_TOKEN_TTL,
+      REFRESH_TOKEN_TTL,
+    );
+    if (!nextSession) {
+      throw new UnauthorizedException('Refresh Token 已失效，请重新登录');
+    }
+
+    const accessToken = this.jwtService.sign(
+      this.buildAccessTokenPayload(user, nextSession.sessionId, tokenVersion),
+    );
 
     return {
       accessToken,
@@ -72,22 +98,18 @@ export class AuthService {
   }
 
   async logout(accessToken: string | null, refreshToken?: string) {
-    // Access Token 加入黑名单（剩余有效期内）
-    if (accessToken) {
-      try {
-        const decoded = this.jwtService.verify(accessToken) as { exp: number };
-        const ttl = decoded.exp - Math.floor(Date.now() / 1000);
-        if (ttl > 0) {
-          await this.redis.addToBlacklist(accessToken, ttl);
-        }
-      } catch {
-        // token 已过期，无需加黑名单
+    if (refreshToken) {
+      const session = await this.redis.getAuthSessionByRefreshToken(refreshToken);
+      if (session) {
+        await this.redis.revokeAuthSession(session.sessionId);
       }
     }
 
-    // 删除 Refresh Token
-    if (refreshToken) {
-      await this.redis.deleteRefreshToken(refreshToken);
+    if (accessToken) {
+      const payload = this.jwtService.decode(accessToken);
+      if (payload && typeof payload === 'object' && typeof payload.sid === 'string') {
+        await this.redis.revokeAuthSession(payload.sid);
+      }
     }
   }
 
@@ -167,9 +189,19 @@ export class AuthService {
     }
   }
 
-  private buildAccessTokenPayload(user: AuthUserRecord): Omit<JwtPayload, 'userId'> & { sub: string } {
+  private buildAccessTokenPayload(
+    user: AuthUserRecord,
+    sessionId: string,
+    tokenVersion: number,
+  ): Omit<JwtPayload, 'userId' | 'sessionId' | 'tokenVersion'> & {
+    sub: string;
+    sid: string;
+    ver: number;
+  } {
     return {
       sub: user.id,
+      sid: sessionId,
+      ver: tokenVersion,
       tenantId: user.tenantId,
       role: user.role as UserRoleEnum,
       side: user.tenantId ? 'tenant' : 'platform',
