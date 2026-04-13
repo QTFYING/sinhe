@@ -117,19 +117,20 @@ score：
 redis-cli
 ```
 
-如果当前机器还没有把 `redis-cli` 加入 `PATH`，再按实际安装位置使用绝对路径。
+如果当前机器还没有把 `redis-cli` 加入 `PATH`，再先定位本机安装位置，然后使用对应路径。
 
-Windows 本机可选示例：
+Windows 本机定位方式：
 
 ```powershell
-C:\Program Files\Redis\redis-cli.exe
+Get-Command redis-cli -ErrorAction SilentlyContinue
+where.exe redis-cli
 ```
 
 说明：
 
-- 文档中的绝对路径只表示“本机某次排查时的一个示例路径”
+- 文档不应依赖某台机器上的固定安装目录
 - 不是项目运行时依赖
-- 换一台电脑、换一个用户名、换到服务器环境后，路径都可能不同
+- 换一台电脑、换一个用户名、换到服务器环境后，最终路径都可能不同
 
 ### 3.1 查询所有会话相关 key
 
@@ -222,14 +223,10 @@ redis-cli -h 127.0.0.1 -p 6379 TTL 'refresh:c1982a75b61c1c663b75363b5991532a2665
 
 ```powershell
 $env:PGPASSWORD='postgres'
-& 'C:\Program Files\PostgreSQL\18\bin\psql.exe' -h 127.0.0.1 -U postgres -d shou_db -t -A -c "select id, account, role from users order by account;"
-```
-
-如果 `psql` 已加入环境变量，也可直接写成：
-
-```powershell
 psql -h 127.0.0.1 -U postgres -d shou_db -t -A -c "select id, account, role from users order by account;"
 ```
+
+如果当前机器还没有把 `psql` 加入 `PATH`，先参考 [psql_quick_reference.md](./psql_quick_reference.md) 里的定位方法确认可执行文件位置，再替换为本机实际路径。
 
 示例结果：
 
@@ -365,9 +362,94 @@ redis-cli --raw -h 127.0.0.1 -p 6379 KEYS 'user:tokenVersion:*'
 
 删除前先确认环境，避免误删线上数据。
 
-## 8. 阿里云或其他服务器环境怎么用
+## 8. ECS Docker Redis 的推荐连接方式
 
-如果部署在阿里云或其他 Linux 服务器，通常不会使用 Windows 绝对路径，而是直接用系统命令：
+如果 Redis 部署在阿里云 ECS 且由 Docker 运行，推荐做法不是直接开放公网 `6379`，而是：
+
+1. 用 `1Panel` 管理容器、日志和重启
+2. 用 Redis Insight 查看 key、TTL、Hash、ZSet
+3. 通过 SSH 隧道让本地 Redis Insight 安全连接 ECS 上的 Redis
+
+### 8.1 为什么不建议直接开放 6379
+
+原因：
+
+- Redis 不是面向公网暴露的业务入口
+- 直接开放公网 `6379` 会显著增加被扫描和暴力探测的风险
+- 即使设置了密码，也不值得把这类基础设施端口直接暴露出去
+
+因此更推荐：
+
+- Redis 容器仅绑定服务器本机或内网
+- ECS 安全组不放行 `6379`
+- 需要排查时，通过 SSH 隧道临时连接
+
+### 8.2 Docker 侧的推荐端口映射
+
+如果 Redis 使用 Docker Compose，可优先使用这种写法：
+
+```yaml
+ports:
+  - "127.0.0.1:6379:6379"
+```
+
+它的意义是：
+
+- Redis 只监听 ECS 本机回环地址
+- 服务器外部机器不能直接访问 Redis
+- 服务器自己、容器编排和 SSH 隧道仍然可以访问
+
+### 8.3 本地通过 SSH 隧道连接 ECS Redis
+
+如果你的本机没有占用 `6379`，可直接在本机执行：
+
+```powershell
+ssh -L 6379:127.0.0.1:6379 <user>@<ecs-ip>
+```
+
+这表示：
+
+- 本机 `127.0.0.1:6379`
+- 转发到 ECS `127.0.0.1:6379`
+
+随后 Redis Insight 中填：
+
+- Host：`127.0.0.1`
+- Port：`6379`
+
+### 8.4 如果本机自己也有 Redis，怎么避免冲突
+
+如果本机已经有一个 Redis 正在占用 `6379`，不要把 SSH 隧道也绑到 `6379`，否则会报端口占用错误。
+
+先检查本机 `6379` 是否已被占用：
+
+```powershell
+Get-NetTCPConnection -LocalPort 6379 -ErrorAction SilentlyContinue
+```
+
+如果有结果，说明本机 Redis 已在使用该端口。这时建议把 ECS 隧道改到本机其他端口，例如 `6380`：
+
+```powershell
+ssh -L 6380:127.0.0.1:6379 <user>@<ecs-ip>
+```
+
+这时两套 Redis 的区分会非常清楚：
+
+- 本机 Redis：`127.0.0.1:6379`
+- ECS Redis 隧道：`127.0.0.1:6380`
+
+Redis Insight 中可创建两条连接：
+
+- `local-redis` -> `127.0.0.1:6379`
+- `ecs-redis` -> `127.0.0.1:6380`
+
+这样只是“本地端口转发到远端”，不是把两边数据混在一起。
+
+### 8.5 服务器上直接命令排查
+
+如果你已经 SSH 登录到 ECS，也可以直接在服务器侧排查。
+
+直接用系统命令：
 
 ```bash
 redis-cli -h 127.0.0.1 -p 6379
@@ -379,8 +461,14 @@ redis-cli -h 127.0.0.1 -p 6379
 docker exec -it <redis-container> redis-cli
 ```
 
-结论：
+### 8.6 当前场景下最务实的结论
 
-- 文档中的绝对路径只是本机示例，不是通用依赖
-- 本地、他人电脑、阿里云服务器都应优先使用通用命令 `redis-cli`
-- 只有在命令未加入 `PATH` 时，才按当前机器实际安装位置补绝对路径
+对“ECS + Docker Redis + 本地也有 Redis”的场景，推荐固定采用下面这套分工：
+
+- `1Panel` 负责容器管理、日志查看、重启和编排
+- Redis Insight 负责查 Redis 数据结构和链路
+- SSH 隧道负责安全连通
+- 本地 Redis 固定使用 `6379`
+- ECS Redis 隧道优先固定使用 `6380`
+
+这样最不容易混淆，也不需要开放公网 Redis 端口。

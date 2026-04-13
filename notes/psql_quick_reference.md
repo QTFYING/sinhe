@@ -21,19 +21,20 @@
 psql
 ```
 
-如果当前机器还没有把 `psql` 加入 `PATH`，再按实际安装位置使用绝对路径。
+如果当前机器还没有把 `psql` 加入 `PATH`，再先定位本机安装位置，然后使用对应路径。
 
-Windows 本机可选示例：
+Windows 本机定位方式：
 
 ```powershell
-C:\Program Files\PostgreSQL\18\bin\psql.exe
+Get-Command psql -ErrorAction SilentlyContinue
+where.exe psql
 ```
 
 说明：
 
-- 文档中的绝对路径只表示某台机器上的示例路径
+- 文档不应依赖某台机器上的固定安装目录
 - 不是项目运行时依赖
-- 换一台电脑、换一个用户名、换到服务器环境后，路径都可能不同
+- 换一台电脑、换一个用户名、换到服务器环境后，最终路径都可能不同
 
 ## 2. 最常用的连接方式
 

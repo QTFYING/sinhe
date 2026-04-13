@@ -213,5 +213,5 @@ INIT_TENANT_CREDIT_REMINDER_DAYS=
 3. 不恢复已废弃的旧语义，例如 `/print/jobs`、`erpOrderNo`、`templateId`、`customFields`、旧 `payStatus` 主流程。
 4. `docs/api` 定业务结构，`enums` 定闭集值，`contracts` 跟随投影，`data-model-reference` 做建模同步。
 
-更严格的代理执行规则见 [AGENTS.md](/D:/Sinhe/api/AGENTS.md)。
+更严格的代理执行规则见 `AGENTS.md`。
 

@@ -38,7 +38,7 @@
 
 ### 3.1 代码位置
 
-- [import.service.ts](/D:/Sinhe/api/apps/api/src/import/import.service.ts)
+- `apps/api/src/import/import.service.ts`
 
 关键使用点：
 
@@ -103,9 +103,9 @@
 
 ### 4.1 代码位置
 
-- [redis.service.ts](/D:/Sinhe/api/apps/api/src/redis/redis.service.ts)
-- [payment.service.ts](/D:/Sinhe/api/apps/api/src/payment/payment.service.ts)
-- [import.service.ts](/D:/Sinhe/api/apps/api/src/import/import.service.ts)
+- `apps/api/src/redis/redis.service.ts`
+- `apps/api/src/payment/payment.service.ts`
+- `apps/api/src/import/import.service.ts`
 
 ### 4.2 当前使用点
 
