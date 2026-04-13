@@ -114,6 +114,28 @@ export interface LoginRiskEventItem {
   level: string
 }
 
+export interface PlatformOverviewGrowth {
+  newTenants: number
+  trialToFormal: number
+  churnWarning: number
+  dailyTrend: number[]
+}
+
+export interface PlatformRenewalRiskItem {
+  tenantName: string
+  dueInDays: number
+  owner: string
+}
+
+export interface PlatformOverviewResponse {
+  totalFlow: number
+  totalTenants: number
+  newTenantsThisMonth: number
+  healthScore: number
+  growth: PlatformOverviewGrowth
+  renewalRisks: PlatformRenewalRiskItem[]
+}
+
 export interface RoleTemplateItem {
   name: string
   side: TenantSide

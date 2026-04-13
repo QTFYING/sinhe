@@ -4,6 +4,7 @@ import { PrismaModule } from './prisma/prisma.module';
 import { RedisModule } from './redis/redis.module';
 import { AuthModule } from './auth/auth.module';
 import { TenantModule } from './tenant/tenant.module';
+import { PlatformModule } from './platform/platform.module';
 import { SettingsModule } from './settings/settings.module';
 import { OrderModule } from './order/order.module';
 import { ImportModule } from './import/import.module';
@@ -19,6 +20,7 @@ import { FinanceModule } from './finance/finance.module';
     RedisModule, 
     AuthModule, 
     TenantModule, 
+    PlatformModule,
     SettingsModule,
     OrderModule, 
     ImportModule.register('api'), 

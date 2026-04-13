@@ -147,6 +147,25 @@
 3. 已配置模板时，返回黑盒 `config` 与版本号
 4. 打印配置不支持删除，只支持覆盖更新
 
+### 3.7 平台 Dashboard 链路
+
+接口序列：
+
+1. `GET /platform/console`
+2. `GET /platform/metrics`
+3. `GET /platform/todos`
+4. `GET /platform/tenant-health`
+5. `GET /platform/risk-events`
+6. `GET /platform/overview`
+
+核对点：
+
+1. 平台账号登录后，`/platform/console` 返回产品名、角色名和当前操作人
+2. `metrics`、`todos`、`tenant-health`、`risk-events` 在真实库为空或数据较少时也能返回合法结构
+3. `tenant-health` 中健康度、账号覆盖率和异常提示之间口径自洽
+4. `/platform/overview` 中 `totalTenants / newTenantsThisMonth / growth.dailyTrend / renewalRisks` 与同一时点库内数据口径一致
+5. 平台侧接口不能被租户登录态成功访问
+
 ## 四、联调记录建议模板
 
 每次联调建议至少记录以下内容：
