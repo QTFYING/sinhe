@@ -33,10 +33,38 @@ services:
       DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-shou_db}?schema=public
       REDIS_URL: redis://redis:6379
       JWT_SECRET: ${JWT_SECRET:-please-change-this-secret}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5001,http://localhost:5002,http://localhost:5003}
       NODE_ENV: production
+      PORT: 3000
+      AUTH_COOKIE_SECURE: ${AUTH_COOKIE_SECURE:-true}
+      IMPORT_JOB_WORKER_ENABLED: "false"
+      LAKALA_CASHIER_URL_PREFIX: ${LAKALA_CASHIER_URL_PREFIX:-https://cashier.lakala.com/pay?tradeNo=}
     depends_on:
       - db
       - redis
+    restart: always
+
+  import-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: api
+    container_name: shou-import-worker
+    command: ["sh", "-c", "node_modules/.bin/prisma db push --skip-generate && node dist/import-worker.main"]
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-shou_db}?schema=public
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: ${JWT_SECRET:-please-change-this-secret}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5001,http://localhost:5002,http://localhost:5003}
+      NODE_ENV: production
+      PORT: 3000
+      AUTH_COOKIE_SECURE: ${AUTH_COOKIE_SECURE:-true}
+      IMPORT_JOB_WORKER_ENABLED: "true"
+      LAKALA_CASHIER_URL_PREFIX: ${LAKALA_CASHIER_URL_PREFIX:-https://cashier.lakala.com/pay?tradeNo=}
+    depends_on:
+      - db
+      - redis
+      - api
     restart: always
 
   nginx:

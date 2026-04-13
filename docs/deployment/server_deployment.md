@@ -4,19 +4,20 @@
 
 ## 1. 部署范围
 
-当前仓库内 `docker-compose.yml` 直接定义了以下 4 个容器服务：
+当前仓库内 `docker-compose.yml` 直接定义了以下 5 个容器服务：
 
 | 服务 | 容器名 | 说明 |
 | --- | --- | --- |
 | PostgreSQL | `shou-db` | 主业务数据库 |
 | Redis | `shou-redis` | 缓存与分布式锁 |
 | API | `shou-api` | NestJS 后端服务，容器内端口 `3000` |
+| Import Worker | `shou-import-worker` | 正式导入任务消费进程，不直接对外提供 HTTP |
 | Nginx | `shou-nginx` | 托管三个前端并反向代理 `/api` |
 
 补充说明：
 
-- 若生产环境需要完整支持“正式导入提交 -> Worker 消费 -> 任务完成”链路，还需要额外部署 `import-worker`。
-- 当前仓库里的 `docker-compose.yml` 尚未包含 `import-worker` 服务，因此它不是“完整业务链路”的最终形态。
+- `import-worker` 负责后台轮询并消费正式导入任务。
+- `import-worker` 不监听新的 HTTP 端口，不需要额外二级域名。
 
 对外访问入口以 `docker-compose.yml` 为准，当前端口如下：
 
@@ -31,6 +32,7 @@
 说明：
 
 - API 不直接对公网暴露，三个前端通过 `/api/` 反向代理到容器内 `api:3000`。
+- `import-worker` 只访问数据库和 Redis，不直接暴露公网入口。
 - 生产环境请以阿里云安全组限制公网入口，只放行 `22` 和实际需要的业务端口。
 - 当前项目默认对外开放的是 `5001/5002/5003`，不是旧文档中的 `8001/8002/8003`。
 
@@ -39,7 +41,7 @@
 建议采用以下拓扑：
 
 1. 阿里云 ECS 作为部署主机，项目目录统一放在 `/data/www/sinhe`。
-2. Docker Compose 负责拉起 `db`、`redis`、`api`、`nginx` 四个服务。
+2. Docker Compose 负责拉起 `db`、`redis`、`api`、`import-worker`、`nginx` 五个服务。
 3. 公网入口优先通过阿里云 SLB/ALB 或宿主机 Nginx 再做一层域名和 HTTPS 终止。
 4. 数据库和 Redis 端口不对公网开放，只允许堡垒机、运维网段或同 VPC 访问。
 
@@ -114,7 +116,7 @@ openssl rand -hex 32
 说明：
 
 - `POSTGRES_PASSWORD`、`JWT_SECRET` 必须使用生产专用值，禁止把真实密钥写入仓库文档。
-- 当前 `docker-compose.yml` 会自动拼装 `DATABASE_URL`、`REDIS_URL`，无需手工填写。
+- 当前 `docker-compose.yml` 会自动拼装 `DATABASE_URL`、`REDIS_URL`，并为 `api` / `import-worker` 注入默认运行参数，无需手工填写。
 - `.env` 属于服务器本地私有文件，不要提交到 Git。
 - 若你采用“裸进程启动 API/Worker”的方式，则还需要准备 `apps/api/.env`，其格式应与 `apps/api/.env.example` 对齐。
 
@@ -158,14 +160,15 @@ docker compose up -d --build
 ```bash
 docker compose ps
 docker compose logs -f api
+docker compose logs -f import-worker
 ```
 
 说明：
 
-- API 容器启动命令中会自动执行 `prisma db push --skip-generate`，即容器启动时会自动同步当前 Prisma 表结构到数据库。
+- API 与 `import-worker` 容器启动命令中都会执行 `prisma db push --skip-generate`，即容器启动时会自动同步当前 Prisma 表结构到数据库。
 - 这属于“直接推表”模式，不是受控 migration 发布。生产发版前必须先做数据库备份，再执行升级。
-- 当前 compose 启动后只会有 `api` 容器，不会自动拉起独立 `import-worker`。
-- 因此若业务侧需要正式导入，你必须补充独立 Worker 部署。
+- 当前 compose 启动后会同时拉起 `api` 与 `import-worker`。
+- 因此正式导入任务具备完整消费链路。
 
 ### 5.3 当前 compose 方式的边界
 
@@ -174,16 +177,7 @@ docker compose logs -f api
 1. 前端静态站点访问
 2. API 基础请求
 3. 登录、设置、订单查询、H5 支付、打印回执等 API 链路
-
-以下能力不能仅靠当前 compose 自动覆盖：
-
-1. 正式导入任务的异步消费
-
-原因：
-
-- `POST /orders/import` 只会创建导入任务
-- 没有独立 `import-worker` 进程时，任务不会自动完成
-- 当前 `docker-compose.yml` 没有定义 `import-worker` 服务
+4. 正式导入任务的异步消费
 
 ### 5.4 访问验证
 
@@ -205,9 +199,9 @@ curl -I http://127.0.0.1:5003
 
 ### 5.5 服务器重启后的自动拉起
 
-当前仓库的 [`docker-compose.yml`](/D:/Sinhe/api/docker-compose.yml) 已为 `db`、`redis`、`api`、`nginx` 四个服务统一配置 `restart: always`，这意味着：
+当前仓库的 [`docker-compose.yml`](/D:/Sinhe/api/docker-compose.yml) 已为 `db`、`redis`、`api`、`import-worker`、`nginx` 五个服务统一配置 `restart: always`，这意味着：
 
-- 只要 Docker 守护进程在宿主机启动后自动恢复运行，这 4 个容器就会自动拉起。
+- 只要 Docker 守护进程在宿主机启动后自动恢复运行，这 5 个容器就会自动拉起。
 - 如果你执行过 `docker compose down`，容器会被删除；此时仅靠 `restart: always` 不会自动重新创建容器，需要再次执行 `docker compose up -d`。
 
 建议在服务器上执行以下命令，确保 Docker 本身开机自启：
@@ -290,7 +284,7 @@ docker compose run --rm \
   -e INIT_TENANT_OWNER_REAL_NAME='租户老板' \
   -e INIT_TENANT_MAX_CREDIT_DAYS=45 \
   -e INIT_TENANT_CREDIT_REMINDER_DAYS=7 \
-docker-compose exec api node ../../scripts/db-init.js
+  api node ../../scripts/db-init.js
 ```
 
 执行规则：
@@ -312,6 +306,7 @@ git pull
 docker compose up -d --build
 docker compose ps
 docker compose logs -f api
+docker compose logs -f import-worker
 ```
 
 ### 7.2 发版前强制检查
@@ -390,6 +385,7 @@ docker compose up -d --build
 ```bash
 docker compose ps
 docker compose logs -f api
+docker compose logs -f import-worker
 docker compose logs -f nginx
 docker compose logs -f db
 docker compose logs -f redis
@@ -399,6 +395,7 @@ docker compose logs -f redis
 
 ```bash
 docker compose restart api
+docker compose restart import-worker
 docker compose restart nginx
 docker compose restart db redis
 ```

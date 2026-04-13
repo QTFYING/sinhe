@@ -45,6 +45,7 @@ pnpm -F api start:prod
 
 - `apps/api` 现已统一通过 `apps/api/.env` 加载环境变量，不再依赖本地脚本硬编码。
 - 完整业务链路如果包含正式导入，必须同时存在 `API + import-worker` 两个进程。
+- `import-worker` 是后台消费进程，不额外监听 HTTP 端口，也不需要单独域名。
 
 ## 三、当前最小运行依赖
 
@@ -335,7 +336,8 @@ pnpm -F api start:import-worker
 1. `db`
 2. `redis`
 3. `api`
-4. `nginx`
+4. `import-worker`
+5. `nginx`
 
 命令：
 
@@ -345,16 +347,16 @@ docker compose up -d --build
 
 但必须明确：
 
-- 当前 `docker-compose.yml` 还没有独立的 `import-worker` 服务。
-- 因此，按当前 compose 直接启动后，导入预检可以用，但正式导入任务会停留在 `pending`。
-- 如果生产环境要支持完整导入链路，必须额外补一个 `import-worker` 容器或独立进程。
+- 当前 `import-worker` 已作为独立容器纳入 compose。
+- 它负责轮询并消费正式导入任务，但不对外暴露 HTTP 端口。
+- 因此不需要为 Worker 额外配置公网端口、二级域名或 Nginx 转发。
 
 ### 10.3 当前建议结论
 
 当前更推荐的阿里云启动方式是：
 
-1. 如果你要最稳妥跑完整业务链，优先使用“方式 A：裸进程发布”。
-2. 如果你当前只需要快速起站点和 API，可临时使用“方式 B：Docker Compose 发布”，但要清楚它不覆盖完整导入链路。
+1. 如果你要长期统一运维，优先使用“方式 B：Docker Compose 发布”，统一托管 `api + import-worker + db + redis + nginx`。
+2. 如果你当前只想做最小改动，也仍可使用“方式 A：裸进程发布”，但它不再是长期首选。
 
 当前建议顺序：
 
@@ -377,27 +379,28 @@ pnpm -F @shou/types build
 pnpm -F api build
 ```
 
-5. 同步数据库 schema
+5. 启动 Docker Compose
 
 ```powershell
-pnpm -F api prisma:push
+docker compose up -d --build
 ```
 
 说明：
 
-- 当前仓库还没有正式迁移体系手册，因此现阶段仍以 `prisma db push` 为主
+- 当前 compose 中 `api` 与 `import-worker` 启动前都会执行 `prisma db push --skip-generate`
 - 生产环境禁止使用 `--force-reset`
 
-6. 启动 API
+6. 查看运行状态
 
 ```powershell
-pnpm -F api start:prod
+docker compose ps
 ```
 
-7. 启动导入 Worker
+7. 查看关键日志
 
 ```powershell
-pnpm -F api start:import-worker
+docker compose logs -f api
+docker compose logs -f import-worker
 ```
 
 ## 十一、发布前后建议执行的验证
