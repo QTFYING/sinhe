@@ -19,6 +19,15 @@
 - `import-worker` 负责后台轮询并消费正式导入任务。
 - `import-worker` 不监听新的 HTTP 端口，不需要额外二级域名。
 
+当前生产域名规划如下：
+
+| 域名 | 对应入口 | 说明 |
+| --- | --- | --- |
+| `mp.shoudanba.cn` | `5001` | OS 运营台 |
+| `www.shoudanba.cn` | `5002` | 租户工作台 |
+| `h5.shoudanba.cn` | `5003` | C 端收款 H5 |
+| `api.shoudanba.cn` | API 对外入口 | 对外 API 域名 |
+
 对外访问入口以 `docker-compose.yml` 为准，当前端口如下：
 
 | 端口 | 用途 | 说明 |
@@ -35,6 +44,7 @@
 - `import-worker` 只访问数据库和 Redis，不直接暴露公网入口。
 - 生产环境请以阿里云安全组限制公网入口，只放行 `22` 和实际需要的业务端口。
 - 当前项目默认对外开放的是 `5001/5002/5003`，不是旧文档中的 `8001/8002/8003`。
+- 当前阶段仍保留 `5001/5002/5003` 的公网放行能力，便于域名回源、端口排查和过渡联调。
 
 ## 2. 推荐部署拓扑
 
@@ -88,7 +98,11 @@ sudo systemctl restart docker
 | `5432` | 否 | PostgreSQL，禁止公网开放 |
 | `6379` | 否 | Redis，禁止公网开放 |
 
-如果已接入域名反向代理，建议外部仅开放 `80/443`，宿主机内部再转发到 `5001/5002/5003`。
+当前项目已确认保留 `5001/5002/5003` 端口放行，因此建议口径改为：
+
+1. `5001/5002/5003` 可继续保留公网放行，用于域名回源与临时排查。
+2. 若后续入口完全收敛到 `80/443`，再评估是否关闭上述端口的公网放行。
+3. `5432/6379` 仍然禁止公网开放。
 
 ## 4. 生产配置约定
 
@@ -104,6 +118,7 @@ POSTGRES_USER=postgres
 POSTGRES_PASSWORD=<请替换为强密码>
 POSTGRES_DB=shou_db
 JWT_SECRET=<请替换为长度至少 64 位的随机密钥>
+CORS_ORIGINS=https://mp.shoudanba.cn,https://www.shoudanba.cn,https://h5.shoudanba.cn
 EOF
 ```
 
@@ -116,6 +131,7 @@ openssl rand -hex 32
 说明：
 
 - `POSTGRES_PASSWORD`、`JWT_SECRET` 必须使用生产专用值，禁止把真实密钥写入仓库文档。
+- `CORS_ORIGINS` 只填写前端域名来源，不填写 `api.shoudanba.cn`。
 - 当前 `docker-compose.yml` 会自动拼装 `DATABASE_URL`、`REDIS_URL`，并为 `api` / `import-worker` 注入默认运行参数，无需手工填写。
 - `.env` 属于服务器本地私有文件，不要提交到 Git。
 - 若你采用“裸进程启动 API/Worker”的方式，则还需要准备 `apps/api/.env`，其格式应与 `apps/api/.env.example` 对齐。
@@ -181,7 +197,16 @@ docker compose logs -f import-worker
 
 ### 5.4 访问验证
 
-若服务器公网 IP 为 `<ECS_PUBLIC_IP>`，则默认访问地址如下：
+当前生产推荐访问地址如下：
+
+| 类型 | 地址 |
+| --- | --- |
+| OS 运营台 | `https://mp.shoudanba.cn` |
+| 租户工作台 | `https://www.shoudanba.cn` |
+| C 端收款 H5 | `https://h5.shoudanba.cn` |
+| API | `https://api.shoudanba.cn` |
+
+同时保留端口访问方式如下：
 
 | 端口 | 地址 |
 | --- | --- |

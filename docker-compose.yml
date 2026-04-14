@@ -33,7 +33,7 @@ services:
       DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-shou_db}?schema=public
       REDIS_URL: redis://redis:6379
       JWT_SECRET: ${JWT_SECRET:-please-change-this-secret}
-      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5001,http://localhost:5002,http://localhost:5003}
+      CORS_ORIGINS: ${CORS_ORIGINS:-https://mp.shoudanba.cn,https://www.shoudanba.cn,https://h5.shoudanba.cn}
       NODE_ENV: production
       PORT: 3000
       AUTH_COOKIE_SECURE: ${AUTH_COOKIE_SECURE:-true}
@@ -55,7 +55,7 @@ services:
       DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-shou_db}?schema=public
       REDIS_URL: redis://redis:6379
       JWT_SECRET: ${JWT_SECRET:-please-change-this-secret}
-      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5001,http://localhost:5002,http://localhost:5003}
+      CORS_ORIGINS: ${CORS_ORIGINS:-https://mp.shoudanba.cn,https://www.shoudanba.cn,https://h5.shoudanba.cn}
       NODE_ENV: production
       PORT: 3000
       AUTH_COOKIE_SECURE: ${AUTH_COOKIE_SECURE:-true}

@@ -49,9 +49,22 @@ POSTGRES_PASSWORD=Sinhe@db_2026_Secure!
 POSTGRES_DB=shou_db
 JWT_SECRET=7f8b9d2a1c4e6f5a3c2b1d4e7f8a9c0b1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a
 REDIS_URL=redis://127.0.0.1:6379
+CORS_ORIGINS=https://mp.shoudanba.cn,https://www.shoudanba.cn,https://h5.shoudanba.cn
 PORT=3000
 NODE_ENV=production
 AUTH_COOKIE_SECURE=true
 IMPORT_JOB_WORKER_ENABLED=false
 LAKALA_CASHIER_URL_PREFIX=https://cashier.lakala.com/pay?tradeNo=
 ```
+
+生产域名约定：
+
+- OS 运营台：`https://mp.shoudanba.cn`
+- 租户工作台：`https://www.shoudanba.cn`
+- C 端收款 H5：`https://h5.shoudanba.cn`
+- API：`https://api.shoudanba.cn`
+
+说明：
+
+- `CORS_ORIGINS` 只填写前端来源域名，不填写 `api.shoudanba.cn`
+- 若阿里云安全组当前仍保留 `5001/5002/5003` 放行，可继续用于端口直连排查，不影响上述域名配置
