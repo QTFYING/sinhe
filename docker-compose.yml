@@ -41,6 +41,8 @@ services:
       dockerfile: Dockerfile
       target: api
     container_name: shou-api
+    ports:
+      - "127.0.0.1:3000:3000"
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-shou_db}?schema=public
       REDIS_URL: redis://redis:6379
