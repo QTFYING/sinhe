@@ -18,6 +18,7 @@ import type {
   OrderImportSubmitRequest,
   OrderImportSubmitResponse,
   OrderImportTemplate,
+  OrderImportTemplateField,
   UpdateOrderImportTemplateRequest,
 } from '@shou/types/contracts';
 import { CurrentUser, JwtPayload } from '../auth/decorators/current-user.decorator';
@@ -32,12 +33,14 @@ import {
   OrderImportJobResponseSwagger,
   OrderImportPreviewResponseSwagger,
   OrderImportSubmitResponseSwagger,
+  OrderImportTemplateFieldSwagger,
   OrderImportTemplateSwagger,
 } from './import.swagger';
 
 @ApiTags('Import')
 @ApiBearerAuth()
 @ApiExtraModels(
+  OrderImportTemplateFieldSwagger,
   OrderImportTemplateSwagger,
   OrderImportPreviewResponseSwagger,
   OrderImportSubmitResponseSwagger,
@@ -47,6 +50,14 @@ import {
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class ImportController {
   constructor(private readonly importService: ImportService) {}
+
+  @ApiOperation({ summary: '获取系统默认映射模板' })
+  @ApiOkResponse({ type: [OrderImportTemplateFieldSwagger] })
+  @Get('import/default-template')
+  @Roles(UserRoleEnum.TENANT_OWNER, UserRoleEnum.TENANT_OPERATOR)
+  async getDefaultTemplate(): Promise<OrderImportTemplateField[]> {
+    return this.importService.getDefaultTemplate();
+  }
 
   @ApiOperation({ summary: '获取导入模板列表' })
   @ApiOkResponse({ type: [OrderImportTemplateSwagger] })

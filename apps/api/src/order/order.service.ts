@@ -68,7 +68,7 @@ export class OrderService {
       this.prisma.order.findMany({
         where,
         include: { lineItems: true },
-        orderBy: [{ date: 'desc' }, { createdAt: 'desc' }],
+        orderBy: [{ orderTime: 'desc' }, { createdAt: 'desc' }],
         skip: (page - 1) * pageSize,
         take: pageSize,
       }),
@@ -122,13 +122,14 @@ export class OrderService {
         tenantId,
         qrCodeToken: this.generateQrCodeToken(),
         customer,
-        summary: this.cut(request.summary?.trim() || '手工创建订单', 255),
-        amount: this.toPrismaDecimal(amount),
+        skuName: this.cut(request.summary?.trim() || '手工创建订单', 255),
+        lineAmount: this.toPrismaDecimal(amount),
+        totalAmount: this.toPrismaDecimal(amount),
         paid: this.toPrismaDecimal(paid),
         status: this.toPrismaOrderStatus(status),
         payType: this.toPrismaOrderPayType(payType),
         prints: 0,
-        date: orderDate,
+        orderTime: orderDate,
       },
       include: { lineItems: true },
     });
@@ -164,7 +165,7 @@ export class OrderService {
         : undefined;
       const derivedAmount = normalizedLineItems
         ? this.sumLineItemAmount(normalizedLineItems)
-        : this.decimal(existing.amount);
+        : this.decimal(existing.totalAmount);
       const amount =
         request.amount !== undefined ? this.toMoney(request.amount, 'amount') : derivedAmount;
       if (amount.lte(0)) {
@@ -182,7 +183,12 @@ export class OrderService {
 
       const payType = request.payType ?? this.fromPrismaOrderPayType(existing.payType);
       const status = this.resolveRequestedStatus(request.status, payType, amount, paid, false);
-      const date = request.date ? this.parseDate(request.date, 'date') : existing.date;
+      const orderTime = request.date ? this.parseDate(request.date, 'date') : existing.orderTime;
+      const resolvedSkuName = normalizedLineItems?.[0]?.skuName
+        ?? (request.summary !== undefined ? this.cut(request.summary.trim(), 255) : existing.skuName);
+      const resolvedLineAmount = normalizedLineItems
+        ? this.toMoney(normalizedLineItems[0]?.lineAmount ?? Number(amount.toFixed(2)), 'lineAmount', true)
+        : (request.amount !== undefined ? amount : this.decimal(existing.lineAmount));
       const updated = await tx.order.update({
         where: { id: existing.id },
         data: {
@@ -190,14 +196,14 @@ export class OrderService {
             request.customer !== undefined
               ? this.normalizeRequiredText(request.customer, 'customer', 100)
               : existing.customer,
-          summary:
-            request.summary !== undefined ? this.cut(request.summary.trim(), 255) : existing.summary,
-          amount: this.toPrismaDecimal(amount),
+          skuName: resolvedSkuName,
+          lineAmount: this.toPrismaDecimal(resolvedLineAmount),
+          totalAmount: this.toPrismaDecimal(amount),
           paid: this.toPrismaDecimal(paid),
           status: this.toPrismaOrderStatus(status),
           payType: this.toPrismaOrderPayType(payType),
-          date,
-          customFieldValues:
+          orderTime,
+          customerValues:
             request.customFieldValues !== undefined
               ? (request.customFieldValues as unknown as Prisma.InputJsonValue)
               : undefined,
@@ -404,7 +410,7 @@ export class OrderService {
     const [orders, total] = await Promise.all([
       this.prisma.order.findMany({
         where,
-        orderBy: [{ creditDueDate: 'asc' }, { date: 'asc' }],
+        orderBy: [{ creditDueDate: 'asc' }, { orderTime: 'asc' }],
         skip: (resolvedPage - 1) * resolvedPageSize,
         take: resolvedPageSize,
       }),
@@ -441,7 +447,7 @@ export class OrderService {
         throw new BadRequestException('仅账期订单允许创建回款记录');
       }
 
-      const amount = this.decimal(order.amount);
+      const amount = this.decimal(order.totalAmount);
       const paid = this.decimal(order.paid);
       const remaining = amount.minus(paid);
       if (remaining.lte(0)) {
@@ -517,16 +523,16 @@ export class OrderService {
         { sourceOrderNo: { contains: keyword, mode: 'insensitive' } },
         { groupKey: { contains: keyword, mode: 'insensitive' } },
         { customer: { contains: keyword, mode: 'insensitive' } },
-        { summary: { contains: keyword, mode: 'insensitive' } },
+        { skuName: { contains: keyword, mode: 'insensitive' } },
       ];
     }
     if (query.dateFrom || query.dateTo) {
-      where.date = {};
+      where.orderTime = {};
       if (query.dateFrom) {
-        where.date.gte = dayjs(query.dateFrom).startOf('day').toDate();
+        where.orderTime.gte = dayjs(query.dateFrom).startOf('day').toDate();
       }
       if (query.dateTo) {
-        where.date.lte = dayjs(query.dateTo).endOf('day').toDate();
+        where.orderTime.lte = dayjs(query.dateTo).endOf('day').toDate();
       }
     }
 
@@ -549,6 +555,7 @@ export class OrderService {
         { sourceOrderNo: { contains: keyword, mode: 'insensitive' } },
         { groupKey: { contains: keyword, mode: 'insensitive' } },
         { customer: { contains: keyword, mode: 'insensitive' } },
+        { skuName: { contains: keyword, mode: 'insensitive' } },
         { tenant: { name: { contains: keyword, mode: 'insensitive' } } },
       ];
     }
@@ -557,7 +564,7 @@ export class OrderService {
       this.prisma.order.findMany({
         where,
         include: { lineItems: true, tenant: true },
-        orderBy: [{ date: 'desc' }, { createdAt: 'desc' }],
+        orderBy: [{ orderTime: 'desc' }, { createdAt: 'desc' }],
         skip: (page - 1) * pageSize,
         take: pageSize,
       }),
@@ -725,14 +732,15 @@ export class OrderService {
     mappingTemplateId: string | null;
     qrCodeToken: string;
     customer: string;
-    summary: string;
-    amount: Prisma.Decimal;
+    skuName: string;
+    lineAmount: Prisma.Decimal;
+    totalAmount: Prisma.Decimal;
     paid: Prisma.Decimal;
-    customFieldValues: Prisma.JsonValue | null;
+    customerValues: Prisma.JsonValue | null;
     status: PrismaOrderStatusEnum;
     payType: PrismaOrderPayTypeEnum;
     prints: number;
-    date: Date;
+    orderTime: Date;
     voided: boolean;
     voidReason: string | null;
     voidedAt: Date | null;
@@ -754,13 +762,14 @@ export class OrderService {
       mappingTemplateId: order.mappingTemplateId ?? undefined,
       qrCodeToken: order.qrCodeToken,
       customer: order.customer,
-      summary: order.summary,
-      amount: this.toMoneyNumber(order.amount),
+      skuName: order.skuName,
+      lineAmount: this.toMoneyNumber(order.lineAmount),
+      totalAmount: this.toMoneyNumber(order.totalAmount),
       paid: this.toMoneyNumber(order.paid),
       status: this.fromPrismaOrderStatus(order.status),
       payType: this.fromPrismaOrderPayType(order.payType),
       prints: order.prints,
-      date: order.date.toISOString(),
+      orderTime: order.orderTime.toISOString(),
       lineItems: order.lineItems.map((item) => ({
         itemId: item.id,
         skuId: item.skuId,
@@ -771,7 +780,7 @@ export class OrderService {
         unitPrice: this.toMoneyNumber(item.unitPrice),
         lineAmount: this.toMoneyNumber(item.lineAmount),
       })),
-      customFieldValues: this.toCustomFieldValues(order.customFieldValues),
+      customerValues: this.toCustomerValues(order.customerValues),
       voided: order.voided,
       voidReason: order.voidReason ?? undefined,
       voidedAt: order.voidedAt?.toISOString(),
@@ -781,17 +790,17 @@ export class OrderService {
   private toCreditOrderItem(order: {
     id: string;
     customer: string;
-    amount: Prisma.Decimal;
-    date: Date;
+    totalAmount: Prisma.Decimal;
+    orderTime: Date;
     creditDays: number | null;
     creditDueDate: Date | null;
   }): CreditOrderItem {
-    const dueDate = order.creditDueDate ?? dayjs(order.date).add(order.creditDays ?? 0, 'day').toDate();
+    const dueDate = order.creditDueDate ?? dayjs(order.orderTime).add(order.creditDays ?? 0, 'day').toDate();
     return {
       id: order.id,
       customer: order.customer,
-      amount: this.toMoneyNumber(order.amount),
-      date: order.date.toISOString(),
+      amount: this.toMoneyNumber(order.totalAmount),
+      date: order.orderTime.toISOString(),
       creditDays: order.creditDays ?? 0,
       dueDate: dueDate.toISOString(),
       creditStatus: this.resolveCreditStatus(dueDate),
@@ -805,12 +814,14 @@ export class OrderService {
     mappingTemplateId: string | null;
     qrCodeToken: string;
     customer: string;
-    amount: Prisma.Decimal;
+    skuName: string;
+    lineAmount: Prisma.Decimal;
+    totalAmount: Prisma.Decimal;
     paid: Prisma.Decimal;
-    customFieldValues: Prisma.JsonValue | null;
+    customerValues: Prisma.JsonValue | null;
     status: PrismaOrderStatusEnum;
     payType: PrismaOrderPayTypeEnum;
-    date: Date;
+    orderTime: Date;
     voided: boolean;
     voidReason: string | null;
     voidedAt: Date | null;
@@ -836,6 +847,9 @@ export class OrderService {
       mappingTemplateId: order.mappingTemplateId ?? undefined,
       qrCodeToken: order.qrCodeToken,
       customer: order.customer,
+      skuName: order.skuName,
+      lineAmount: this.toMoneyNumber(order.lineAmount),
+      totalAmount: this.toMoneyNumber(order.totalAmount),
       lineItems: order.lineItems.map((item) => ({
         itemId: item.id,
         skuId: item.skuId,
@@ -846,12 +860,11 @@ export class OrderService {
         unitPrice: this.toMoneyNumber(item.unitPrice),
         lineAmount: this.toMoneyNumber(item.lineAmount),
       })),
-      customFieldValues: this.toCustomFieldValues(order.customFieldValues),
-      amount: this.toMoneyNumber(order.amount),
+      customerValues: this.toCustomerValues(order.customerValues),
       paid: this.toMoneyNumber(order.paid),
       status: this.fromPrismaOrderStatus(order.status),
       payType: this.fromPrismaOrderPayType(order.payType),
-      date: order.date.toISOString(),
+      orderTime: order.orderTime.toISOString(),
       voided: order.voided,
       voidReason: order.voidReason ?? undefined,
       voidedAt: order.voidedAt?.toISOString(),
@@ -874,7 +887,7 @@ export class OrderService {
     };
   }
 
-  private toCustomFieldValues(value: Prisma.JsonValue | null): Record<string, string> | undefined {
+  private toCustomerValues(value: Prisma.JsonValue | null): Record<string, string> | undefined {
     if (!value || typeof value !== 'object' || Array.isArray(value)) {
       return undefined;
     }

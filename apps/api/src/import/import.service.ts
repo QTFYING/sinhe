@@ -23,15 +23,17 @@ import type {
   OrderImportJobConflictDetail,
   OrderImportJobFailure,
   OrderImportJobResponse,
+  OrderImportPreviewError,
+  OrderImportPreviewOrder,
+  OrderImportPreviewOrderResult,
   OrderImportPreviewRequest,
   OrderImportPreviewResponse,
-  OrderImportPreviewRowError,
   OrderImportPreviewSummary,
   OrderImportSubmitRequest,
   OrderImportSubmitResponse,
   OrderImportTemplate,
+  OrderImportTemplateField,
   OrderLineItem,
-  TenantOrderItem,
   UpdateOrderImportTemplateRequest,
 } from '@shou/types/contracts';
 import type { OrderImportJobStatus, OrderPayType, OrderStatus } from '@shou/types/enums';
@@ -42,6 +44,7 @@ import {
   OrderStatusEnum,
 } from '@shou/types/enums';
 import { randomBytes, randomUUID } from 'crypto';
+import Decimal from 'decimal.js';
 import { JwtPayload } from '../auth/decorators/current-user.decorator';
 import { importConfig } from '../config/import.config';
 import { PrismaService } from '../prisma/prisma.service';
@@ -50,59 +53,45 @@ import {
   resolveImportJobFinalStatus,
   shouldStartImportJobImmediately,
 } from './import-job.worker.helpers';
-import {
-  buildImportOrderSummary,
-  countMatchedImportFields,
-  readImportColumn,
-  resolveImportOrderStatus,
-  resolveImportPayType,
-} from './import.domain';
 import { IMPORT_RUNTIME_MODE, type ImportRuntimeMode } from './import.constants';
 
 const IMPORT_PREVIEW_TTL_SECONDS = 3600;
 const IMPORT_JOB_POLL_INTERVAL_MS = 5000;
 const IMPORT_JOB_LOCK_TTL_SECONDS = 1800;
 const IMPORT_JOB_STALE_SECONDS = 120;
-const DEFAULT_UNIT = '件';
-const BUILTIN_KEYS = new Set([
-  'sourceOrderNo',
-  'groupKey',
-  'customer',
-  'summary',
-  'amount',
-  'paid',
-  'status',
-  'payType',
-  'prints',
-  'date',
-  'creditDays',
-  'skuId',
-  'skuName',
-  'skuSpec',
-  'unit',
-  'quantity',
-  'unitPrice',
-  'lineAmount',
-]);
+const IMPORT_PREVIEW_CONSUME_LOCK_SECONDS = 30;
 
-type TemplateField = OrderImportTemplate['fields'][number];
-type TemplateMapping = OrderImportTemplate['mappings'][number];
-type TemplateSourceColumn = OrderImportTemplate['sourceColumns'][number];
+const DEFAULT_TEMPLATE_FIELDS: OrderImportTemplateField[] = [
+  { label: '源订单号', key: 'sourceOrderNo', mapStr: '', isRequired: true },
+  { label: '客户名称', key: 'customer', mapStr: '', isRequired: true },
+  { label: '商品名称', key: 'skuName', mapStr: '', isRequired: true },
+  { label: '行金额', key: 'lineAmount', mapStr: '', isRequired: true },
+  { label: '总金额', key: 'totalAmount', mapStr: '', isRequired: true },
+  { label: '下单时间', key: 'orderTime', mapStr: '', isRequired: true },
+];
 
-interface NormalizedImportOrder extends TenantOrderItem {
-  creditDays?: number;
-  rowNumbers: number[];
+interface PreparedImportOrder {
+  index: number;
+  sourceOrderNo: string;
+  groupKey?: string;
+  customer: string;
+  skuName: string;
+  lineAmount: number;
+  totalAmount: number;
+  orderTime: string;
+  customerValues: Record<string, string>;
+  mappingTemplateId?: string;
+  lineItems: OrderLineItem[];
 }
 
 interface PreviewSnapshot {
+  previewId: string;
   tenantId: string;
-  templateId?: string;
-  matchedFieldCount?: number;
-  requiredFieldMissing: string[];
+  templateId: string;
   summary: OrderImportPreviewSummary;
-  aggregatedOrders: NormalizedImportOrder[];
+  orders: PreparedImportOrder[];
   duplicateOrders: OrderImportDuplicateOrder[];
-  invalidRows: OrderImportPreviewRowError[];
+  invalidOrders: OrderImportPreviewError[];
 }
 
 interface ImportJobProgress {
@@ -110,7 +99,7 @@ interface ImportJobProgress {
   successCount: number;
   skippedCount: number;
   overwrittenCount: number;
-  failedRows: OrderImportJobFailure[];
+  failedOrders: OrderImportJobFailure[];
   conflictDetails: OrderImportJobConflictDetail[];
 }
 
@@ -147,13 +136,18 @@ export class ImportService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
+  getDefaultTemplate(): OrderImportTemplateField[] {
+    return DEFAULT_TEMPLATE_FIELDS.map((field) => ({ ...field }));
+  }
+
   async getImportTemplates(currentUser: JwtPayload): Promise<OrderImportTemplate[]> {
     const tenantId = this.getTenantId(currentUser);
     const templates = await this.prisma.importTemplate.findMany({
       where: { tenantId, deletedAt: null },
       orderBy: [{ isDefault: 'desc' }, { createdAt: 'asc' }],
     });
-    return templates.map((item) => this.toTemplate(item));
+
+    return templates.map((template) => this.toTemplate(template));
   }
 
   async createImportTemplate(
@@ -161,10 +155,10 @@ export class ImportService implements OnModuleInit, OnModuleDestroy {
     request: CreateOrderImportTemplateRequest,
   ): Promise<OrderImportTemplate> {
     const tenantId = this.getTenantId(currentUser);
-    this.validateTemplate(request);
+    const normalized = this.normalizeTemplatePayload(request);
 
     const created = await this.prisma.$transaction(async (tx) => {
-      if (request.isDefault) {
+      if (normalized.isDefault) {
         await tx.importTemplate.updateMany({
           where: { tenantId, deletedAt: null },
           data: { isDefault: false },
@@ -174,11 +168,10 @@ export class ImportService implements OnModuleInit, OnModuleDestroy {
       return tx.importTemplate.create({
         data: {
           tenantId,
-          name: request.name.trim(),
-          isDefault: request.isDefault,
-          sourceColumns: request.sourceColumns as unknown as Prisma.InputJsonValue,
-          fields: request.fields as unknown as Prisma.InputJsonValue,
-          mappings: request.mappings as unknown as Prisma.InputJsonValue,
+          name: normalized.name,
+          isDefault: normalized.isDefault,
+          defaultFields: normalized.defaultFields as unknown as Prisma.InputJsonValue,
+          customerFields: normalized.customerFields as unknown as Prisma.InputJsonValue,
         },
       });
     });
@@ -193,18 +186,21 @@ export class ImportService implements OnModuleInit, OnModuleDestroy {
   ): Promise<OrderImportTemplate> {
     const tenantId = this.getTenantId(currentUser);
     const existing = await this.getScopedTemplate(tenantId, templateId);
-
-    const payload: CreateOrderImportTemplateRequest = {
-      name: request.name?.trim() || existing.name,
-      isDefault: request.isDefault ?? existing.isDefault,
-      sourceColumns: request.sourceColumns ?? this.asSourceColumns(existing.sourceColumns),
-      fields: request.fields ?? this.asFields(existing.fields),
-      mappings: request.mappings ?? this.asMappings(existing.mappings),
-    };
-    this.validateTemplate(payload);
+    const current = this.toTemplate(existing);
+    const normalized = this.normalizeTemplatePayload({
+      name: request.name ?? current.name,
+      isDefault: request.isDefault ?? current.isDefault,
+      defaultFields: request.defaultFields ?? current.defaultFields,
+      customerFields:
+        request.customerFields ??
+        current.customerFields.map((field) => ({
+          label: field.label,
+          mapStr: field.mapStr,
+        })),
+    });
 
     const updated = await this.prisma.$transaction(async (tx) => {
-      if (payload.isDefault) {
+      if (normalized.isDefault) {
         await tx.importTemplate.updateMany({
           where: { tenantId, deletedAt: null, id: { not: templateId } },
           data: { isDefault: false },
@@ -214,11 +210,10 @@ export class ImportService implements OnModuleInit, OnModuleDestroy {
       return tx.importTemplate.update({
         where: { id: templateId },
         data: {
-          name: payload.name,
-          isDefault: payload.isDefault,
-          sourceColumns: payload.sourceColumns as unknown as Prisma.InputJsonValue,
-          fields: payload.fields as unknown as Prisma.InputJsonValue,
-          mappings: payload.mappings as unknown as Prisma.InputJsonValue,
+          name: normalized.name,
+          isDefault: normalized.isDefault,
+          defaultFields: normalized.defaultFields as unknown as Prisma.InputJsonValue,
+          customerFields: normalized.customerFields as unknown as Prisma.InputJsonValue,
         },
       });
     });
@@ -232,19 +227,16 @@ export class ImportService implements OnModuleInit, OnModuleDestroy {
   ): Promise<OrderImportPreviewResponse> {
     const tenantId = this.getTenantId(currentUser);
     const snapshot = await this.buildPreviewSnapshot(tenantId, request);
-    const previewId = randomUUID();
 
-    await this.redis.setJson(this.getPreviewKey(previewId), snapshot, IMPORT_PREVIEW_TTL_SECONDS);
+    await this.redis.setJson(this.getPreviewKey(snapshot.previewId), snapshot, IMPORT_PREVIEW_TTL_SECONDS);
 
     return {
-      previewId,
+      previewId: snapshot.previewId,
       templateId: snapshot.templateId,
-      matchedFieldCount: snapshot.matchedFieldCount,
-      requiredFieldMissing: snapshot.requiredFieldMissing,
       summary: snapshot.summary,
-      aggregatedOrders: snapshot.aggregatedOrders.map((item) => this.toTenantOrder(item)),
+      orders: snapshot.orders.map((order) => this.toPreviewOrderResult(order)),
       duplicateOrders: snapshot.duplicateOrders,
-      invalidRows: snapshot.invalidRows,
+      invalidOrders: snapshot.invalidOrders,
     };
   }
 
@@ -253,52 +245,58 @@ export class ImportService implements OnModuleInit, OnModuleDestroy {
     request: OrderImportSubmitRequest,
   ): Promise<OrderImportSubmitResponse> {
     const tenantId = this.getTenantId(currentUser);
-    const snapshot = request.previewId
-      ? await this.readPreviewSnapshot(tenantId, request.previewId)
-      : await this.buildPreviewSnapshot(tenantId, {
-          templateId: request.templateId,
-          rows: request.rows ?? [],
-        });
-
-    if (snapshot.requiredFieldMissing.length > 0 || snapshot.invalidRows.length > 0) {
-      throw new BadRequestException('导入数据未通过预检，请先修正映射或行数据错误');
+    const lockKey = this.getPreviewConsumeLockKey(request.previewId);
+    const lockValue = await this.redis.acquireLock(lockKey, IMPORT_PREVIEW_CONSUME_LOCK_SECONDS);
+    if (!lockValue) {
+      throw new BadRequestException('预检结果正在被消费，请勿重复提交');
     }
 
-    if (snapshot.aggregatedOrders.length === 0) {
-      throw new BadRequestException('没有可导入的有效订单');
+    try {
+      const snapshot = await this.readPreviewSnapshot(tenantId, request.previewId);
+      if (snapshot.invalidOrders.length > 0) {
+        throw new BadRequestException('导入数据未通过预检，请先修正订单错误');
+      }
+      if (snapshot.orders.length === 0) {
+        throw new BadRequestException('没有可导入的有效订单');
+      }
+
+      const conflictPolicy = request.conflictPolicy ?? OrderImportConflictPolicyEnum.SKIP;
+      const job = await this.prisma.importJob.create({
+        data: {
+          tenantId,
+          status: PrismaImportJobStatusEnum.PENDING,
+          conflictPolicy: this.toPrismaImportConflictPolicy(conflictPolicy),
+          snapshot: snapshot as unknown as Prisma.InputJsonValue,
+          submittedCount: snapshot.orders.length,
+          processedCount: 0,
+          successCount: 0,
+          skippedCount: 0,
+          overwrittenCount: 0,
+          failedCount: 0,
+          failedOrders: [],
+          conflictDetails: [],
+        },
+      });
+
+      await this.redis.delete(this.getPreviewKey(request.previewId));
+
+      if (
+        shouldStartImportJobImmediately({
+          IMPORT_JOB_WORKER_ENABLED: String(this.importSettings.workerEnabled),
+        })
+      ) {
+        this.enqueueImportJob(job.id);
+      }
+
+      return {
+        jobId: job.id,
+        previewId: snapshot.previewId,
+        submittedCount: job.submittedCount,
+        status: this.toImportJobStatus(job.status),
+      };
+    } finally {
+      await this.redis.releaseLock(lockKey, lockValue).catch(() => false);
     }
-
-    const conflictPolicy = request.conflictPolicy ?? OrderImportConflictPolicyEnum.SKIP;
-    const job = await this.prisma.importJob.create({
-      data: {
-        tenantId,
-        status: PrismaImportJobStatusEnum.PENDING,
-        conflictPolicy: this.toPrismaImportConflictPolicy(conflictPolicy),
-        snapshot: snapshot as unknown as Prisma.InputJsonValue,
-        submittedCount: snapshot.aggregatedOrders.length,
-        processedCount: 0,
-        successCount: 0,
-        skippedCount: 0,
-        overwrittenCount: 0,
-        failedCount: 0,
-        failedRows: [],
-        conflictDetails: [],
-      },
-    });
-
-    if (
-      shouldStartImportJobImmediately({
-        IMPORT_JOB_WORKER_ENABLED: String(this.importSettings.workerEnabled),
-      })
-    ) {
-      this.enqueueImportJob(job.id);
-    }
-
-    return {
-      jobId: job.id,
-      submittedCount: job.submittedCount,
-      status: this.toImportJobStatus(job.status),
-    };
   }
 
   async getImportJob(currentUser: JwtPayload, jobId: string): Promise<OrderImportJobResponse> {
@@ -311,8 +309,14 @@ export class ImportService implements OnModuleInit, OnModuleDestroy {
       throw new NotFoundException('未找到对应的导入任务');
     }
 
+    const snapshot = this.asPreviewSnapshot(job.snapshot);
+    if (!snapshot) {
+      throw new NotFoundException('导入任务缺少可读快照');
+    }
+
     return {
       jobId: job.id,
+      previewId: snapshot.previewId,
       status: this.toImportJobStatus(job.status),
       submittedCount: job.submittedCount,
       processedCount: job.processedCount,
@@ -320,7 +324,7 @@ export class ImportService implements OnModuleInit, OnModuleDestroy {
       skippedCount: job.skippedCount,
       overwrittenCount: job.overwrittenCount,
       failedCount: job.failedCount,
-      failedRows: this.asJobFailures(job.failedRows),
+      failedOrders: this.asJobFailures(job.failedOrders),
       conflictDetails: this.asConflictDetails(job.conflictDetails),
       completedAt: job.completedAt?.toISOString(),
     };
@@ -330,199 +334,243 @@ export class ImportService implements OnModuleInit, OnModuleDestroy {
     tenantId: string,
     request: OrderImportPreviewRequest,
   ): Promise<PreviewSnapshot> {
-    if (!request.rows?.length) {
-      throw new BadRequestException('导入预检至少需要一行原始数据');
+    if (!request.orders?.length) {
+      throw new BadRequestException('导入预检至少需要一张订单');
     }
 
-    const resolved = await this.resolveTemplate(tenantId, request.templateId, request.rows);
-    if (!resolved.template) {
-      const invalidRows = request.rows.map((_, index) => ({
-        row: index + 1,
-        reason: '未命中可用的导入模板，请先选择模板',
-      }));
-      return {
-        tenantId,
-        requiredFieldMissing: [],
-        summary: {
-          totalRows: request.rows.length,
-          validRows: 0,
-          invalidRows: request.rows.length,
-          aggregatedOrderCount: 0,
-          duplicateOrderCount: 0,
-          errorCount: invalidRows.length,
-        },
-        aggregatedOrders: [],
-        duplicateOrders: [],
-        invalidRows,
-      };
-    }
+    const template = this.toTemplate(await this.getScopedTemplate(tenantId, request.templateId));
+    const customerFieldKeySet = new Set(template.customerFields.map((field) => field.key));
+    const invalidErrors: OrderImportPreviewError[] = [];
+    const normalizedOrders: PreparedImportOrder[] = [];
 
-    const template = resolved.template;
-    const requiredFieldMissing = template.fields
-      .filter((field) => field.required)
-      .filter((field) => !template.mappings.some((mapping) => mapping.targetField === field.key))
-      .map((field) => field.key);
-
-    const invalidRows: OrderImportPreviewRowError[] = [];
-    const invalidRowNumbers = new Set<number>();
-    const aggregates = new Map<string, NormalizedImportOrder>();
-
-    request.rows.forEach((row, index) => {
-      const rowNumber = index + 1;
-      const values = this.extractValues(row, template.mappings);
-      const sourceOrderNo = this.readString(values.sourceOrderNo);
-      const customer = this.readString(values.customer);
-
-      template.fields
-        .filter((field) => field.required && !this.hasValue(values[field.key]))
-        .forEach((field) => {
-          invalidRows.push({
-            row: rowNumber,
-            field: field.key,
-            sourceOrderNo,
-            reason: `字段 ${field.key} 为必填项`,
-          });
-          invalidRowNumbers.add(rowNumber);
-        });
-      if (invalidRowNumbers.has(rowNumber)) return;
-
-      if (!sourceOrderNo) {
-        invalidRows.push({ row: rowNumber, field: 'sourceOrderNo', reason: '缺少 sourceOrderNo' });
-        invalidRowNumbers.add(rowNumber);
-        return;
-      }
-      if (!customer) {
-        invalidRows.push({ row: rowNumber, field: 'customer', sourceOrderNo, reason: '缺少 customer' });
-        invalidRowNumbers.add(rowNumber);
+    request.orders.forEach((order, index) => {
+      const prepared = this.normalizePreviewOrder(order, index + 1, template.id, customerFieldKeySet);
+      if ('error' in prepared) {
+        invalidErrors.push(...prepared.error);
         return;
       }
 
-      const lineItem = this.buildLineItem(values, rowNumber, sourceOrderNo);
-      if (!lineItem.ok) {
-        invalidRows.push(lineItem.error);
-        invalidRowNumbers.add(rowNumber);
-        return;
-      }
-
-      this.mergePreviewRow(aggregates, {
-        rowNumber,
-        sourceOrderNo,
-        customer,
-        values,
-        fields: template.fields,
-        templateId: template.id,
-        lineItem: lineItem.value,
-      });
+      normalizedOrders.push(prepared.value);
     });
 
-    const aggregatedOrders = Array.from(aggregates.values()).filter((order) => {
-      if (order.amount <= 0) {
-        order.amount = this.round(order.lineItems.reduce((sum, item) => sum + item.lineAmount, 0));
-      }
-      if (!order.summary) order.summary = buildImportOrderSummary(order.lineItems);
-      order.status = resolveImportOrderStatus(order.status, order.payType, order.paid, order.amount);
+    const batchCountMap = normalizedOrders.reduce<Map<string, number>>((acc, order) => {
+      acc.set(order.sourceOrderNo, (acc.get(order.sourceOrderNo) ?? 0) + 1);
+      return acc;
+    }, new Map());
 
-      if (order.amount <= 0) {
-        order.rowNumbers.forEach((row) => {
-          invalidRows.push({ row, sourceOrderNo: order.sourceOrderNo, reason: '订单金额必须大于 0' });
-          invalidRowNumbers.add(row);
-        });
-        return false;
+    const validOrders = normalizedOrders.filter((order) => {
+      const currentCount = batchCountMap.get(order.sourceOrderNo) ?? 0;
+      if (currentCount <= 1) {
+        return true;
       }
-      return true;
+
+      invalidErrors.push({
+        index: order.index,
+        sourceOrderNo: order.sourceOrderNo,
+        field: 'sourceOrderNo',
+        reason: '当前批次存在重复的源订单号',
+      });
+      return false;
     });
 
     const existingMap = await this.loadExistingOrderMap(
       tenantId,
-      aggregatedOrders.map((item) => item.sourceOrderNo).filter((item): item is string => Boolean(item)),
+      Array.from(new Set(validOrders.map((order) => order.sourceOrderNo))),
     );
-    const duplicateOrders = aggregatedOrders
-      .filter((item) => item.sourceOrderNo && existingMap.has(item.sourceOrderNo))
-      .map((item) => ({
-        sourceOrderNo: item.sourceOrderNo as string,
-        existingOrderId: existingMap.get(item.sourceOrderNo as string),
-        incomingRowCount: item.rowNumbers.length,
-      }));
+
+    const duplicateOrders = validOrders
+      .filter((order) => existingMap.has(order.sourceOrderNo))
+      .map((order) => {
+        const existing = existingMap.get(order.sourceOrderNo)!;
+        return {
+          sourceOrderNo: order.sourceOrderNo,
+          existingOrderId: existing.id,
+          customer: existing.customer,
+          totalAmount: existing.totalAmount,
+          existingStatus: existing.status,
+          incomingCount: batchCountMap.get(order.sourceOrderNo) ?? 1,
+        };
+      });
 
     return {
+      previewId: randomUUID(),
       tenantId,
       templateId: template.id,
-      matchedFieldCount: resolved.matchedFieldCount,
-      requiredFieldMissing,
-      summary: {
-        totalRows: request.rows.length,
-        validRows: request.rows.length - invalidRowNumbers.size,
-        invalidRows: invalidRowNumbers.size,
-        aggregatedOrderCount: aggregatedOrders.length,
-        duplicateOrderCount: duplicateOrders.length,
-        errorCount: invalidRows.length,
-      },
-      aggregatedOrders,
-      duplicateOrders,
-      invalidRows,
+      summary: this.buildPreviewSummary(request.orders.length, validOrders, invalidErrors, duplicateOrders),
+      orders: validOrders,
+      duplicateOrders: this.uniqueDuplicateOrders(duplicateOrders),
+      invalidOrders: invalidErrors,
     };
   }
 
-  private mergePreviewRow(
-    aggregates: Map<string, NormalizedImportOrder>,
-    input: {
-      rowNumber: number;
-      sourceOrderNo: string;
-      customer: string;
-      values: Record<string, unknown>;
-      fields: TemplateField[];
-      templateId: string;
-      lineItem: OrderLineItem;
-    },
-  ): void {
-    const amount = this.readMoney(input.values.amount) ?? 0;
-    const paid = this.readMoney(input.values.paid) ?? 0;
-    const creditDays = this.readInt(input.values.creditDays);
-    const payType = resolveImportPayType(this.readString(input.values.payType), creditDays);
-    const status = resolveImportOrderStatus(
-      this.readString(input.values.status),
-      payType,
-      paid,
-      amount || input.lineItem.lineAmount,
-    );
-    const summary = this.readString(input.values.summary) ?? '';
-    const date = (this.readDate(input.values.date) ?? new Date()).toISOString();
-    const customFieldValues = this.extractCustomValues(input.values, input.fields);
+  private normalizePreviewOrder(
+    order: OrderImportPreviewOrder,
+    index: number,
+    templateId: string,
+    customerFieldKeySet: Set<string>,
+  ): { value: PreparedImportOrder } | { error: OrderImportPreviewError[] } {
+    const errors: OrderImportPreviewError[] = [];
+    const sourceOrderNo = this.readString(order.sourceOrderNo);
+    const customer = this.readString(order.customer);
+    const skuName = this.readString(order.skuName);
+    const groupKey = this.readString(order.groupKey) ?? sourceOrderNo;
+    const lineAmount = this.readMoney(order.lineAmount);
+    const totalAmount = this.readMoney(order.totalAmount);
+    const orderTime = this.readDate(order.orderTime);
 
-    const aggregate = aggregates.get(input.sourceOrderNo);
-    if (!aggregate) {
-      aggregates.set(input.sourceOrderNo, {
-        id: randomUUID(),
-        sourceOrderNo: input.sourceOrderNo,
-        groupKey: this.readString(input.values.groupKey) ?? input.sourceOrderNo,
-        mappingTemplateId: input.templateId,
-        customer: input.customer,
-        summary,
-        amount,
-        paid,
-        status,
-        payType,
-        prints: this.readInt(input.values.prints) ?? 0,
-        date,
-        lineItems: [input.lineItem],
-        customFieldValues: Object.keys(customFieldValues).length ? customFieldValues : undefined,
-        voided: false,
-        creditDays: creditDays ?? undefined,
-        rowNumbers: [input.rowNumber],
-      });
-      return;
+    if (!sourceOrderNo) {
+      errors.push({ index, field: 'sourceOrderNo', reason: '源订单号不能为空' });
+    }
+    if (!customer) {
+      errors.push({ index, sourceOrderNo, field: 'customer', reason: '客户名称不能为空' });
+    }
+    if (!skuName) {
+      errors.push({ index, sourceOrderNo, field: 'skuName', reason: '商品名称不能为空' });
+    }
+    if (lineAmount === undefined) {
+      errors.push({ index, sourceOrderNo, field: 'lineAmount', reason: '行金额不能为空' });
+    } else if (lineAmount.lte(0)) {
+      errors.push({ index, sourceOrderNo, field: 'lineAmount', reason: '行金额必须大于 0' });
+    }
+    if (totalAmount === undefined) {
+      errors.push({ index, sourceOrderNo, field: 'totalAmount', reason: '总金额不能为空' });
+    } else if (totalAmount.lte(0)) {
+      errors.push({ index, sourceOrderNo, field: 'totalAmount', reason: '总金额必须大于 0' });
+    }
+    if (!orderTime) {
+      errors.push({ index, sourceOrderNo, field: 'orderTime', reason: '下单时间格式不正确' });
     }
 
-    aggregate.lineItems.push(input.lineItem);
-    aggregate.rowNumbers.push(input.rowNumber);
-    aggregate.amount = Math.max(aggregate.amount, amount);
-    aggregate.paid = Math.max(aggregate.paid, paid);
-    aggregate.prints = Math.max(aggregate.prints, this.readInt(input.values.prints) ?? 0);
-    if (!aggregate.summary && summary) aggregate.summary = summary;
-    if (!aggregate.customFieldValues && Object.keys(customFieldValues).length) {
-      aggregate.customFieldValues = customFieldValues;
+    const customerValues = this.normalizeCustomerValues(order.customerValues, customerFieldKeySet, index, sourceOrderNo);
+    errors.push(...customerValues.errors);
+
+    const lineItems = this.normalizeLineItems(order.lineItems ?? [], index, sourceOrderNo);
+    errors.push(...lineItems.errors);
+
+    if (errors.length > 0 || !sourceOrderNo || !customer || !skuName || !lineAmount || !totalAmount || !orderTime) {
+      return { error: errors };
     }
-    if (!aggregate.creditDays && creditDays) aggregate.creditDays = creditDays;
+
+    return {
+      value: {
+        index,
+        sourceOrderNo,
+        groupKey,
+        customer,
+        skuName,
+        lineAmount: Number(lineAmount.toFixed(2)),
+        totalAmount: Number(totalAmount.toFixed(2)),
+        orderTime: orderTime.toISOString(),
+        customerValues: customerValues.values,
+        mappingTemplateId: templateId,
+        lineItems: lineItems.values,
+      },
+    };
+  }
+
+  private normalizeCustomerValues(
+    value: Record<string, string> | undefined,
+    customerFieldKeySet: Set<string>,
+    index: number,
+    sourceOrderNo?: string,
+  ): { values: Record<string, string>; errors: OrderImportPreviewError[] } {
+    const errors: OrderImportPreviewError[] = [];
+    if (!value || typeof value !== 'object' || Array.isArray(value)) {
+      return { values: {}, errors };
+    }
+
+    const values = Object.entries(value).reduce<Record<string, string>>((acc, [key, item]) => {
+      const resolved = this.readString(item);
+      if (!customerFieldKeySet.has(key)) {
+        errors.push({
+          index,
+          sourceOrderNo,
+          field: 'customerValues',
+          reason: `自定义字段 key 不存在：${key}`,
+        });
+        return acc;
+      }
+
+      if (resolved) {
+        acc[key] = resolved;
+      }
+      return acc;
+    }, {});
+
+    return { values, errors };
+  }
+
+  private normalizeLineItems(
+    lineItems: OrderLineItem[],
+    index: number,
+    sourceOrderNo?: string,
+  ): { values: OrderLineItem[]; errors: OrderImportPreviewError[] } {
+    const errors: OrderImportPreviewError[] = [];
+    const values: OrderLineItem[] = [];
+
+    lineItems.forEach((item, itemIndex) => {
+      try {
+        values.push(this.normalizeLineItem(item));
+      } catch (error) {
+        errors.push({
+          index,
+          sourceOrderNo,
+          field: `lineItems[${itemIndex}]`,
+          reason: error instanceof Error ? error.message : '订单明细格式不正确',
+        });
+      }
+    });
+
+    return { values, errors };
+  }
+
+  private normalizeLineItem(item: OrderLineItem): OrderLineItem {
+    const quantity = this.toDecimal(item.quantity, 'quantity', 3);
+    const unitPrice = this.toMoney(item.unitPrice, 'unitPrice', true);
+    const lineAmount = this.toMoney(item.lineAmount, 'lineAmount', true);
+    const expected = quantity.mul(unitPrice).toDecimalPlaces(2);
+
+    if (!expected.equals(lineAmount)) {
+      throw new BadRequestException('lineAmount 必须等于 quantity * unitPrice');
+    }
+
+    return {
+      itemId: item.itemId,
+      skuId: item.skuId ?? null,
+      skuName: this.normalizeRequiredText(item.skuName, 'skuName', 200),
+      skuSpec: item.skuSpec?.trim() ? this.cut(item.skuSpec.trim(), 100) : undefined,
+      unit: this.normalizeRequiredText(item.unit, 'unit', 20),
+      quantity: Number(quantity.toFixed(3)),
+      unitPrice: Number(unitPrice.toFixed(2)),
+      lineAmount: Number(lineAmount.toFixed(2)),
+    };
+  }
+
+  private buildPreviewSummary(
+    totalOrders: number,
+    orders: PreparedImportOrder[],
+    invalidOrders: OrderImportPreviewError[],
+    duplicateOrders: OrderImportDuplicateOrder[],
+  ): OrderImportPreviewSummary {
+    const invalidOrderCount = new Set(invalidOrders.map((item) => item.index)).size;
+    return {
+      totalOrders,
+      validOrders: orders.length,
+      invalidOrders: invalidOrderCount,
+      duplicateOrderCount: this.uniqueDuplicateOrders(duplicateOrders).length,
+      errorCount: invalidOrders.length,
+    };
+  }
+
+  private uniqueDuplicateOrders(duplicateOrders: OrderImportDuplicateOrder[]): OrderImportDuplicateOrder[] {
+    const seen = new Set<string>();
+    return duplicateOrders.filter((item) => {
+      if (seen.has(item.sourceOrderNo)) {
+        return false;
+      }
+      seen.add(item.sourceOrderNo);
+      return true;
+    });
   }
 
   private enqueueImportJob(jobId: string): void {
@@ -580,7 +628,11 @@ export class ImportService implements OnModuleInit, OnModuleDestroy {
 
     try {
       const job = await this.prisma.importJob.findUnique({ where: { id: jobId } });
-      if (!job || job.status === PrismaImportJobStatusEnum.COMPLETED || job.status === PrismaImportJobStatusEnum.FAILED) {
+      if (
+        !job ||
+        job.status === PrismaImportJobStatusEnum.COMPLETED ||
+        job.status === PrismaImportJobStatusEnum.FAILED
+      ) {
         return;
       }
 
@@ -626,8 +678,8 @@ export class ImportService implements OnModuleInit, OnModuleDestroy {
   ): Promise<void> {
     let progress = initialProgress;
 
-    for (let index = progress.processedCount; index < snapshot.aggregatedOrders.length; index += 1) {
-      const order = snapshot.aggregatedOrders[index];
+    for (let index = progress.processedCount; index < snapshot.orders.length; index += 1) {
+      const order = snapshot.orders[index];
 
       try {
         progress = await this.prisma.$transaction(async (tx) => {
@@ -663,7 +715,7 @@ export class ImportService implements OnModuleInit, OnModuleDestroy {
   private async applyImportOrder(
     client: Prisma.TransactionClient,
     tenantId: string,
-    order: NormalizedImportOrder,
+    order: PreparedImportOrder,
     conflictPolicy: (typeof OrderImportConflictPolicyEnum)[keyof typeof OrderImportConflictPolicyEnum],
   ): Promise<ImportOrderOutcome> {
     const existing = await this.findExistingOrder(client, tenantId, order.sourceOrderNo);
@@ -696,13 +748,16 @@ export class ImportService implements OnModuleInit, OnModuleDestroy {
       };
     }
 
-    await client.order.create({ data: this.toOrderCreateInput(tenantId, order) });
+    await client.order.create({
+      data: this.toOrderCreateInput(tenantId, order),
+    });
+
     return { type: 'created' };
   }
 
   private nextProgressForOutcome(
     current: ImportJobProgress,
-    order: NormalizedImportOrder,
+    order: PreparedImportOrder,
     outcome: ImportOrderOutcome,
   ): ImportJobProgress {
     const next: ImportJobProgress = {
@@ -710,17 +765,13 @@ export class ImportService implements OnModuleInit, OnModuleDestroy {
       successCount: current.successCount,
       skippedCount: current.skippedCount,
       overwrittenCount: current.overwrittenCount,
-      failedRows: [...current.failedRows],
+      failedOrders: [...current.failedOrders],
       conflictDetails: [...current.conflictDetails],
     };
 
     if (outcome.type === 'created') {
       next.successCount += 1;
       return next;
-    }
-
-    if (!order.sourceOrderNo) {
-      throw new BadRequestException('重复订单处理缺少 sourceOrderNo');
     }
 
     next.conflictDetails.push({
@@ -744,7 +795,7 @@ export class ImportService implements OnModuleInit, OnModuleDestroy {
 
   private nextProgressForFailure(
     current: ImportJobProgress,
-    order: NormalizedImportOrder,
+    order: PreparedImportOrder,
     error: unknown,
   ): ImportJobProgress {
     return {
@@ -752,10 +803,10 @@ export class ImportService implements OnModuleInit, OnModuleDestroy {
       successCount: current.successCount,
       skippedCount: current.skippedCount,
       overwrittenCount: current.overwrittenCount,
-      failedRows: [
-        ...current.failedRows,
+      failedOrders: [
+        ...current.failedOrders,
         {
-          row: order.rowNumbers[0] ?? 0,
+          index: order.index,
           sourceOrderNo: order.sourceOrderNo,
           reason: error instanceof Error ? error.message : '导入处理失败',
         },
@@ -769,7 +820,7 @@ export class ImportService implements OnModuleInit, OnModuleDestroy {
     successCount: number;
     skippedCount: number;
     overwrittenCount: number;
-    failedRows: Prisma.JsonValue | null;
+    failedOrders: Prisma.JsonValue | null;
     conflictDetails: Prisma.JsonValue | null;
   }): ImportJobProgress {
     return {
@@ -777,7 +828,7 @@ export class ImportService implements OnModuleInit, OnModuleDestroy {
       successCount: job.successCount,
       skippedCount: job.skippedCount,
       overwrittenCount: job.overwrittenCount,
-      failedRows: this.asJobFailures(job.failedRows),
+      failedOrders: this.asJobFailures(job.failedOrders),
       conflictDetails: this.asConflictDetails(job.conflictDetails),
     };
   }
@@ -788,8 +839,8 @@ export class ImportService implements OnModuleInit, OnModuleDestroy {
       successCount: progress.successCount,
       skippedCount: progress.skippedCount,
       overwrittenCount: progress.overwrittenCount,
-      failedCount: progress.failedRows.length,
-      failedRows: progress.failedRows as unknown as Prisma.InputJsonValue,
+      failedCount: progress.failedOrders.length,
+      failedOrders: progress.failedOrders as unknown as Prisma.InputJsonValue,
       conflictDetails: progress.conflictDetails as unknown as Prisma.InputJsonValue,
       heartbeatAt: new Date(),
     };
@@ -800,7 +851,7 @@ export class ImportService implements OnModuleInit, OnModuleDestroy {
       successCount: progress.successCount,
       skippedCount: progress.skippedCount,
       overwrittenCount: progress.overwrittenCount,
-      failedCount: progress.failedRows.length,
+      failedCount: progress.failedOrders.length,
     });
   }
 
@@ -816,53 +867,49 @@ export class ImportService implements OnModuleInit, OnModuleDestroy {
     });
   }
 
-  private toOrderCreateInput(tenantId: string, order: NormalizedImportOrder): Prisma.OrderCreateInput {
+  private toOrderCreateInput(
+    tenantId: string,
+    order: PreparedImportOrder,
+  ): Prisma.OrderCreateInput {
     return {
       tenant: { connect: { id: tenantId } },
       sourceOrderNo: order.sourceOrderNo,
       groupKey: order.groupKey,
-      mappingTemplate: order.mappingTemplateId
-        ? { connect: { id: order.mappingTemplateId } }
-        : undefined,
+      mappingTemplate: { connect: { id: order.mappingTemplateId as string } },
       qrCodeToken: this.generateQrCodeToken(),
       customer: this.cut(order.customer, 100),
-      summary: this.cut(order.summary, 255),
-      amount: order.amount,
-      paid: order.paid,
-      customFieldValues: order.customFieldValues
-        ? (order.customFieldValues as unknown as Prisma.InputJsonValue)
-        : undefined,
-      status: this.toPrismaOrderStatus(order.status),
-      payType: this.toPrismaOrderPayType(order.payType),
-      prints: order.prints,
-      creditDays: order.creditDays,
-      creditDueDate: this.toCreditDueDate(order.date, order.creditDays),
-      date: new Date(order.date),
-      voided: order.voided,
-      voidReason: order.voidReason,
-      voidedAt: order.voidedAt ? new Date(order.voidedAt) : undefined,
-      lineItems: { create: order.lineItems.map((item) => this.toLineItemInput(item)) },
+      skuName: this.cut(order.skuName, 255),
+      lineAmount: this.toPrismaDecimal(this.toMoney(order.lineAmount, 'lineAmount', true)),
+      totalAmount: this.toPrismaDecimal(this.toMoney(order.totalAmount, 'totalAmount')),
+      paid: this.toPrismaDecimal(new Decimal(0)),
+      customerValues: order.customerValues as unknown as Prisma.InputJsonValue,
+      status: PrismaOrderStatusEnum.PENDING,
+      payType: PrismaOrderPayTypeEnum.CASH,
+      prints: 0,
+      orderTime: new Date(order.orderTime),
+      voided: false,
+      lineItems: {
+        create: order.lineItems.map((item) => this.toLineItemInput(item)),
+      },
     };
   }
 
-  private toOrderUpdateInput(order: NormalizedImportOrder): Prisma.OrderUpdateInput {
+  private toOrderUpdateInput(order: PreparedImportOrder): Prisma.OrderUpdateInput {
     return {
       groupKey: order.groupKey,
-      mappingTemplate: order.mappingTemplateId
-        ? { connect: { id: order.mappingTemplateId } }
-        : { disconnect: true },
+      mappingTemplate: { connect: { id: order.mappingTemplateId as string } },
       customer: this.cut(order.customer, 100),
-      summary: this.cut(order.summary, 255),
-      amount: order.amount,
-      paid: order.paid,
-      customFieldValues: order.customFieldValues
-        ? (order.customFieldValues as unknown as Prisma.InputJsonValue)
-        : Prisma.JsonNull,
-      status: this.toPrismaOrderStatus(order.status),
-      payType: this.toPrismaOrderPayType(order.payType),
-      creditDays: order.creditDays,
-      creditDueDate: this.toCreditDueDate(order.date, order.creditDays),
-      date: new Date(order.date),
+      skuName: this.cut(order.skuName, 255),
+      lineAmount: this.toPrismaDecimal(this.toMoney(order.lineAmount, 'lineAmount', true)),
+      totalAmount: this.toPrismaDecimal(this.toMoney(order.totalAmount, 'totalAmount')),
+      paid: this.toPrismaDecimal(new Decimal(0)),
+      customerValues: order.customerValues as unknown as Prisma.InputJsonValue,
+      status: PrismaOrderStatusEnum.PENDING,
+      payType: PrismaOrderPayTypeEnum.CASH,
+      orderTime: new Date(order.orderTime),
+      voided: false,
+      voidReason: null,
+      voidedAt: null,
       lineItems: {
         deleteMany: {},
         create: order.lineItems.map((item) => this.toLineItemInput(item)),
@@ -870,128 +917,160 @@ export class ImportService implements OnModuleInit, OnModuleDestroy {
     };
   }
 
-  private toLineItemInput(item: OrderLineItem) {
+  private toLineItemInput(item: OrderLineItem): Prisma.OrderItemCreateWithoutOrderInput {
     return {
       skuId: item.skuId ?? null,
       skuName: this.cut(item.skuName, 200),
       skuSpec: item.skuSpec ? this.cut(item.skuSpec, 100) : undefined,
       unit: this.cut(item.unit, 20),
-      quantity: item.quantity,
-      unitPrice: item.unitPrice,
-      lineAmount: item.lineAmount,
+      quantity: this.toPrismaDecimal(this.toDecimal(item.quantity, 'quantity', 3)),
+      unitPrice: this.toPrismaDecimal(this.toMoney(item.unitPrice, 'unitPrice', true)),
+      lineAmount: this.toPrismaDecimal(this.toMoney(item.lineAmount, 'lineAmount', true)),
     };
   }
 
-  private buildLineItem(values: Record<string, unknown>, row: number, sourceOrderNo: string) {
-    const summary = this.readString(values.summary);
-    const skuName = this.readString(values.skuName) ?? summary;
-    if (!skuName) {
-      return {
-        ok: false as const,
-        error: { row, field: 'skuName', sourceOrderNo, reason: '缺少 skuName' },
-      };
-    }
-
-    const quantity = this.readNumber(values.quantity) ?? 1;
-    const unit = this.readString(values.unit) ?? DEFAULT_UNIT;
-    const unitPrice = this.readMoney(values.unitPrice);
-    const lineAmount =
-      this.readMoney(values.lineAmount) ??
-      (unitPrice !== undefined ? this.round(quantity * unitPrice) : undefined);
-
-    if (lineAmount === undefined) {
-      return {
-        ok: false as const,
-        error: { row, field: 'lineAmount', sourceOrderNo, reason: '缺少 lineAmount 或 unitPrice' },
-      };
-    }
-
+  private toPreviewOrderResult(order: PreparedImportOrder): OrderImportPreviewOrderResult {
     return {
-      ok: true as const,
-      value: {
-        skuId: this.readString(values.skuId) ?? undefined,
-        skuName,
-        skuSpec: this.readString(values.skuSpec) ?? undefined,
-        unit,
-        quantity,
-        unitPrice: unitPrice ?? (quantity === 0 ? 0 : this.round(lineAmount / quantity)),
-        lineAmount,
-      },
+      sourceOrderNo: order.sourceOrderNo,
+      groupKey: order.groupKey,
+      customer: order.customer,
+      skuName: order.skuName,
+      lineAmount: order.lineAmount,
+      totalAmount: order.totalAmount,
+      orderTime: order.orderTime,
+      customerValues: order.customerValues,
+      mappingTemplateId: order.mappingTemplateId,
+      lineItems: order.lineItems,
     };
   }
 
-  private extractValues(row: Record<string, unknown>, mappings: TemplateMapping[]): Record<string, unknown> {
-    return mappings.reduce<Record<string, unknown>>((acc, mapping) => {
-      acc[mapping.targetField] = readImportColumn(row, mapping.sourceColumn);
-      return acc;
-    }, {});
-  }
+  private normalizeTemplatePayload(
+    payload: CreateOrderImportTemplateRequest,
+  ): Pick<OrderImportTemplate, 'name' | 'isDefault' | 'defaultFields' | 'customerFields'> {
+    const name = this.normalizeRequiredText(payload.name, 'name', 100);
+    const defaultFieldMap = new Map<string, OrderImportTemplateField>(
+      (payload.defaultFields ?? []).map((field: OrderImportTemplateField) => [field.key, field]),
+    );
 
-  private extractCustomValues(values: Record<string, unknown>, fields: TemplateField[]): Record<string, string> {
-    return fields.reduce<Record<string, string>>((acc, field) => {
-      if (field.builtin || BUILTIN_KEYS.has(field.key)) return acc;
-      const value = values[field.key];
-      if (this.hasValue(value)) acc[field.key] = String(value).trim();
-      return acc;
-    }, {});
-  }
-
-  private async resolveTemplate(
-    tenantId: string,
-    templateId: string | undefined,
-    rows: Array<Record<string, unknown>>,
-  ): Promise<{ template?: OrderImportTemplate; matchedFieldCount?: number }> {
-    if (templateId) {
-      const template = this.toTemplate(await this.getScopedTemplate(tenantId, templateId));
-      return { template, matchedFieldCount: countMatchedImportFields(rows, template.mappings) };
-    }
-
-    const templates = await this.prisma.importTemplate.findMany({
-      where: { tenantId, deletedAt: null },
-      orderBy: [{ isDefault: 'desc' }, { createdAt: 'asc' }],
+    const defaultFields = DEFAULT_TEMPLATE_FIELDS.map((field) => {
+      const input = defaultFieldMap.get(field.key);
+      const mapStr = this.readString(input?.mapStr);
+      if (!mapStr) {
+        throw new BadRequestException(`${field.label} 的 mapStr 不能为空`);
+      }
+      return {
+        label: field.label,
+        key: field.key,
+        mapStr,
+        isRequired: true,
+      };
     });
 
-    let bestTemplate: OrderImportTemplate | undefined;
-    let bestScore = 0;
-    for (const item of templates) {
-      const template = this.toTemplate(item);
-      const score = countMatchedImportFields(rows, template.mappings);
-      if (score > bestScore) {
-        bestTemplate = template;
-        bestScore = score;
-      }
+    const unexpectedDefaultField = (payload.defaultFields ?? []).find(
+      (field: OrderImportTemplateField) => !DEFAULT_TEMPLATE_FIELDS.some((item) => item.key === field.key),
+    );
+    if (unexpectedDefaultField) {
+      throw new BadRequestException(`默认字段 key 非法：${unexpectedDefaultField.key}`);
     }
 
-    return { template: bestTemplate, matchedFieldCount: bestScore || undefined };
+    const customerFields = (payload.customerFields ?? []).map((field, index): OrderImportTemplateField => {
+      const label = this.normalizeRequiredText(field.label, `customerFields[${index}].label`, 100);
+      const mapStr = this.readString(field.mapStr);
+      if (!mapStr) {
+        throw new BadRequestException(`customerFields[${index}].mapStr 不能为空`);
+      }
+
+      return {
+        label,
+        key: `customerKey${index + 1}`,
+        mapStr,
+        isRequired: false,
+      };
+    });
+
+    this.ensureNoDuplicate(
+      [...defaultFields, ...customerFields].map((field) => field.mapStr),
+      'mapStr',
+    );
+
+    return {
+      name,
+      isDefault: Boolean(payload.isDefault),
+      defaultFields,
+      customerFields,
+    };
   }
 
-  private async loadExistingOrderMap(tenantId: string, sourceOrderNos: string[]): Promise<Map<string, string>> {
-    if (sourceOrderNos.length === 0) return new Map();
+  private ensureNoDuplicate(values: string[], label: string): void {
+    const seen = new Set<string>();
+    for (const value of values) {
+      if (seen.has(value)) {
+        throw new BadRequestException(`${label} 重复：${value}`);
+      }
+      seen.add(value);
+    }
+  }
+
+  private async getScopedTemplate(tenantId: string, templateId: string) {
+    const template = await this.prisma.importTemplate.findFirst({
+      where: { id: templateId, tenantId, deletedAt: null },
+    });
+    if (!template) {
+      throw new NotFoundException('未找到对应的导入模板');
+    }
+    return template;
+  }
+
+  private async loadExistingOrderMap(
+    tenantId: string,
+    sourceOrderNos: string[],
+  ): Promise<Map<string, { id: string; customer: string; totalAmount: number; status: OrderStatus }>> {
+    if (sourceOrderNos.length === 0) {
+      return new Map();
+    }
+
     const existing = await this.prisma.order.findMany({
-      where: { tenantId, sourceOrderNo: { in: sourceOrderNos } },
-      select: { id: true, sourceOrderNo: true },
+      where: { tenantId, sourceOrderNo: { in: sourceOrderNos }, deletedAt: null },
+      select: {
+        id: true,
+        sourceOrderNo: true,
+        customer: true,
+        totalAmount: true,
+        status: true,
+      },
     });
 
     return new Map(
       existing
-        .filter((item): item is { id: string; sourceOrderNo: string } => Boolean(item.sourceOrderNo))
-        .map((item) => [item.sourceOrderNo, item.id]),
+        .filter((item): item is typeof item & { sourceOrderNo: string } => Boolean(item.sourceOrderNo))
+        .map((item) => [
+          item.sourceOrderNo,
+          {
+            id: item.id,
+            customer: item.customer,
+            totalAmount: Number(item.totalAmount.toFixed(2)),
+            status: this.fromPrismaOrderStatus(item.status),
+          },
+        ]),
     );
   }
 
   private async readPreviewSnapshot(tenantId: string, previewId: string): Promise<PreviewSnapshot> {
     const snapshot = await this.redis.getJson<PreviewSnapshot>(this.getPreviewKey(previewId));
-    if (!snapshot) throw new BadRequestException('预检结果不存在或已过期');
-    if (snapshot.tenantId !== tenantId) throw new ForbiddenException('无权使用该预检结果');
+    if (!snapshot) {
+      throw new BadRequestException('预检结果不存在或已过期');
+    }
+    if (snapshot.tenantId !== tenantId) {
+      throw new ForbiddenException('无权使用该预检结果');
+    }
     return snapshot;
   }
 
   private async findExistingOrder(
     client: Prisma.TransactionClient | PrismaService,
     tenantId: string,
-    sourceOrderNo?: string,
+    sourceOrderNo: string,
   ) {
-    if (!sourceOrderNo) return null;
     return client.order.findUnique({
       where: { tenantId_sourceOrderNo: { tenantId, sourceOrderNo } },
       select: { id: true },
@@ -1017,34 +1096,8 @@ export class ImportService implements OnModuleInit, OnModuleDestroy {
         },
       }),
     ]);
+
     return payments > 0 || paymentOrders > 0;
-  }
-
-  private async getScopedTemplate(tenantId: string, templateId: string) {
-    const template = await this.prisma.importTemplate.findFirst({
-      where: { id: templateId, tenantId, deletedAt: null },
-    });
-    if (!template) throw new NotFoundException('未找到对应的导入模板');
-    return template;
-  }
-
-  private validateTemplate(payload: CreateOrderImportTemplateRequest): void {
-    this.ensureNoDuplicate(payload.fields.map((item) => item.key), '字段 key');
-    this.ensureNoDuplicate(payload.sourceColumns.map((item) => item.key), '列 key');
-    this.ensureNoDuplicate(payload.mappings.map((item) => item.targetField), '目标字段映射');
-    const fieldKeys = new Set(payload.fields.map((item) => item.key));
-    const invalidMapping = payload.mappings.find((item) => !fieldKeys.has(item.targetField));
-    if (invalidMapping) {
-      throw new BadRequestException(`映射目标字段不存在：${invalidMapping.targetField}`);
-    }
-  }
-
-  private ensureNoDuplicate(values: string[], label: string): void {
-    const seen = new Set<string>();
-    for (const value of values) {
-      if (seen.has(value)) throw new BadRequestException(`${label}重复：${value}`);
-      seen.add(value);
-    }
   }
 
   private toTemplate(template: {
@@ -1052,53 +1105,21 @@ export class ImportService implements OnModuleInit, OnModuleDestroy {
     name: string;
     isDefault: boolean;
     updatedAt: Date;
-    sourceColumns: Prisma.JsonValue;
-    fields: Prisma.JsonValue;
-    mappings: Prisma.JsonValue;
+    defaultFields: Prisma.JsonValue;
+    customerFields: Prisma.JsonValue;
   }): OrderImportTemplate {
     return {
       id: template.id,
       name: template.name,
       isDefault: template.isDefault,
       updatedAt: template.updatedAt.toISOString(),
-      sourceColumns: this.asSourceColumns(template.sourceColumns),
-      fields: this.asFields(template.fields),
-      mappings: this.asMappings(template.mappings),
+      defaultFields: this.asTemplateFields(template.defaultFields),
+      customerFields: this.asTemplateFields(template.customerFields),
     };
   }
 
-  private toTenantOrder(order: NormalizedImportOrder): TenantOrderItem {
-    return {
-      id: order.id,
-      sourceOrderNo: order.sourceOrderNo,
-      groupKey: order.groupKey,
-      mappingTemplateId: order.mappingTemplateId,
-      customer: order.customer,
-      summary: order.summary,
-      amount: order.amount,
-      paid: order.paid,
-      status: order.status,
-      payType: order.payType,
-      prints: order.prints,
-      date: order.date,
-      lineItems: order.lineItems,
-      customFieldValues: order.customFieldValues,
-      voided: order.voided,
-      voidReason: order.voidReason,
-      voidedAt: order.voidedAt,
-    };
-  }
-
-  private asSourceColumns(value: Prisma.JsonValue): TemplateSourceColumn[] {
-    return Array.isArray(value) ? (value as unknown as TemplateSourceColumn[]) : [];
-  }
-
-  private asFields(value: Prisma.JsonValue): TemplateField[] {
-    return Array.isArray(value) ? (value as unknown as TemplateField[]) : [];
-  }
-
-  private asMappings(value: Prisma.JsonValue): TemplateMapping[] {
-    return Array.isArray(value) ? (value as unknown as TemplateMapping[]) : [];
+  private asTemplateFields(value: Prisma.JsonValue): OrderImportTemplateField[] {
+    return Array.isArray(value) ? (value as unknown as OrderImportTemplateField[]) : [];
   }
 
   private asJobFailures(value: Prisma.JsonValue | null): OrderImportJobFailure[] {
@@ -1109,34 +1130,32 @@ export class ImportService implements OnModuleInit, OnModuleDestroy {
     return Array.isArray(value) ? (value as unknown as OrderImportJobConflictDetail[]) : [];
   }
 
-  private hasValue(value: unknown): boolean {
-    return value !== null && value !== undefined && (typeof value !== 'string' || value.trim().length > 0);
-  }
-
   private readString(value: unknown): string | undefined {
-    return this.hasValue(value) ? String(value).trim() : undefined;
-  }
-
-  private readNumber(value: unknown): number | undefined {
-    if (!this.hasValue(value)) return undefined;
-    const numeric = typeof value === 'number' ? value : Number(String(value).replace(/,/g, '').trim());
-    return Number.isNaN(numeric) ? undefined : numeric;
-  }
-
-  private readInt(value: unknown): number | undefined {
-    const numeric = this.readNumber(value);
-    return numeric === undefined ? undefined : Math.trunc(numeric);
-  }
-
-  private readMoney(value: unknown): number | undefined {
-    const numeric = this.readNumber(value);
-    return numeric === undefined ? undefined : this.round(numeric);
+    if (value === null || value === undefined) {
+      return undefined;
+    }
+    const resolved = String(value).trim();
+    return resolved ? resolved : undefined;
   }
 
   private readDate(value: unknown): Date | undefined {
-    if (!this.hasValue(value)) return undefined;
-    const date = new Date(String(value));
+    const resolved = this.readString(value);
+    if (!resolved) {
+      return undefined;
+    }
+    const date = new Date(resolved);
     return Number.isNaN(date.getTime()) ? undefined : date;
+  }
+
+  private readMoney(value: unknown): Decimal | undefined {
+    if (value === null || value === undefined || value === '') {
+      return undefined;
+    }
+    const numeric = typeof value === 'number' ? value : Number(String(value).replace(/,/g, '').trim());
+    if (!Number.isFinite(numeric)) {
+      return undefined;
+    }
+    return new Decimal(numeric).toDecimalPlaces(2);
   }
 
   private toImportJobStatus(status: PrismaImportJobStatusEnum): OrderImportJobStatus {
@@ -1157,64 +1176,67 @@ export class ImportService implements OnModuleInit, OnModuleDestroy {
   private toPrismaImportConflictPolicy(
     conflictPolicy: (typeof OrderImportConflictPolicyEnum)[keyof typeof OrderImportConflictPolicyEnum],
   ): PrismaImportConflictPolicyEnum {
-    switch (conflictPolicy) {
-      case OrderImportConflictPolicyEnum.OVERWRITE:
-        return PrismaImportConflictPolicyEnum.OVERWRITE;
-      case OrderImportConflictPolicyEnum.SKIP:
-      default:
-        return PrismaImportConflictPolicyEnum.SKIP;
-    }
+    return conflictPolicy === OrderImportConflictPolicyEnum.OVERWRITE
+      ? PrismaImportConflictPolicyEnum.OVERWRITE
+      : PrismaImportConflictPolicyEnum.SKIP;
   }
 
   private toImportConflictPolicy(
     conflictPolicy: PrismaImportConflictPolicyEnum,
   ): (typeof OrderImportConflictPolicyEnum)[keyof typeof OrderImportConflictPolicyEnum] {
-    switch (conflictPolicy) {
-      case PrismaImportConflictPolicyEnum.OVERWRITE:
-        return OrderImportConflictPolicyEnum.OVERWRITE;
-      case PrismaImportConflictPolicyEnum.SKIP:
-      default:
-        return OrderImportConflictPolicyEnum.SKIP;
-    }
+    return conflictPolicy === PrismaImportConflictPolicyEnum.OVERWRITE
+      ? OrderImportConflictPolicyEnum.OVERWRITE
+      : OrderImportConflictPolicyEnum.SKIP;
   }
 
-  private toPrismaOrderStatus(status: OrderStatus): PrismaOrderStatusEnum {
+  private fromPrismaOrderStatus(status: PrismaOrderStatusEnum): OrderStatus {
     switch (status) {
-      case OrderStatusEnum.PENDING:
-        return PrismaOrderStatusEnum.PENDING;
-      case OrderStatusEnum.PARTIAL:
-        return PrismaOrderStatusEnum.PARTIAL;
-      case OrderStatusEnum.PAID:
-        return PrismaOrderStatusEnum.PAID;
-      case OrderStatusEnum.EXPIRED:
-        return PrismaOrderStatusEnum.EXPIRED;
-      case OrderStatusEnum.CREDIT:
-        return PrismaOrderStatusEnum.CREDIT;
+      case PrismaOrderStatusEnum.PARTIAL:
+        return OrderStatusEnum.PARTIAL;
+      case PrismaOrderStatusEnum.PAID:
+        return OrderStatusEnum.PAID;
+      case PrismaOrderStatusEnum.EXPIRED:
+        return OrderStatusEnum.EXPIRED;
+      case PrismaOrderStatusEnum.CREDIT:
+        return OrderStatusEnum.CREDIT;
+      case PrismaOrderStatusEnum.PENDING:
       default:
-        return PrismaOrderStatusEnum.PENDING;
+        return OrderStatusEnum.PENDING;
     }
   }
 
-  private toPrismaOrderPayType(payType: OrderPayType): PrismaOrderPayTypeEnum {
-    switch (payType) {
-      case OrderPayTypeEnum.CREDIT:
-        return PrismaOrderPayTypeEnum.CREDIT;
-      case OrderPayTypeEnum.CASH:
-      default:
-        return PrismaOrderPayTypeEnum.CASH;
+  private toDecimal(
+    value: number,
+    label: string,
+    scale: number,
+    allowZero = false,
+  ): Decimal {
+    if (!Number.isFinite(value)) {
+      throw new BadRequestException(`${label} 必须是合法数字`);
     }
+
+    const decimal = new Decimal(String(value)).toDecimalPlaces(scale);
+    if (allowZero ? decimal.lt(0) : decimal.lte(0)) {
+      throw new BadRequestException(`${label} 必须${allowZero ? '大于等于' : '大于'} 0`);
+    }
+
+    return decimal;
   }
 
-  private toCreditDueDate(date: string, creditDays?: number): Date | undefined {
-    if (!creditDays || creditDays <= 0) return undefined;
-    const base = new Date(date);
-    if (Number.isNaN(base.getTime())) return undefined;
-    base.setDate(base.getDate() + creditDays);
-    return base;
+  private toMoney(value: number, label: string, allowZero = false): Decimal {
+    return this.toDecimal(value, label, 2, allowZero);
   }
 
-  private round(value: number): number {
-    return Number(value.toFixed(2));
+  private toPrismaDecimal(value: Decimal): Prisma.Decimal {
+    return new Prisma.Decimal(value.toString());
+  }
+
+  private normalizeRequiredText(value: string, label: string, max: number): string {
+    const trimmed = value.trim();
+    if (!trimmed) {
+      throw new BadRequestException(`${label} 不能为空`);
+    }
+    return this.cut(trimmed, max);
   }
 
   private cut(value: string, max: number): string {
@@ -1233,6 +1255,10 @@ export class ImportService implements OnModuleInit, OnModuleDestroy {
 
   private getPreviewKey(previewId: string): string {
     return `import:preview:${previewId}`;
+  }
+
+  private getPreviewConsumeLockKey(previewId: string): string {
+    return `import:preview:consume:${previewId}`;
   }
 
   private getImportJobLockKey(jobId: string): string {

@@ -46,11 +46,14 @@ export class TenantOrderItemSwagger {
   @ApiProperty({ description: '客户名称', example: '深圳华强贸易' })
   customer!: string;
 
-  @ApiProperty({ description: '商品摘要', example: '农夫山泉 550ml、康师傅冰红茶 等 4 项' })
-  summary!: string;
+  @ApiProperty({ description: '主商品名称', example: '农夫山泉 550ml' })
+  skuName!: string;
 
-  @ApiProperty({ description: '订单金额（元）', example: 198.5 })
-  amount!: number;
+  @ApiProperty({ description: '主展示行金额（元）', example: 48 })
+  lineAmount!: number;
+
+  @ApiProperty({ description: '订单总金额（元）', example: 198.5 })
+  totalAmount!: number;
 
   @ApiProperty({ description: '已收金额（元）', example: 100 })
   paid!: number;
@@ -65,7 +68,7 @@ export class TenantOrderItemSwagger {
   prints!: number;
 
   @ApiProperty({ description: '下单时间', example: '2026-04-10T12:00:00.000Z' })
-  date!: string;
+  orderTime!: string;
 
   @ApiProperty({ description: '订单明细', type: [OrderLineItemSwagger] })
   lineItems!: OrderLineItemSwagger[];
@@ -76,7 +79,7 @@ export class TenantOrderItemSwagger {
     additionalProperties: { type: 'string' },
     example: { customerCode: 'C-001', deliveryRoute: 'A区' },
   })
-  customFieldValues?: Record<string, string>;
+  customerValues?: Record<string, string>;
 
   @ApiProperty({ description: '是否已作废', example: false })
   voided!: boolean;
@@ -110,6 +113,15 @@ export class AdminOrderItemSwagger {
   @ApiProperty({ description: '客户名称', example: '深圳华强贸易' })
   customer!: string;
 
+  @ApiProperty({ description: '主商品名称', example: '农夫山泉 550ml' })
+  skuName!: string;
+
+  @ApiProperty({ description: '主展示行金额（元）', example: 48 })
+  lineAmount!: number;
+
+  @ApiProperty({ description: '订单总金额（元）', example: 198.5 })
+  totalAmount!: number;
+
   @ApiProperty({ description: '订单明细', type: [OrderLineItemSwagger] })
   lineItems!: OrderLineItemSwagger[];
 
@@ -119,10 +131,7 @@ export class AdminOrderItemSwagger {
     additionalProperties: { type: 'string' },
     example: { customerCode: 'C-001', deliveryRoute: 'A区' },
   })
-  customFieldValues?: Record<string, string>;
-
-  @ApiProperty({ description: '订单金额（元）', example: 198.5 })
-  amount!: number;
+  customerValues?: Record<string, string>;
 
   @ApiProperty({ description: '已收金额（元）', example: 100 })
   paid!: number;
@@ -134,7 +143,7 @@ export class AdminOrderItemSwagger {
   payType!: string;
 
   @ApiProperty({ description: '下单时间', example: '2026-04-10T12:00:00.000Z' })
-  date!: string;
+  orderTime!: string;
 
   @ApiProperty({ description: '是否已作废', example: false })
   voided!: boolean;
