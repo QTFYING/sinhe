@@ -50,7 +50,7 @@
 
 1. `POST /auth/login`
 2. `POST /auth/refresh`
-3. `GET /auth/profile`
+3. `GET /auth/me`
 4. `POST /auth/logout`
 
 核对点：
@@ -66,8 +66,8 @@
 
 1. `GET /import/templates`
 2. `POST /import/preview`
-3. `POST /import/jobs`
-4. `GET /import/jobs/{jobId}`
+3. `POST /orders/import`
+4. `GET /orders/import/jobs/{jobId}`
 
 核对点：
 
@@ -101,12 +101,12 @@
 
 接口序列：
 
-1. `GET /payments/{token}`
-2. `POST /payments/{token}/initiate`
-3. `GET /payments/{token}/status`
-4. `POST /payments/{token}/offline`
-5. `POST /payments/{token}/callbacks/lakala`
-6. `POST /tenant/payments/cash-verifications/{orderId}`
+1. `GET /pay/{token}`
+2. `POST /pay/{token}/initiate`
+3. `GET /pay/{token}/status`
+4. `POST /pay/{token}/offline-payment`
+5. `POST /payment/webhook/lakala`
+6. `POST /orders/{id}/cash-verifications`
 
 核对点：
 
@@ -185,7 +185,7 @@
 ## 2026-04-11 第 1 轮联调
 
 - 环境：dev-local
-- 接口：POST /payments/{token}/offline
+- 接口：POST /pay/{token}/offline-payment
 - 结果：通过
 - 备注：现金登记后状态正确进入 pending_verification
 ```

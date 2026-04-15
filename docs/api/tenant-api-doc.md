@@ -464,8 +464,77 @@ interface TenantOrder {
 
 ```typescript
 {
-  templateId?: string                    // 选定的模板 ID；不传时允许服务端按列头尝试匹配
-  rows: Array<Record<string, unknown>>   // 浏览器端解析后的原始行数据
+  templateId?: string                    // 选定的模板 ID；强烈建议显式传入，避免服务端自动匹配到非预期模板
+  rows: Array<{
+    [sourceColumn: string]: string | number | null | undefined
+    // 注意：
+    // 1. 每个 key 必须是当前模板 mappings[].sourceColumn 对应的“原始列头”，不是 targetField
+    // 2. 例如模板把 "商品名称" -> skuName，则此处必须传 { "商品名称": "..." }，不能传 { skuName: "..." }
+    // 3. 每个对象代表 Excel 的一行原始记录，前端不要先按订单聚合
+  }>
+}
+```
+
+**服务端硬性要求：**
+
+1. 当前模板必须至少把以下目标字段映射出来，否则预检必失败：
+   - `sourceOrderNo`：源订单号，缺失时返回 `缺少 sourceOrderNo`
+   - `customer`：客户名称，缺失时返回 `缺少 customer`
+   - `skuName` 或 `summary`：二选一至少能映射出一个；若两者都没有，返回 `缺少 skuName`
+   - `lineAmount` 或 `unitPrice`：二选一至少能映射出一个；若两者都没有，返回 `缺少 lineAmount 或 unitPrice`
+2. 若当前模板的 `fields[].required=true`，则对应 `targetField` 也必须能从 `rows` 中映射出来；否则返回 `字段 xxx 为必填项`
+3. `rows` 中的 key 是否命中，按列头文本匹配；服务端会忽略大小写并去掉首尾空格及中间空白差异，但不会自动把中文列头翻译成英文字段名
+
+**推荐最小映射：**
+
+| 目标字段 `targetField` | 是否建议必配 | 说明 |
+|---|---|---|
+| `sourceOrderNo` | 是 | 用于按源订单号聚合、查重和正式导入 |
+| `customer` | 是 | 客户名称 |
+| `skuName` | 是 | 商品名称；若模板不配此字段，则至少要映射 `summary` |
+| `lineAmount` | 是 | 行金额；若模板不配此字段，则至少要映射 `unitPrice` |
+| `date` | 否 | 下单时间；不传时服务端默认取当前时间 |
+| `quantity` | 否 | 数量；不传时默认 `1` |
+| `unit` | 否 | 单位；不传时默认 `件` |
+| `paid` | 否 | 已收金额；不传时默认 `0` |
+| `payType` | 否 | 付款方式；支持 `cash` / `credit` |
+
+**单行结构示例（按模板原始列头传值）：**
+
+```typescript
+{
+  单据: 'XD260331000014',
+  客户名称: '客运技校超市',
+  商品名称: '500mL茶π蜜桃乌龙茶15入纸箱',
+  下单金额: 57,
+  小单位价格: 3.8,
+  单据时间: '2026-03-31 15:43:45'
+}
+```
+
+**完整请求示例：**
+
+```json
+{
+  "templateId": "1c1d1b0e-23f7-4102-8654-aebe221e5ae2",
+  "rows": [
+    {
+      "单据": "XD260331000014",
+      "客户名称": "客运技校超市",
+      "商品名称": "500mL茶π蜜桃乌龙茶15入纸箱",
+      "下单金额": 57,
+      "小单位价格": 3.8,
+      "单据时间": "2026-03-31 15:43:45"
+    },
+    {
+      "单据": "XD260331000014",
+      "客户名称": "客运技校超市",
+      "商品名称": "550mL美汁源果粒橙15入纸箱",
+      "下单金额": 46,
+      "小单位价格": 3.8,
+      "单据时间": "2026-03-31 15:43:45"
+    }
+  ]
 }
 ```
 
@@ -545,7 +614,10 @@ interface TenantOrder {
   previewId?: string                      // 若已完成预检，优先传该标识，服务端按该批次结果正式导入
   templateId?: string                     // 未传 previewId 时，用于说明本次导入使用的模板
   conflictPolicy?: OrderImportConflictPolicy // 针对 duplicateOrders 采取的策略，默认 'skip'
-  rows?: Array<Record<string, unknown>>   // 未传 previewId 时，可直接提交前端解析后的原始行数据
+  rows?: Array<{
+    [sourceColumn: string]: string | number | null | undefined
+    // 结构与 `POST /import/preview` 的 rows 完全一致
+  }>
 }
 ```
 
