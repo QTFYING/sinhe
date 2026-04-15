@@ -167,16 +167,17 @@
   mappingTemplateId: string | null // 绑定的导入模板 ID
   qrCodeToken: string       // 订单级 H5 公开路由标识，送货单二维码直接使用
   customer: string          // 客户名称
-  summary: string           // 商品摘要
-  amount: number            // 订单金额（元）
+  skuName: string           // 主商品名称
+  lineAmount: number        // 主展示行金额（元）
+  totalAmount: number       // 订单总金额（元）
   paid: number              // 已收金额（元）
-  customFieldValues: any    // JSON: 动态模板映射的自定义字段
+  customerValues: any       // JSON: 动态模板映射的自定义字段
   status: OrderStatus         // 订单收款状态
   payType: OrderPayType    // 付款方式
   prints: number            // 打印次数
   creditDays: number | null // 账期天数
   creditDueDate: string | null // 账期到期日
-  date: string              // 订单日期
+  orderTime: string         // 下单时间
   voided: boolean           // 是否已作废
   voidReason: string | null // 作废原因
   voidedAt: string | null   // 作废时间
@@ -213,9 +214,8 @@
   tenantId: string          // 关联租户 ID
   name: string              // 模板名称
   isDefault: boolean        // 是否默认模板
-  sourceColumns: any        // JSON: Excel 表头读取快照数组
-  fields: any               // JSON: 靶点骨架定义数组
-  mappings: any             // JSON: 映射连线关系数组
+  defaultFields: any        // JSON: 系统默认字段映射数组
+  customerFields: any       // JSON: 租户自定义字段映射数组
   createdAt: string         // 创建时间
   updatedAt: string         // 更新时间
 }
@@ -236,7 +236,7 @@
   skippedCount: number      // 跳过数量
   overwrittenCount: number  // 覆盖更新数量
   failedCount: number       // 失败数量
-  failedRows: any           // JSON: 行级报错日志
+  failedOrders: any         // JSON: 失败订单日志
   conflictDetails: any      // JSON: 重复冲突判定策略与结果追溯
   startedAt: string | null  // 开始执行时间
   heartbeatAt: string | null // 最近心跳时间，用于识别卡死任务

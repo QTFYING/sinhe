@@ -5,7 +5,6 @@ import type {
   OrderImportJobStatus,
   OrderPayType,
   OrderStatus,
-  OrderTemplateFieldType,
 } from '../enums'
 
 export interface OrderLineItem {
@@ -26,15 +25,16 @@ export interface TenantOrderItem {
   mappingTemplateId?: string
   qrCodeToken?: string
   customer: string
-  summary: string
-  amount: number
+  skuName: string
+  lineAmount: number
+  totalAmount: number
   paid: number
   status: OrderStatus
   payType: OrderPayType
   prints: number
-  date: string
+  orderTime: string
   lineItems: OrderLineItem[]
-  customFieldValues?: Record<string, string>
+  customerValues?: Record<string, string>
   voided: boolean
   voidReason?: string
   voidedAt?: string
@@ -48,13 +48,15 @@ export interface AdminOrderItem {
   mappingTemplateId?: string
   qrCodeToken?: string
   customer: string
-  lineItems: OrderLineItem[]
-  customFieldValues?: Record<string, string>
-  amount: number
+  skuName: string
+  lineAmount: number
+  totalAmount: number
   paid: number
   status: OrderStatus
   payType: OrderPayType
-  date: string
+  orderTime: string
+  lineItems: OrderLineItem[]
+  customerValues?: Record<string, string>
   voided: boolean
   voidReason?: string
   voidedAt?: string
@@ -101,27 +103,16 @@ export interface VoidOrderRequest {
   voidReason: string
 }
 
-export interface OrderImportMapping {
-  sourceColumn: string
-  targetField: string
-  sampleValue?: string
-}
-
-export interface OrderImportSourceColumn {
-  key: string
-  title: string
-  index: number
-  sampleValue?: string
-}
-
 export interface OrderImportTemplateField {
-  key: string
   label: string
-  fieldType: OrderTemplateFieldType
-  required: boolean
-  visible: boolean
-  order: number
-  builtin?: boolean
+  key: string
+  mapStr: string
+  isRequired: boolean
+}
+
+export interface OrderImportCustomerFieldRequest {
+  label: string
+  mapStr: string
 }
 
 export interface OrderImportTemplate {
@@ -129,38 +120,59 @@ export interface OrderImportTemplate {
   name: string
   isDefault: boolean
   updatedAt: string
-  sourceColumns: OrderImportSourceColumn[]
-  fields: OrderImportTemplateField[]
-  mappings: OrderImportMapping[]
+  defaultFields: OrderImportTemplateField[]
+  customerFields: OrderImportTemplateField[]
 }
 
 export interface CreateOrderImportTemplateRequest {
   name: string
   isDefault: boolean
-  sourceColumns: OrderImportSourceColumn[]
-  fields: OrderImportTemplateField[]
-  mappings: OrderImportMapping[]
+  defaultFields: OrderImportTemplateField[]
+  customerFields: OrderImportCustomerFieldRequest[]
 }
 
 export interface UpdateOrderImportTemplateRequest {
   name?: string
   isDefault?: boolean
-  sourceColumns?: OrderImportSourceColumn[]
-  fields?: OrderImportTemplateField[]
-  mappings?: OrderImportMapping[]
+  defaultFields?: OrderImportTemplateField[]
+  customerFields?: OrderImportCustomerFieldRequest[]
+}
+
+export interface OrderImportPreviewOrder {
+  sourceOrderNo: string
+  groupKey?: string
+  customer: string
+  skuName: string
+  lineAmount: number | string
+  totalAmount: number | string
+  orderTime: string
+  customerValues: Record<string, string>
+  lineItems: OrderLineItem[]
+}
+
+export interface OrderImportPreviewOrderResult {
+  sourceOrderNo: string
+  groupKey?: string
+  customer: string
+  skuName: string
+  lineAmount: number
+  totalAmount: number
+  orderTime: string
+  customerValues: Record<string, string>
+  mappingTemplateId?: string
+  lineItems: OrderLineItem[]
 }
 
 export interface OrderImportPreviewSummary {
-  totalRows: number
-  validRows: number
-  invalidRows: number
-  aggregatedOrderCount: number
+  totalOrders: number
+  validOrders: number
+  invalidOrders: number
   duplicateOrderCount: number
   errorCount: number
 }
 
-export interface OrderImportPreviewRowError {
-  row: number
+export interface OrderImportPreviewError {
+  index: number
   field?: string
   sourceOrderNo?: string
   reason: string
@@ -170,42 +182,39 @@ export interface OrderImportDuplicateOrder {
   sourceOrderNo: string
   existingOrderId?: string
   customer?: string
-  amount?: number
+  totalAmount?: number
   existingStatus?: OrderStatus
-  incomingRowCount: number
+  incomingCount: number
 }
 
 export interface OrderImportPreviewRequest {
-  templateId?: string
-  rows: Array<Record<string, unknown>>
+  templateId: string
+  orders: OrderImportPreviewOrder[]
 }
 
 export interface OrderImportPreviewResponse {
   previewId: string
-  templateId?: string
-  matchedFieldCount?: number
-  requiredFieldMissing: string[]
+  templateId: string
   summary: OrderImportPreviewSummary
-  aggregatedOrders: TenantOrderItem[]
+  orders: OrderImportPreviewOrderResult[]
   duplicateOrders: OrderImportDuplicateOrder[]
-  invalidRows: OrderImportPreviewRowError[]
+  invalidOrders: OrderImportPreviewError[]
 }
 
 export interface OrderImportSubmitRequest {
-  previewId?: string
-  templateId?: string
+  previewId: string
   conflictPolicy?: OrderImportConflictPolicy
-  rows?: Array<Record<string, unknown>>
 }
 
 export interface OrderImportSubmitResponse {
   jobId: string
+  previewId: string
   submittedCount: number
   status: OrderImportJobStatus
 }
 
 export interface OrderImportJobFailure {
-  row: number
+  index?: number
   sourceOrderNo?: string
   reason: string
 }
@@ -219,6 +228,7 @@ export interface OrderImportJobConflictDetail {
 
 export interface OrderImportJobResponse {
   jobId: string
+  previewId: string
   status: OrderImportJobStatus
   submittedCount: number
   processedCount: number
@@ -226,7 +236,7 @@ export interface OrderImportJobResponse {
   skippedCount: number
   overwrittenCount: number
   failedCount: number
-  failedRows: OrderImportJobFailure[]
+  failedOrders: OrderImportJobFailure[]
   conflictDetails: OrderImportJobConflictDetail[]
   completedAt?: string
 }
