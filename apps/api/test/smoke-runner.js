@@ -182,28 +182,28 @@ run('账期状态推导覆盖逾期、当天、临近与正常场景', () => {
 run('支付状态推导覆盖已作废、已支付、待支付与待核销场景', () => {
   assert.equal(
     resolvePaymentOrderStatus(
-      { status: PrismaOrderStatusEnum.EXPIRED, voided: false, amount: '100', paid: '0' },
+      { status: PrismaOrderStatusEnum.EXPIRED, voided: false, totalAmount: '100', paid: '0' },
       null,
     ),
     PaymentOrderStatusEnum.EXPIRED,
   );
   assert.equal(
     resolvePaymentOrderStatus(
-      { status: PrismaOrderStatusEnum.PAID, voided: false, amount: '100', paid: '100' },
+      { status: PrismaOrderStatusEnum.PAID, voided: false, totalAmount: '100', paid: '100' },
       null,
     ),
     PaymentOrderStatusEnum.PAID,
   );
   assert.equal(
     resolvePaymentOrderStatus(
-      { status: PrismaOrderStatusEnum.PENDING, voided: false, amount: '100', paid: '0' },
+      { status: PrismaOrderStatusEnum.PENDING, voided: false, totalAmount: '100', paid: '0' },
       null,
     ),
     PaymentOrderStatusEnum.UNPAID,
   );
   assert.equal(
     resolvePaymentOrderStatus(
-      { status: PrismaOrderStatusEnum.PENDING, voided: false, amount: '100', paid: '0' },
+      { status: PrismaOrderStatusEnum.PENDING, voided: false, totalAmount: '100', paid: '0' },
       { status: PrismaPaymentOrderStatusEnum.PENDING_VERIFICATION },
     ),
     PaymentOrderStatusEnum.PENDING_VERIFICATION,

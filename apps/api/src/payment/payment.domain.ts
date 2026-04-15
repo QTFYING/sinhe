@@ -28,14 +28,14 @@ export function resolvePaymentOrderStatus(
   order: {
     status: PrismaOrderStatusEnum;
     voided: boolean;
-    amount: Prisma.Decimal | Decimal.Value;
+    totalAmount: Prisma.Decimal | Decimal.Value;
     paid: Prisma.Decimal | Decimal.Value;
   },
   paymentOrder: {
     status: PrismaPaymentOrderStatusEnum;
   } | null,
 ): PaymentOrderStatus {
-  const amountDecimal = new Decimal(order.amount.toString());
+  const amountDecimal = new Decimal(order.totalAmount.toString());
   const paidDecimal = new Decimal(order.paid.toString());
 
   if (order.voided || order.status === PrismaOrderStatusEnum.EXPIRED) {

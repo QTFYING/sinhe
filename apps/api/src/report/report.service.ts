@@ -25,9 +25,9 @@ export class ReportService {
         where: {
           tenantId,
           deletedAt: null,
-          date: { gte: start.toDate(), lte: end.toDate() },
+          orderTime: { gte: start.toDate(), lte: end.toDate() },
         },
-        select: { date: true, amount: true },
+        select: { orderTime: true, totalAmount: true },
       }),
       this.prisma.payment.findMany({
         where: {
@@ -41,8 +41,8 @@ export class ReportService {
     return Array.from({ length: 7 }, (_, index) => {
       const current = start.add(index, 'day');
       const receivableAmount = orders
-        .filter((item) => dayjs(item.date).isSame(current, 'day'))
-        .reduce((sum, item) => sum.plus(item.amount.toString()), new Decimal(0));
+        .filter((item) => dayjs(item.orderTime).isSame(current, 'day'))
+        .reduce((sum, item) => sum.plus(item.totalAmount.toString()), new Decimal(0));
       const receivedAmount = payments
         .filter((item) => dayjs(item.paidAt).isSame(current, 'day'))
         .reduce((sum, item) => sum.plus(item.amount.toString()), new Decimal(0));
@@ -66,9 +66,9 @@ export class ReportService {
         where: {
           tenantId,
           deletedAt: null,
-          date: { gte: start.toDate(), lte: end.toDate() },
+          orderTime: { gte: start.toDate(), lte: end.toDate() },
         },
-        select: { date: true, amount: true },
+        select: { orderTime: true, totalAmount: true },
       }),
       this.prisma.payment.findMany({
         where: {
@@ -82,8 +82,8 @@ export class ReportService {
     return Array.from({ length: monthCount }, (_, index) => {
       const current = start.add(index, 'month');
       const receivableAmount = orders
-        .filter((item) => dayjs(item.date).isSame(current, 'month'))
-        .reduce((sum, item) => sum.plus(item.amount.toString()), new Decimal(0));
+        .filter((item) => dayjs(item.orderTime).isSame(current, 'month'))
+        .reduce((sum, item) => sum.plus(item.totalAmount.toString()), new Decimal(0));
       const receivedAmount = payments
         .filter((item) => dayjs(item.paidAt).isSame(current, 'month'))
         .reduce((sum, item) => sum.plus(item.amount.toString()), new Decimal(0));
@@ -135,9 +135,9 @@ export class ReportService {
           where: {
             tenantId,
             deletedAt: null,
-            date: { gte: todayStart.toDate(), lte: todayEnd.toDate() },
+            orderTime: { gte: todayStart.toDate(), lte: todayEnd.toDate() },
           },
-          select: { amount: true },
+          select: { totalAmount: true },
         }),
         this.prisma.payment.findMany({
           where: {
@@ -176,7 +176,7 @@ export class ReportService {
       ]);
 
     const todayReceivable = todayOrders.reduce(
-      (sum, item) => sum.plus(item.amount.toString()),
+      (sum, item) => sum.plus(item.totalAmount.toString()),
       new Decimal(0),
     );
     const todayReceived = todayPayments.reduce(

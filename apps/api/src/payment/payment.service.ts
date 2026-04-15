@@ -85,10 +85,10 @@ export class PaymentService {
       orderNo: order.id,
       merchant: order.tenant.generalSettings?.companyName || order.tenant.name,
       customer: order.customer,
-      amount: this.toMoneyNumber(order.amount),
+      amount: this.toMoneyNumber(order.totalAmount),
       paidAmount: this.toMoneyNumber(order.paid),
-      summary: order.summary,
-      date: order.date.toISOString(),
+      summary: order.skuName,
+      date: order.orderTime.toISOString(),
       status,
       statusMessage: currentPaymentOrder?.statusMessage ?? undefined,
       servicePhone: order.tenant.generalSettings?.contactPhone || order.tenant.contactPhone,
@@ -630,7 +630,7 @@ export class PaymentService {
       id: string;
       tenantId: string;
       customer: string;
-      amount: Prisma.Decimal;
+      totalAmount: Prisma.Decimal;
       paid: Prisma.Decimal;
       payType: PrismaOrderPayTypeEnum;
     },
@@ -662,7 +662,7 @@ export class PaymentService {
     tx: Prisma.TransactionClient,
     order: {
       id: string;
-      amount: Prisma.Decimal;
+      totalAmount: Prisma.Decimal;
       paid: Prisma.Decimal;
       payType: PrismaOrderPayTypeEnum;
     },
@@ -671,7 +671,7 @@ export class PaymentService {
     const newPaid = this.decimal(order.paid).plus(delta);
     const nextStatus = this.deriveOrderStatus(
       this.fromPrismaOrderPayType(order.payType),
-      this.decimal(order.amount),
+      this.decimal(order.totalAmount),
       newPaid,
     );
 
@@ -684,8 +684,8 @@ export class PaymentService {
     });
   }
 
-  private getRemainingAmount(order: { amount: Prisma.Decimal; paid: Prisma.Decimal }): Decimal {
-    return this.decimal(order.amount).minus(this.decimal(order.paid));
+  private getRemainingAmount(order: { totalAmount: Prisma.Decimal; paid: Prisma.Decimal }): Decimal {
+    return this.decimal(order.totalAmount).minus(this.decimal(order.paid));
   }
 
   private async getAdminPayments(

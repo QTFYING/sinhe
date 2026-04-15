@@ -25,7 +25,7 @@ export class FinanceService {
     const [orderAggregate, paymentAggregate, paymentCount, creditOrderCount] = await Promise.all([
       this.prisma.order.aggregate({
         where: { tenantId, deletedAt: null, voided: false },
-        _sum: { amount: true },
+        _sum: { totalAmount: true },
         _count: { _all: true },
       }),
       this.prisma.payment.aggregate({
@@ -38,7 +38,7 @@ export class FinanceService {
       }),
     ]);
 
-    const totalReceivable = this.money(orderAggregate._sum.amount ?? 0);
+    const totalReceivable = this.money(orderAggregate._sum.totalAmount ?? 0);
     const totalReceived = this.money(paymentAggregate._sum.amount ?? 0);
     const totalFee = this.money(paymentAggregate._sum.fee ?? 0);
     const totalNet = this.money(paymentAggregate._sum.net ?? 0);
@@ -79,7 +79,7 @@ export class FinanceService {
       list: records.map((item) => ({
         orderId: item.orderId,
         customer: item.customer,
-        amount: this.money(item.order.amount),
+        amount: this.money(item.order.totalAmount),
         net: this.money(item.net),
         fee: this.money(item.fee),
         channel: item.channel,
@@ -118,8 +118,8 @@ export class FinanceService {
 
     const [orders, payments] = await Promise.all([
       this.prisma.order.findMany({
-        where: { deletedAt: null, voided: false, date: { gte: monthStart, lte: monthEnd } },
-        select: { amount: true, paid: true, status: true },
+        where: { deletedAt: null, voided: false, orderTime: { gte: monthStart, lte: monthEnd } },
+        select: { totalAmount: true, paid: true, status: true },
       }),
       this.prisma.payment.findMany({
         where: { paidAt: { gte: monthStart, lte: monthEnd } },
@@ -127,16 +127,16 @@ export class FinanceService {
       }),
     ]);
 
-    const totalReceivable = orders.reduce((sum, item) => sum.plus(item.amount.toString()), new Decimal(0));
+    const totalReceivable = orders.reduce((sum, item) => sum.plus(item.totalAmount.toString()), new Decimal(0));
     const totalReceived = payments.reduce((sum, item) => sum.plus(item.amount.toString()), new Decimal(0));
     const totalPending = orders.reduce(
-      (sum, item) => sum.plus(Decimal.max(new Decimal(item.amount.toString()).minus(item.paid.toString()), 0)),
+      (sum, item) => sum.plus(Decimal.max(new Decimal(item.totalAmount.toString()).minus(item.paid.toString()), 0)),
       new Decimal(0),
     );
     const totalOverdue = orders
       .filter((item) => item.status === PrismaOrderStatusEnum.EXPIRED)
       .reduce(
-        (sum, item) => sum.plus(Decimal.max(new Decimal(item.amount.toString()).minus(item.paid.toString()), 0)),
+        (sum, item) => sum.plus(Decimal.max(new Decimal(item.totalAmount.toString()).minus(item.paid.toString()), 0)),
         new Decimal(0),
       );
 
@@ -158,15 +158,15 @@ export class FinanceService {
     const orders = await this.prisma.order.findMany({
       where: { deletedAt: null, voided: false },
       include: { tenant: true },
-      orderBy: [{ date: 'desc' }],
+      orderBy: [{ orderTime: 'desc' }],
     });
 
     const grouped = new Map<string, AdminReconciliationDailyRecordItem>();
     for (const order of orders) {
-      const date = dayjs(order.date).format('YYYY-MM-DD');
+      const date = dayjs(order.orderTime).format('YYYY-MM-DD');
       const tenantName = order.tenant.name;
       const key = `${date}:${tenantName}`;
-      const amount = new Decimal(order.amount.toString());
+      const amount = new Decimal(order.totalAmount.toString());
       const paid = new Decimal(order.paid.toString());
       const pending = Decimal.max(amount.minus(paid), 0);
       const current = grouped.get(key) ?? {
