@@ -9,7 +9,7 @@
 
 1. [通用约定](#一通用约定)
 2. [认证模块 Auth](#二认证模块-auth4-个端点)
-3. [订单模块 Orders](#三订单模块-orders13-个端点)
+3. [订单模块 Orders](#三订单模块-orders14-个端点)
 4. [支付与核销 Payment](#四支付与核销-payment3-个端点)
 5. [财务对账 Finance](#五财务对账-finance3-个端点)
 6. [账期管理 Credit](#六账期管理-credit2-个端点)
@@ -149,11 +149,12 @@ type AuthSourceTag = 'mock' | 'remote'
 
 ---
 
-## 三、订单模块 Orders（13 个端点）
+## 三、订单模块 Orders（14 个端点）
 
 > 源码：`features/orders/` + `@shou/shared/api/modules/order`
 > 后端自动按当前用户的 tenantId 过滤，仅返回本租户数据。
 > 订单创建与正式导入成功时，服务端同步生成 `orders.qrCodeToken`，供前端在送货单上渲染 `/pay/:token` 二维码。
+> 本轮文档以“默认模板 -> 租户模板 -> 预检 -> 正式导入 -> 导入任务 -> 订单查询”的新闭环为准；预检同步执行，正式导入异步执行。
 
 ### 类型定义
 
@@ -166,25 +167,56 @@ type OrderTemplateFieldType = 'text' | 'number' | 'money' | 'date' | 'enum'
 type PaymentRecordStatus = 'success' | 'partial' | 'pending' | 'failed'
 type CreditOrderStatus = 'normal' | 'soon' | 'today' | 'overdue'
 
-interface TenantOrder {
-  id: string                   // 如 "PLT-20260325-001"
-  sourceOrderNo?: string       // 由 Excel 导入的原始 ERP 订单号
-  groupKey?: string            // 用于防重的辅键
-  mappingTemplateId?: string   // 关联的导入模板
-  qrCodeToken?: string         // 订单级公开路由标识，前端据此生成 /pay/:token 二维码
+interface TenantOrderLineItem {
+  itemId?: string              // 行项目 ID
+  skuId?: string | null        // 商品主数据 ID
+  skuName: string              // 商品名称
+  skuSpec?: string             // 商品规格
+  unit: string                 // 单位
+  quantity: number             // 数量
+  unitPrice: number            // 单价（元）
+  lineAmount: number           // 行金额（元）
+}
+
+interface OrderImportTemplateField {
+  label: string                // 字段展示名
+  key: string                  // 字段 key
+  mapStr: string               // ERP 列头映射值
+  isRequired: boolean          // 是否系统必填
+}
+
+interface OrderImportTemplate {
+  id: string                   // 模板 ID
+  name: string                 // 模板名称
+  isDefault: boolean           // 是否默认模板
+  updatedAt: string            // 最近更新时间
+  defaultFields: OrderImportTemplateField[]  // 系统默认字段，固定 6 项
+  customerFields: OrderImportTemplateField[] // 租户自定义字段
+}
+
+interface TenantOrderListItem {
+  id: string                   // 订单 ID
+  sourceOrderNo: string        // 源订单号
+  groupKey?: string            // 辅助分组/防重键；未显式提供时通常回退为 sourceOrderNo
   customer: string             // 客户名称
-  summary: string              // 商品摘要
-  amount: number               // 订单金额（元）
+  skuName: string              // 主商品名称
+  lineAmount: number           // 主展示行金额（元）
+  totalAmount: number          // 订单总金额（元）
+  orderTime: string            // 下单时间
+  customerValues: Record<string, string> // 模板自定义字段值
   paid: number                 // 已收金额（元）
   status: OrderStatus          // 收款状态
   payType: OrderPayType        // 付款方式
   prints: number               // 打印次数
-  date: string                 // 下单时间
-  lineItems: OrderItem[]       // 聚合订单下的商品明细
-  customFieldValues?: Record<string, string> // 模板动态映射的自定义字段
-  voided: boolean              // 是否已作废（防物理删除）
+  mappingTemplateId?: string   // 关联映射模板 ID
+  qrCodeToken?: string         // 订单级 H5 支付跳转令牌，前端据此生成 `/pay/:token`
+  voided: boolean              // 是否已作废
   voidReason?: string          // 作废原因
   voidedAt?: string            // 作废时间
+}
+
+interface TenantOrderDetail extends TenantOrderListItem {
+  lineItems: TenantOrderLineItem[] // 订单商品明细
 }
 ```
 
@@ -199,12 +231,12 @@ interface TenantOrder {
 {
   page?: number                // 默认 1
   pageSize?: number            // 默认 200
-  keyword?: string             // 检索范围新增：ERP 源订单号 (sourceOrderNo)
+  keyword?: string             // 搜索订单号、源订单号、客户名称
   status?: OrderStatus         // 状态筛选
   payType?: OrderPayType       // 付款方式筛选
-  templateId?: string          // 新增：按导入模板类型过滤订单
-  dateFrom?: string            // 开始日期 YYYY-MM-DD
-  dateTo?: string              // 结束日期 YYYY-MM-DD
+  templateId?: string          // 按导入模板过滤
+  dateFrom?: string            // 按 orderTime 范围过滤，开始日期 YYYY-MM-DD
+  dateTo?: string              // 按 orderTime 范围过滤，结束日期 YYYY-MM-DD
 }
 ```
 
@@ -212,36 +244,27 @@ interface TenantOrder {
 
 ```typescript
 {
-  list: Array<{               // 注意：此处必须返回以 sourceOrderNo 聚合后的列表结构
+  list: Array<{
     id: string                 // 订单 ID
-    sourceOrderNo?: string     // 原始 ERP 订单号
-    groupKey?: string          // 防重辅键
-    mappingTemplateId?: string // 导入模板 ID
-    qrCodeToken?: string       // 订单级 H5 公开路由标识
+    sourceOrderNo: string      // 源订单号
+    groupKey?: string          // 辅助分组/防重键
     customer: string           // 客户名称
-    summary: string            // 商品摘要
-    amount: number             // 订单金额（元）
+    skuName: string            // 主商品名称
+    lineAmount: number         // 主展示行金额（元）
+    totalAmount: number        // 订单总金额（元）
+    orderTime: string          // 下单时间
+    customerValues: Record<string, string> // 模板自定义字段值
     paid: number               // 已收金额（元）
     status: OrderStatus        // 收款状态
     payType: OrderPayType      // 付款方式
     prints: number             // 打印次数
-    date: string               // 下单时间
-    lineItems: Array<{
-      itemId?: string          // 行项目 ID
-      skuId?: string | null    // 商品主数据 ID
-      skuName: string          // 商品名称
-      skuSpec?: string         // 商品规格
-      unit: string             // 单位
-      quantity: number         // 数量
-      unitPrice: number        // 单价（元）
-      lineAmount: number       // 行金额（元）
-    }>
-    customFieldValues?: Record<string, string> // 动态自定义字段
+    mappingTemplateId?: string // 关联映射模板 ID
+    qrCodeToken?: string       // 订单级 H5 支付跳转令牌
     voided: boolean            // 是否已作废
     voidReason?: string        // 作废原因
     voidedAt?: string          // 作废时间
   }>
-  total: number                // 聚合订单的总数（非商品行明细总数）
+  total: number                // 订单总数
   page: number                 // 当前页码
   pageSize: number             // 每页条数
 }
@@ -258,18 +281,20 @@ interface TenantOrder {
 ```typescript
 {
   id: string                   // 订单 ID
-  sourceOrderNo?: string       // 原始 ERP 订单号
-  groupKey?: string            // 防重辅键
-  mappingTemplateId?: string   // 关联的导入模板 ID
-  qrCodeToken?: string         // 订单级公开路由标识，前端据此生成送货单二维码并打开 H5 页面
+  sourceOrderNo: string        // 源订单号
+  groupKey?: string            // 辅助分组/防重键
   customer: string             // 客户名称
-  summary: string              // 商品摘要
-  amount: number               // 订单总金额（元）
+  skuName: string              // 主商品名称
+  lineAmount: number           // 主展示行金额（元）
+  totalAmount: number          // 订单总金额（元）
+  orderTime: string            // 下单时间
+  customerValues: Record<string, string> // 模板自定义字段值
   paid: number                 // 已收金额（元）
   status: OrderStatus          // 收款状态
   payType: OrderPayType        // 付款方式
   prints: number               // 累计打印次数
-  date: string                 // 下单时间
+  mappingTemplateId?: string   // 关联映射模板 ID
+  qrCodeToken?: string         // 订单级 H5 支付跳转令牌，前端据此生成 `/pay/:token`
   lineItems: Array<{
     itemId?: string            // 行项目 ID
     skuId?: string | null      // 可选的商品主数据 ID
@@ -280,7 +305,6 @@ interface TenantOrder {
     unitPrice: number          // 单价（元）
     lineAmount: number         // 行金额（元）
   }>
-  customFieldValues?: Record<string, string> // 模板映射出的自定义字段键值对
   voided: boolean              // 是否已作废
   voidReason?: string          // 作废原因
   voidedAt?: string            // 作废时间
@@ -291,119 +315,13 @@ interface TenantOrder {
 
 - **POST** `/orders`
 - **角色**：TENANT_OWNER, TENANT_OPERATOR
-- **说明**：创建成功后返回订单级 `qrCodeToken`；该字段直接对应 `orders.qrCodeToken`。
-
-**请求参数：**
-
-```typescript
-{
-  customer: string             // 客户名称（必填）
-  summary?: string             // 商品摘要
-  amount: number               // 订单金额（必填）
-  paid?: number                // 已收金额，默认 0
-  status?: OrderStatus         // 默认 'pending'
-  payType?: OrderPayType       // 默认 'cash'
-  date?: string                // 不传则取当前时间
-}
-```
-
-**响应 data：**
-
-```typescript
-{
-  id: string                   // 订单 ID
-  sourceOrderNo?: string       // 原始 ERP 订单号
-  groupKey?: string            // 防重辅键
-  mappingTemplateId?: string   // 导入模板 ID
-  qrCodeToken?: string         // 订单级 H5 公开路由标识
-  customer: string             // 客户名称
-  summary: string              // 商品摘要
-  amount: number               // 订单金额（元）
-  paid: number                 // 已收金额（元）
-  status: OrderStatus          // 收款状态
-  payType: OrderPayType        // 付款方式
-  prints: number               // 打印次数
-  date: string                 // 下单时间
-  lineItems: Array<{
-    itemId?: string            // 行项目 ID
-    skuId?: string | null      // 商品主数据 ID
-    skuName: string            // 商品名称
-    skuSpec?: string           // 商品规格
-    unit: string               // 单位
-    quantity: number           // 数量
-    unitPrice: number          // 单价（元）
-    lineAmount: number         // 行金额（元）
-  }>
-  customFieldValues?: Record<string, string> // 动态自定义字段
-  voided: boolean              // 是否已作废
-  voidReason?: string          // 作废原因
-  voidedAt?: string            // 作废时间
-}
-```
+- **说明**：当前手工建单接口暂未纳入本轮订单导入字段换模，仍沿用既有建单结构；本轮重点调整导入链路与订单读取接口，手工建单契约待后续统一。
 
 ### 3.4 更新订单
 
 - **PUT** `/orders/{id}`
 - **角色**：TENANT_OWNER, TENANT_OPERATOR
-
-**请求参数：**
-
-```typescript
-{
-  customer?: string            // 客户名称
-  summary?: string             // 商品摘要
-  amount?: number              // 订单总金额（元）
-  paid?: number                // 已收金额（元）
-  status?: OrderStatus         // 收款状态
-  payType?: OrderPayType       // 付款方式
-  date?: string                // 下单时间
-  lineItems?: Array<{
-    itemId?: string            // 行项目 ID
-    skuId?: string | null      // 商品主数据 ID
-    skuName: string            // 商品名称
-    skuSpec?: string           // 商品规格
-    unit: string               // 单位
-    quantity: number           // 数量
-    unitPrice: number          // 单价（元）
-    lineAmount: number         // 行金额（元）
-  }>
-  customFieldValues?: Record<string, string> // 自定义字段键值对
-}
-```
-
-**响应 data：**
-
-```typescript
-{
-  id: string                   // 订单 ID
-  sourceOrderNo?: string       // 原始 ERP 订单号
-  groupKey?: string            // 防重辅键
-  mappingTemplateId?: string   // 导入模板 ID
-  qrCodeToken?: string         // 订单级 H5 公开路由标识
-  customer: string             // 客户名称
-  summary: string              // 商品摘要
-  amount: number               // 订单金额（元）
-  paid: number                 // 已收金额（元）
-  status: OrderStatus          // 收款状态
-  payType: OrderPayType        // 付款方式
-  prints: number               // 打印次数
-  date: string                 // 下单时间
-  lineItems: Array<{
-    itemId?: string            // 行项目 ID
-    skuId?: string | null      // 商品主数据 ID
-    skuName: string            // 商品名称
-    skuSpec?: string           // 商品规格
-    unit: string               // 单位
-    quantity: number           // 数量
-    unitPrice: number          // 单价（元）
-    lineAmount: number         // 行金额（元）
-  }>
-  customFieldValues?: Record<string, string> // 动态自定义字段
-  voided: boolean              // 是否已作废
-  voidReason?: string          // 作废原因
-  voidedAt?: string            // 作废时间
-}
-```
+- **说明**：当前手工改单接口暂未纳入本轮订单导入字段换模，仍沿用既有改单结构；本轮重点调整导入链路与订单读取接口，手工改单契约待后续统一。
 
 ### 3.5 更新订单作废状态
 
@@ -424,18 +342,20 @@ interface TenantOrder {
 ```typescript
 {
   id: string                   // 订单 ID
-  sourceOrderNo?: string       // 原始 ERP 订单号
-  groupKey?: string            // 防重辅键
-  mappingTemplateId?: string   // 导入模板 ID
-  qrCodeToken?: string         // 订单级 H5 公开路由标识
+  sourceOrderNo: string        // 源订单号
+  groupKey?: string            // 辅助分组/防重键
   customer: string             // 客户名称
-  summary: string              // 商品摘要
-  amount: number               // 订单金额（元）
+  skuName: string              // 主商品名称
+  lineAmount: number           // 主展示行金额（元）
+  totalAmount: number          // 订单总金额（元）
+  orderTime: string            // 下单时间
+  customerValues: Record<string, string> // 模板自定义字段值
   paid: number                 // 已收金额（元）
   status: OrderStatus          // 收款状态
   payType: OrderPayType        // 付款方式
   prints: number               // 打印次数
-  date: string                 // 下单时间
+  mappingTemplateId?: string   // 关联映射模板 ID
+  qrCodeToken?: string         // 订单级 H5 支付跳转令牌
   lineItems: Array<{
     itemId?: string            // 行项目 ID
     skuId?: string | null      // 商品主数据 ID
@@ -446,69 +366,218 @@ interface TenantOrder {
     unitPrice: number          // 单价（元）
     lineAmount: number         // 行金额（元）
   }>
-  customFieldValues?: Record<string, string> // 动态自定义字段
   voided: boolean              // 是否已作废
   voidReason?: string          // 作废原因
   voidedAt?: string            // 作废时间
 }
 ```
 
-### 3.6 导入-数据预检校验
+### 3.6 获取系统默认映射模板
+
+- **GET** `/import/default-template`
+- **角色**：TENANT_OWNER, TENANT_OPERATOR
+- **描述**：获取系统默认映射模板。租户创建或编辑自定义模板时，必须先以该默认模板为基底填写 `mapStr`，再补充自定义字段。
+
+**响应 data：**
+
+```typescript
+Array<{
+  label: string               // 字段展示名
+  key: string                 // 系统字段 key
+  mapStr: string              // ERP 列头映射值；默认返回空字符串
+  isRequired: boolean         // 是否系统必填
+}>
+```
+
+**固定返回内容：**
+
+```json
+[
+  { "label": "源订单号", "key": "sourceOrderNo", "mapStr": "", "isRequired": true },
+  { "label": "客户名称", "key": "customer", "mapStr": "", "isRequired": true },
+  { "label": "商品名称", "key": "skuName", "mapStr": "", "isRequired": true },
+  { "label": "行金额", "key": "lineAmount", "mapStr": "", "isRequired": true },
+  { "label": "总金额", "key": "totalAmount", "mapStr": "", "isRequired": true },
+  { "label": "下单时间", "key": "orderTime", "mapStr": "", "isRequired": true }
+]
+```
+
+### 3.7 导入-获取模板列表
+
+- **GET** `/import/templates`
+- **角色**：TENANT_OWNER, TENANT_OPERATOR
+- **描述**：获取当前租户可用的订单导入模板
+- **关联表**：import_templates
+
+**响应 data：**
+
+```typescript
+Array<{
+  id: string                  // 模板 ID
+  name: string                // 模板名称
+  isDefault: boolean          // 是否默认模板
+  updatedAt: string           // 最近更新时间
+  defaultFields: Array<{
+    label: string             // 字段展示名
+    key: string               // 系统字段 key
+    mapStr: string            // ERP 列头映射值
+    isRequired: boolean       // 默认字段固定为 true
+  }>
+  customerFields: Array<{
+    label: string             // 自定义字段展示名
+    key: string               // 服务端生成的 customerKeyN
+    mapStr: string            // ERP 列头映射值
+    isRequired: boolean       // 自定义字段固定为 false
+  }>
+}>
+```
+
+**业务规则：**
+
+- `defaultFields` 固定 6 项，字段 key 与 `GET /import/default-template` 保持一致
+- `customerFields` 为租户自定义字段，结构与默认字段一致
+- 当前模板列表只返回新结构，不再返回旧三段式 `sourceColumns / fields / mappings`
+
+### 3.8 导入-创建模板
+
+- **POST** `/import/templates`
+- **角色**：TENANT_OWNER, TENANT_OPERATOR
+- **关联表**：import_templates
+
+**请求参数：**
+
+```typescript
+{
+  name: string                // 模板名称
+  isDefault: boolean          // 是否默认模板
+  defaultFields: Array<{
+    label: string             // 字段展示名
+    key: string               // 系统字段 key
+    mapStr: string            // ERP 列头映射值
+    isRequired: boolean       // 必须为 true
+  }>
+  customerFields: Array<{
+    label: string             // 自定义字段展示名
+    mapStr: string            // ERP 列头映射值
+  }>
+}
+```
+
+**响应 data：**
+
+```typescript
+{
+  id: string                  // 模板 ID
+  name: string                // 模板名称
+  isDefault: boolean          // 是否默认模板
+  updatedAt: string           // 最近更新时间
+  defaultFields: Array<{
+    label: string
+    key: string
+    mapStr: string
+    isRequired: boolean
+  }>
+  customerFields: Array<{
+    label: string
+    key: string               // 服务端生成的 customerKeyN
+    mapStr: string
+    isRequired: boolean       // 服务端固定回填 false
+  }>
+}
+```
+
+**服务端规则：**
+
+- `defaultFields` 必须完整包含 6 个系统字段，且 `key / label / isRequired` 不能改写
+- `defaultFields[].mapStr` 由租户填写对应 ERP 列头
+- `customerFields` 由前端提交 `label + mapStr`，服务端统一补 `key=customerKey1...N`
+- 所有 `customerFields[].isRequired` 均由服务端固定为 `false`
+
+### 3.9 导入-更新模板
+
+- **PUT** `/import/templates/{id}`
+- **角色**：TENANT_OWNER, TENANT_OPERATOR
+- **关联表**：import_templates
+
+**请求参数：**
+
+```typescript
+{
+  name?: string               // 模板名称
+  isDefault?: boolean         // 是否默认模板
+  defaultFields: Array<{
+    label: string
+    key: string
+    mapStr: string
+    isRequired: boolean
+  }>
+  customerFields: Array<{
+    label: string
+    mapStr: string
+  }>
+}
+```
+
+**响应 data：**
+
+```typescript
+{
+  id: string
+  name: string
+  isDefault: boolean
+  updatedAt: string
+  defaultFields: Array<{
+    label: string
+    key: string
+    mapStr: string
+    isRequired: boolean
+  }>
+  customerFields: Array<{
+    label: string
+    key: string
+    mapStr: string
+    isRequired: boolean
+  }>
+}
+```
+
+**服务端规则：**
+
+- 更新模板时按当前提交内容整体替换模板结构
+- `customerFields` 每次按当前提交数组重新编号
+- 相同租户下若本次更新设置 `isDefault=true`，则其他模板自动取消默认
+
+### 3.10 导入-数据预检校验
 
 - **POST** `/import/preview`
 - **角色**：TENANT_OWNER, TENANT_OPERATOR
-- **描述**：前端完成 Excel 解析后，提交结构化行数据做字段映射、格式校验、聚合试算与重复检查，不下发单据。
+- **描述**：前端完成 Excel 解析并按模板映射回填后，提交标准订单数组做订单级预检。预检同步返回结果，不进入 `import-worker`。
 - **关联表**：无
 
 **请求参数：**
 
 ```typescript
 {
-  templateId?: string                    // 选定的模板 ID；强烈建议显式传入，避免服务端自动匹配到非预期模板
-  rows: Array<{
-    [sourceColumn: string]: string | number | null | undefined
-    // 注意：
-    // 1. 每个 key 必须是当前模板 mappings[].sourceColumn 对应的“原始列头”，不是 targetField
-    // 2. 例如模板把 "商品名称" -> skuName，则此处必须传 { "商品名称": "..." }，不能传 { skuName: "..." }
-    // 3. 每个对象代表 Excel 的一行原始记录，前端不要先按订单聚合
+  templateId: string                     // 选定的模板 ID
+  orders: Array<{
+    sourceOrderNo: string                // 源订单号
+    customer: string                     // 客户名称
+    skuName: string                      // 主商品名称
+    lineAmount: number | string          // 主展示行金额
+    totalAmount: number | string         // 订单总金额
+    orderTime: string                    // 下单时间
+    customerValues: Record<string, string> // 模板自定义字段值
+    lineItems: Array<{
+      itemId?: string                    // 行项目 ID
+      skuId?: string | null              // 商品主数据 ID
+      skuName: string                    // 商品名称
+      skuSpec?: string                   // 商品规格
+      unit: string                       // 单位
+      quantity: number                   // 数量
+      unitPrice: number                  // 单价（元）
+      lineAmount: number                 // 行金额（元）
+    }>                                   // 可为空数组
   }>
-}
-```
-
-**服务端硬性要求：**
-
-1. 当前模板必须至少把以下目标字段映射出来，否则预检必失败：
-   - `sourceOrderNo`：源订单号，缺失时返回 `缺少 sourceOrderNo`
-   - `customer`：客户名称，缺失时返回 `缺少 customer`
-   - `skuName` 或 `summary`：二选一至少能映射出一个；若两者都没有，返回 `缺少 skuName`
-   - `lineAmount` 或 `unitPrice`：二选一至少能映射出一个；若两者都没有，返回 `缺少 lineAmount 或 unitPrice`
-2. 若当前模板的 `fields[].required=true`，则对应 `targetField` 也必须能从 `rows` 中映射出来；否则返回 `字段 xxx 为必填项`
-3. `rows` 中的 key 是否命中，按列头文本匹配；服务端会忽略大小写并去掉首尾空格及中间空白差异，但不会自动把中文列头翻译成英文字段名
-
-**推荐最小映射：**
-
-| 目标字段 `targetField` | 是否建议必配 | 说明 |
-|---|---|---|
-| `sourceOrderNo` | 是 | 用于按源订单号聚合、查重和正式导入 |
-| `customer` | 是 | 客户名称 |
-| `skuName` | 是 | 商品名称；若模板不配此字段，则至少要映射 `summary` |
-| `lineAmount` | 是 | 行金额；若模板不配此字段，则至少要映射 `unitPrice` |
-| `date` | 否 | 下单时间；不传时服务端默认取当前时间 |
-| `quantity` | 否 | 数量；不传时默认 `1` |
-| `unit` | 否 | 单位；不传时默认 `件` |
-| `paid` | 否 | 已收金额；不传时默认 `0` |
-| `payType` | 否 | 付款方式；支持 `cash` / `credit` |
-
-**单行结构示例（按模板原始列头传值）：**
-
-```typescript
-{
-  单据: 'XD260331000014',
-  客户名称: '客运技校超市',
-  商品名称: '500mL茶π蜜桃乌龙茶15入纸箱',
-  下单金额: 57,
-  小单位价格: 3.8,
-  单据时间: '2026-03-31 15:43:45'
 }
 ```
 
@@ -516,23 +585,29 @@ interface TenantOrder {
 
 ```json
 {
-  "templateId": "1c1d1b0e-23f7-4102-8654-aebe221e5ae2",
-  "rows": [
+  "templateId": "tpl_order_001",
+  "orders": [
     {
-      "单据": "XD260331000014",
-      "客户名称": "客运技校超市",
-      "商品名称": "500mL茶π蜜桃乌龙茶15入纸箱",
-      "下单金额": 57,
-      "小单位价格": 3.8,
-      "单据时间": "2026-03-31 15:43:45"
-    },
-    {
-      "单据": "XD260331000014",
-      "客户名称": "客运技校超市",
-      "商品名称": "550mL美汁源果粒橙15入纸箱",
-      "下单金额": 46,
-      "小单位价格": 3.8,
-      "单据时间": "2026-03-31 15:43:45"
+      "sourceOrderNo": "SO-20260415-001",
+      "customer": "深圳华强贸易",
+      "skuName": "农夫山泉550ml",
+      "lineAmount": 24,
+      "totalAmount": 48,
+      "orderTime": "2026-04-15 09:30:00",
+      "customerValues": {
+        "customerKey1": "MD001",
+        "customerKey2": "张三"
+      },
+      "lineItems": [
+        {
+          "skuName": "农夫山泉550ml",
+          "skuSpec": "24瓶/箱",
+          "unit": "箱",
+          "quantity": 2,
+          "unitPrice": 24,
+          "lineAmount": 48
+        }
+      ]
     }
   ]
 }
@@ -542,32 +617,25 @@ interface TenantOrder {
 
 ```typescript
 {
-  previewId: string            // 预检批次标识，用于后续正式导入复用本次校验结果
-  templateId?: string          // 最终命中的模板 ID；可能是前端传入值，也可能是服务端自动识别结果
-  matchedFieldCount?: number   // 成功匹配的目标字段数量
-  requiredFieldMissing: string[] // 当前批次缺失的必填字段 key 列表
+  previewId: string            // 预检批次标识，用于后续正式导入
+  templateId: string           // 本次预检使用的模板 ID
   summary: {
-    totalRows: number               // 上传并参与预检的总行数
-    validRows: number               // 通过字段与格式校验的行数
-    invalidRows: number             // 未通过校验的行数
-    aggregatedOrderCount: number    // 按 sourceOrderNo 聚合后的有效订单数
-    duplicateOrderCount: number     // 与库内已存在订单发生重复的聚合订单数
-    errorCount: number              // 错误明细总数；通常与 invalidRows 接近，但允许一行多错
+    totalOrders: number             // 参与预检的订单总数
+    validOrders: number             // 通过预检的订单数
+    invalidOrders: number           // 预检失败的订单数
+    duplicateOrderCount: number     // 与库内已存在订单重复的数量
+    errorCount: number              // 错误明细总数
   }
-  aggregatedOrders: Array<{    // 预览用的聚合结果
-    id: string                 // 订单 ID
-    sourceOrderNo?: string     // 原始 ERP 订单号
-    groupKey?: string          // 防重辅键
-    mappingTemplateId?: string // 导入模板 ID
-    qrCodeToken?: string       // 订单级 H5 公开路由标识
+  orders: Array<{
+    sourceOrderNo: string      // 源订单号
+    groupKey?: string          // 辅助分组/防重键
     customer: string           // 客户名称
-    summary: string            // 商品摘要
-    amount: number             // 订单金额（元）
-    paid: number               // 已收金额（元）
-    status: OrderStatus        // 收款状态
-    payType: OrderPayType      // 付款方式
-    prints: number             // 打印次数
-    date: string               // 下单时间
+    skuName: string            // 主商品名称
+    lineAmount: number         // 主展示行金额（元）
+    totalAmount: number        // 订单总金额（元）
+    orderTime: string          // 下单时间
+    customerValues: Record<string, string> // 模板自定义字段值
+    mappingTemplateId?: string // 关联映射模板 ID
     lineItems: Array<{
       itemId?: string          // 行项目 ID
       skuId?: string | null    // 商品主数据 ID
@@ -578,46 +646,45 @@ interface TenantOrder {
       unitPrice: number        // 单价（元）
       lineAmount: number       // 行金额（元）
     }>
-    customFieldValues?: Record<string, string> // 动态自定义字段
-    voided: boolean            // 是否已作废
-    voidReason?: string        // 作废原因
-    voidedAt?: string          // 作废时间
-  }>
+  }>                           // 服务端规范化后的订单预览
   duplicateOrders: {
-    sourceOrderNo: string           // 检测到重复的源订单号
-    existingOrderId?: string        // 系统内已存在的订单 ID
-    customer?: string               // 重复订单对应的客户名称
-    amount?: number                 // 重复订单对应的金额
-    existingStatus?: OrderStatus    // 已存在订单当前状态
-    incomingRowCount: number        // 当前导入批次中该源订单号对应的原始行数
+    sourceOrderNo: string       // 检测到重复的源订单号
+    existingOrderId?: string    // 系统内已存在的订单 ID
+    customer?: string           // 重复订单对应的客户名称
+    totalAmount?: number        // 重复订单对应的金额
+    existingStatus?: OrderStatus // 已存在订单当前状态
+    incomingCount: number       // 当前导入批次中命中的订单数
   }[]
-  invalidRows: {
-    row: number                     // 出错的原始 Excel 行号或解析后行号
-    field?: string                  // 出错字段 key；无法定位字段时可不返回
-    sourceOrderNo?: string          // 若已解析出源订单号，则返回该值方便定位
-    reason: string                  // 中文错误原因
+  invalidOrders: {
+    index: number               // 当前批次中的订单序号，从 1 开始
+    sourceOrderNo?: string      // 若已提供源订单号，则返回该值方便定位
+    field?: string              // 出错字段 key
+    reason: string              // 中文错误原因
   }[]
 }
 ```
 
-### 3.7 异步正式导入
+**预检规则：**
+
+- `orders` 必须为非空数组
+- 每张订单必须包含 6 个默认字段值：`sourceOrderNo / customer / skuName / lineAmount / totalAmount / orderTime`
+- `customerValues` 中的 key 必须全部命中该模板的 `customerFields[].key`
+- `lineItems` 可为空数组；非空时继续沿用当前行项目结构校验
+- `invalidOrders.length === 0` 时，前端才应继续触发正式导入
+
+### 3.11 异步正式导入
 
 - **POST** `/orders/import`
 - **角色**：TENANT_OWNER, TENANT_OPERATOR
-- **描述**：提交预检结果或前端已整理完成的合法数据，推入后端异步处理队列；导入成功的订单会同步生成 `qrCodeToken`
+- **描述**：消费预检成功的 `previewId`，创建正式导入任务。该接口本身不再接收原始订单数组。
 - **关联表**：orders
 
 **请求参数：**
 
 ```typescript
 {
-  previewId?: string                      // 若已完成预检，优先传该标识，服务端按该批次结果正式导入
-  templateId?: string                     // 未传 previewId 时，用于说明本次导入使用的模板
-  conflictPolicy?: OrderImportConflictPolicy // 针对 duplicateOrders 采取的策略，默认 'skip'
-  rows?: Array<{
-    [sourceColumn: string]: string | number | null | undefined
-    // 结构与 `POST /import/preview` 的 rows 完全一致
-  }>
+  previewId: string                       // 预检成功后返回的批次 ID
+  conflictPolicy?: OrderImportConflictPolicy // 命中重复订单时的处理策略，默认 'skip'
 }
 ```
 
@@ -625,13 +692,20 @@ interface TenantOrder {
 
 ```typescript
 {
-  jobId: string                           // 异步导入任务 ID
-  submittedCount: number                 // 本次进入队列处理的聚合订单数
-  status: OrderImportJobStatus           // 任务初始状态
+  jobId: string               // 异步导入任务 ID
+  previewId: string           // 本次消费的预检批次 ID
+  submittedCount: number      // 本次进入队列处理的订单数
+  status: OrderImportJobStatus // 任务初始状态
 }
 ```
 
-### 3.8 轮询导入进度
+**业务规则：**
+
+- `/orders/import` 只能消费 `previewId`，不再支持直传 `orders / rows / templateId`
+- 一个 `previewId` 成功创建导入任务后立即视为已消费，不允许重复提交
+- 正式导入才进入 `import-worker`；预检始终同步执行
+
+### 3.12 轮询导入进度
 
 - **GET** `/orders/import/jobs/{jobId}`
 - **角色**：TENANT_OWNER, TENANT_OPERATOR
@@ -642,27 +716,32 @@ interface TenantOrder {
 
 ```typescript
 {
-  jobId: string                          // 异步导入任务 ID
-  status: OrderImportJobStatus          // 当前任务状态
-  submittedCount: number                // 提交入队的聚合订单数
-  processedCount: number                // 当前已处理完成的聚合订单数
-  successCount: number                  // 成功新增入库的订单数
-  skippedCount: number                  // 因冲突策略或校验拦截而被跳过的订单数
-  overwrittenCount: number              // 覆盖已有订单成功的数量
-  failedCount: number                   // 最终导入失败的订单数
-  failedRows: { row: number, sourceOrderNo?: string, reason: string }[] // 行级失败明细
-  conflictDetails: {
-    sourceOrderNo: string               // 触发冲突的源订单号
-    existingOrderId?: string            // 系统内已存在的订单 ID
-    action: OrderImportConflictPolicy   // 本次对该冲突订单采取的处理动作
-    reason: string                      // 处理原因或结果说明
+  jobId: string                  // 异步导入任务 ID
+  previewId: string              // 对应的预检批次 ID
+  status: OrderImportJobStatus   // 当前任务状态
+  submittedCount: number         // 提交入队的订单总数
+  processedCount: number         // 当前已处理完成的订单数
+  successCount: number           // 成功新增入库的订单数
+  skippedCount: number           // 因冲突策略被跳过的订单数
+  overwrittenCount: number       // 覆盖已有订单成功的数量
+  failedCount: number            // 最终导入失败的订单数
+  failedOrders: {
+    index?: number               // 失败订单在预检批次中的序号
+    sourceOrderNo?: string       // 失败订单对应的源订单号
+    reason: string               // 失败原因
   }[]
-  completedAt?: string                  // 任务完成时间；未完成时可为空
+  conflictDetails: {
+    sourceOrderNo: string         // 触发冲突的源订单号
+    existingOrderId?: string      // 系统内已存在的订单 ID
+    action: OrderImportConflictPolicy // 本次采取的处理动作
+    reason: string                // 处理原因或结果说明
+  }[]
+  completedAt?: string            // 任务完成时间；未完成时可为空
 }
 ```
 
 
-### 3.9 提交打印记录
+### 3.13 提交打印记录
 
 - **POST** `/orders/print-records`
 - **角色**：TENANT_OWNER, TENANT_OPERATOR
@@ -699,7 +778,7 @@ interface TenantOrder {
 - `totalCount` 以服务端去重后的 `orderIds` 数量为准
 - 同一租户下，相同 `requestId` 的重复提交必须幂等返回首次结果
 
-### 3.10 创建催款提醒记录
+### 3.14 创建催款提醒记录
 
 - **POST** `/orders/{id}/reminders`
 - **角色**：TENANT_OWNER, TENANT_FINANCE
@@ -719,176 +798,6 @@ interface TenantOrder {
 {
   sent: boolean
   channels: string[]           // 实际发送的渠道
-}
-```
-
-### 3.11 导入-获取模板列表
-
-- **GET** `/import/templates`
-- **角色**：TENANT_OWNER, TENANT_OPERATOR
-- **描述**：获取当前租户可用的 Excel 导入模板
-- **关联表**：import_templates
-
-**响应 data：**
-
-```typescript
-Array<{
-  id: string                   // 模板 ID
-  name: string                 // 模板名称
-  isDefault: boolean           // 是否默认模板
-  updatedAt: string            // 最近更新时间
-  sourceColumns: Array<{
-    key: string                 // 列唯一标识
-    title: string               // Excel 原始表头
-    index: number               // 所在列索引
-    sampleValue: string         // 示例数据，方便预览与排查
-  }>
-  fields: Array<{
-    key: string                 // 内部字段 key，如 "sourceOrderNo"
-    label: string               // 中文展示名
-    fieldType: OrderTemplateFieldType   // 字段类型
-    required: boolean           // 是否必填
-    visible: boolean            // 是否在列表页展示
-    order: number               // 展示顺序
-    builtin?: boolean           // 是否系统内置字段
-  }>
-  mappings: Array<{
-    sourceColumn: string        // 原始列头
-    targetField: string         // 目标字段 key
-    sampleValue: string         // 映射样例值
-  }>
-}>
-```
-
-### 3.12 导入-创建模板
-
-- **POST** `/import/templates`
-- **角色**：TENANT_OWNER, TENANT_OPERATOR
-- **关联表**：import_templates
-
-**请求参数：**
-
-```typescript
-{
-  name: string                 // 模板名称
-  isDefault: boolean           // 是否默认模板
-  sourceColumns: Array<{
-    key: string                 // 列唯一标识
-    title: string               // Excel 原始表头
-    index: number               // 列索引
-    sampleValue: string         // 示例值
-  }>
-  fields: Array<{
-    key: string                 // 目标字段 key
-    label: string               // 中文展示名
-    fieldType: OrderTemplateFieldType   // 字段类型
-    required: boolean           // 是否必填
-    visible: boolean            // 是否在列表页展示
-    order: number               // 展示顺序
-    builtin?: boolean           // 是否系统内置字段
-  }>
-  mappings: Array<{
-    sourceColumn: string        // 原始列头
-    targetField: string         // 目标字段 key
-    sampleValue: string         // 映射样例值
-  }>
-}
-```
-
-**响应 data：**
-
-```typescript
-{
-  id: string                   // 模板 ID
-  name: string                 // 模板名称
-  isDefault: boolean           // 是否默认模板
-  updatedAt: string            // 最近更新时间
-  sourceColumns: Array<{
-    key: string                // 列唯一标识
-    title: string              // Excel 原始表头
-    index: number              // 列索引
-    sampleValue: string        // 示例值
-  }>
-  fields: Array<{
-    key: string                // 目标字段 key
-    label: string              // 中文展示名
-    fieldType: OrderTemplateFieldType   // 字段类型
-    required: boolean          // 是否必填
-    visible: boolean           // 是否展示
-    order: number              // 展示顺序
-    builtin?: boolean          // 是否系统内置字段
-  }>
-  mappings: Array<{
-    sourceColumn: string       // 原始列头
-    targetField: string        // 目标字段 key
-    sampleValue: string        // 映射样例值
-  }>
-}
-```
-
-### 3.13 导入-更新模板
-
-- **PUT** `/import/templates/{id}`
-- **角色**：TENANT_OWNER, TENANT_OPERATOR
-- **关联表**：import_templates
-
-**请求参数：**
-
-```typescript
-{
-  name?: string                // 模板名称
-  isDefault?: boolean          // 是否默认模板
-  sourceColumns?: Array<{
-    key: string                // 列唯一标识
-    title: string              // Excel 原始表头
-    index: number              // 列索引
-    sampleValue: string        // 示例值
-  }>
-  fields?: Array<{
-    key: string                // 目标字段 key
-    label: string              // 中文展示名
-    fieldType: OrderTemplateFieldType   // 字段类型
-    required: boolean          // 是否必填
-    visible: boolean           // 是否展示
-    order: number              // 展示顺序
-    builtin?: boolean          // 是否系统内置字段
-  }>
-  mappings?: Array<{
-    sourceColumn: string       // 原始列头
-    targetField: string        // 目标字段 key
-    sampleValue: string        // 映射样例值
-  }>
-}
-```
-
-**响应 data：**
-
-```typescript
-{
-  id: string                   // 模板 ID
-  name: string                 // 模板名称
-  isDefault: boolean           // 是否默认模板
-  updatedAt: string            // 最近更新时间
-  sourceColumns: Array<{
-    key: string                // 列唯一标识
-    title: string              // Excel 原始表头
-    index: number              // 列索引
-    sampleValue: string        // 示例值
-  }>
-  fields: Array<{
-    key: string                // 目标字段 key
-    label: string              // 中文展示名
-    fieldType: OrderTemplateFieldType   // 字段类型
-    required: boolean          // 是否必填
-    visible: boolean           // 是否展示
-    order: number              // 展示顺序
-    builtin?: boolean          // 是否系统内置字段
-  }>
-  mappings: Array<{
-    sourceColumn: string       // 原始列头
-    targetField: string        // 目标字段 key
-    sampleValue: string        // 映射样例值
-  }>
 }
 ```
 
@@ -1943,7 +1852,7 @@ interface TenantCertificationStatusResult {
 | 模块 | 接口数 | 方法分布 |
 |------|--------|---------|
 | 认证 Auth | 4 | POST ×3, GET ×1 |
-| 订单 Orders | 13 | GET ×4, POST ×7, PUT ×2 |
+| 订单 Orders | 14 | GET ×5, POST ×6, PUT ×2, PATCH ×1 |
 | 支付与核销 Payment | 3 | GET ×2, POST ×1 |
 | 财务对账 Finance | 3 | GET ×3 |
 | 账期管理 Credit | 2 | GET ×1, POST ×1 |
@@ -1951,7 +1860,7 @@ interface TenantCertificationStatusResult {
 | 系统设置 Settings | 13 | GET ×7, POST ×1, PUT ×4, DELETE ×1 |
 | 通知 Notifications | 2 | GET ×1, POST ×1 |
 | 资质提交 Certification | 2 | GET ×1, POST ×1 |
-| **合计** | **46** | GET ×24, POST ×15, PUT ×6, DELETE ×1 |
+| **合计** | **47** | GET ×25, POST ×14, PUT ×6, PATCH ×1, DELETE ×1 |
 
 | 关联数据库表 | 说明 |
 |-------------|------|

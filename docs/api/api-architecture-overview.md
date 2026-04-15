@@ -169,7 +169,7 @@ H5 前端                    后端                     支付网关
 
 ---
 
-### 4.2 Tenant 端（商户 SaaS）— 46 个端点
+### 4.2 Tenant 端（商户 SaaS）— 47 个端点
 
 > 鉴权方式：业务请求走 Bearer Access Token；Refresh Token 存于 HttpOnly Cookie，后端通过 token 中的 tenantId 自动隔离数据
 > 角色（固定枚举）：TENANT_OWNER / TENANT_OPERATOR / TENANT_FINANCE / TENANT_VIEWER
@@ -186,7 +186,7 @@ H5 前端                    后端                     支付网关
 > 三端共用同一套 Auth，后端通过 user.tenantId 区分平台用户 / 租户用户。
 > 登录仅返回 accessToken + user；`/auth/refresh` 与 `/auth/logout` 从 HttpOnly Refresh Cookie 读取会话。
 
-#### 模块 B：订单管理（Orders）— 13 个端点
+#### 模块 B：订单管理（Orders）— 14 个端点
 
 | # | Method | Path | 说明 | 角色 | 关联表 |
 |---|--------|------|------|------|--------|
@@ -195,21 +195,27 @@ H5 前端                    后端                     支付网关
 | B3 | POST | `/orders` | 创建订单 | TENANT_OWNER, TENANT_OPERATOR | orders |
 | B4 | PUT | `/orders/{id}` | 更新订单 | TENANT_OWNER, TENANT_OPERATOR | orders |
 | B5 | PATCH | `/orders/{id}` | 更新订单作废状态 | TENANT_OWNER | orders |
-| B6 | POST | `/orders/import` | 异步正式导入 | TENANT_OWNER, TENANT_OPERATOR | orders |
-| B7 | POST | `/orders/print-records` | 打印成功回执（单个/批量） | TENANT_OWNER, TENANT_OPERATOR | orders + print_record_batches |
-| B8 | POST | `/orders/{id}/reminders` | 创建催款提醒记录 | TENANT_OWNER, TENANT_FINANCE | orders |
-| B9 | GET | `/import/templates` | 导入-获取模板列表 | TENANT_OWNER, TENANT_OPERATOR | — |
-| B10 | POST | `/import/templates` | 导入-创建模板 | TENANT_OWNER, TENANT_OPERATOR | — |
-| B11 | PUT | `/import/templates/:id` | 导入-更新模板 | TENANT_OWNER, TENANT_OPERATOR | — |
-| B12 | POST | `/import/preview` | 导入-数据预检校验 | TENANT_OWNER, TENANT_OPERATOR | — |
-| B13 | GET | `/orders/import/jobs/:jobId` | 查询导入任务进度 | TENANT_OWNER, TENANT_OPERATOR | — |
+| B6 | GET | `/import/default-template` | 获取系统默认映射模板 | TENANT_OWNER, TENANT_OPERATOR | — |
+| B7 | GET | `/import/templates` | 导入-获取模板列表 | TENANT_OWNER, TENANT_OPERATOR | import_templates |
+| B8 | POST | `/import/templates` | 导入-创建模板 | TENANT_OWNER, TENANT_OPERATOR | import_templates |
+| B9 | PUT | `/import/templates/:id` | 导入-更新模板 | TENANT_OWNER, TENANT_OPERATOR | import_templates |
+| B10 | POST | `/import/preview` | 导入-订单级预检 | TENANT_OWNER, TENANT_OPERATOR | — |
+| B11 | POST | `/orders/import` | 异步正式导入 | TENANT_OWNER, TENANT_OPERATOR | orders + import_jobs |
+| B12 | GET | `/orders/import/jobs/:jobId` | 查询导入任务进度 | TENANT_OWNER, TENANT_OPERATOR | import_jobs |
+| B13 | POST | `/orders/print-records` | 打印成功回执（单个/批量） | TENANT_OWNER, TENANT_OPERATOR | orders + print_record_batches |
+| B14 | POST | `/orders/{id}/reminders` | 创建催款提醒记录 | TENANT_OWNER, TENANT_FINANCE | orders |
 
 **导入接口详细说明（已确认决策）：**
-- 完整链路使用基于服务端的模板：模板持久化在 DB
-- 前端 SheetJS 解析提取数据后，调用 `/import/preview`，请求体采用 `{ templateId?, rows }`
-- 调用 `/orders/import` 提交 JSON Payload，支持 `{ previewId?, templateId?, conflictPolicy?, rows? }`
-- 请求参数支持包含：`customFieldDefs` 和实列值映射
-- 使用 `/orders/import/jobs/:jobId` 轮询导入进度，结果需包含 `overwrittenCount` 与 `conflictDetails`
+- 完整链路为：`GET /import/default-template` → `GET/POST/PUT /import/templates` → `POST /import/preview` → `POST /orders/import` → `GET /orders/import/jobs/:jobId`
+- 模板结构统一为 `{ defaultFields, customerFields }`，不再使用旧三段式 `sourceColumns / fields / mappings`
+- `defaultFields` 固定 6 项：`sourceOrderNo / customer / skuName / lineAmount / totalAmount / orderTime`
+- `customerFields` 与默认字段结构一致，但由服务端生成 `customerKey1...N`，且 `isRequired=false`
+- 前端 SheetJS 解析 Excel 后，必须先按模板把数据回填成标准订单数组，再调用 `/import/preview`
+- `/import/preview` 请求体采用 `{ templateId, orders }`，直接提交订单级标准结构，不再上传原始 `rows`
+- `/orders/import` 只接收 `{ previewId, conflictPolicy? }`，不再支持直传 `orders / rows / templateId`
+- `/import/preview` 同步执行，目标是快速反馈；`/orders/import` 异步执行，正式入队后交由 `import-worker` 处理
+- `previewId` 为正式导入唯一凭证，且成功创建 `jobId` 后一次性消费
+- 使用 `/orders/import/jobs/:jobId` 轮询正式导入进度，结果需包含 `previewId / overwrittenCount / conflictDetails`
 - 创建订单与正式导入成功时，同步生成 `orders.qrCodeToken`
 - `POST /orders/print-records` 建议携带 `requestId`，按 `tenantId + requestId` 实现批次级幂等
 
@@ -304,7 +310,7 @@ H5 前端                    后端                     支付网关
 | 模块 | 端点数 | 主要关联表 |
 |------|--------|-----------|
 | Auth | 4 | users |
-| Orders | 13 | orders, order_items, import_templates, import_jobs, print_record_batches |
+| Orders | 14 | orders, order_items, import_templates, import_jobs, print_record_batches |
 | Payment & 核销 | 3 | orders, payments, payment_orders |
 | Finance | 3 | orders, payments |
 | Credit | 2 | orders, payments |
@@ -312,7 +318,7 @@ H5 前端                    后端                     支付网关
 | Settings | 13 | roles, permissions, users, system_configs, tenant_general_settings, printer_templates, import_templates, audit_logs |
 | Notifications | 2 | notices |
 | Certification | 2 | tenant_certifications |
-| **合计** | **46** | — |
+| **合计** | **47** | — |
 
 ---
 
@@ -537,9 +543,9 @@ H5 前端                    后端                     支付网关
 | 项目 | 端点数 | 鉴权方式 |
 |------|--------|---------|
 | H5 | 4 | `qrCodeToken` 公开路由 |
-| Tenant | 46 | Bearer Token（tenantId 自动隔离） |
+| Tenant | 47 | Bearer Token（tenantId 自动隔离） |
 | Admin | 81 | Bearer Token（tenantId=null，跨租户） |
-| **合计** | **131** | — |
+| **合计** | **132** | — |
 
 ### 已确认的关键设计决策
 
@@ -553,4 +559,3 @@ H5 前端                    后端                     支付网关
 | 6 | 通用配置模型 | `/settings/general` 采用“平台默认 + 租户覆盖”两层模型，GET 返回合并结果 |
 | 7 | 打印配置模型 | `/settings/printing*` 只存黑盒 JSON，持久化维度为 `tenantId + importTemplateId` |
 | 8 | 打印回执幂等 | `/orders/print-records` 按 `tenantId + requestId` 做批次级幂等 |
-
