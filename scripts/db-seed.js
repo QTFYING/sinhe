@@ -1,7 +1,14 @@
 const path = require('node:path');
 const { createRequire } = require('node:module');
 
-const apiRequire = createRequire(path.join(__dirname, '../apps/api/package.json'));
+let apiRequire;
+try {
+  // 尝试开发环境下的路径 (Monorepo 结构)
+  apiRequire = createRequire(path.join(__dirname, '../apps/api/package.json'));
+} catch (e) {
+  // 生产环境 (Docker) 下 node_modules 就在根目录，直接使用内置 require
+  apiRequire = require;
+}
 
 const {
   PrismaClient,
