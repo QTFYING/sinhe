@@ -1,601 +1,553 @@
-# 收单吧 SaaS 平台 — 数据模型参考（Prisma 建表依据）
+# 收单吧 SaaS 平台 — 数据模型说明书
 
-> 本文档承接原 docs/api/api-architecture-overview.md 中的“数据模型（服务端建表参考）”章节。
-> 用途：作为 Prisma 建表与服务端数据建模参考，不作为前端 API 联调必读文档。
-> 确认日期：2026-04-10
-> 统一枚举命名与取值参见 **[../enums/enum-manual.md](../enums/enum-manual.md)**。
-> 本文出现的 `TenantStatus`、`OrderStatus`、`PaymentOrderStatus` 等闭集字段，均以 `packages/types/src/enums/*` 为唯一事实源。
+> 本文件仅作为当前 `apps/api/prisma/schema.prisma` 的说明书，不作为 `schema.prisma` 设计或迭代的前置事实源。
+> 涉及业务语义、字段含义、状态机与对外结构时，以上游 `docs/api/*.md -> packages/types/src/enums -> packages/types/src/contracts` 为准。
+> `apps/api/prisma/schema.prisma` 是当前可执行基准，本文只做人工可读同步。
+> 确认日期：2026-04-16
+> 枚举取值参见 [../enums/enum-manual.md](../enums/enum-manual.md)。
 
 ---
 
-## 一、数据模型（服务端建表参考）
+## 1. 当前模型总览
 
-### 1.1 用户与权限域
+当前 `schema.prisma` 共定义 18 个 model：
 
-**users 表**
+| Prisma Model | 表名 | 说明 |
+|---|---|---|
+| `Tenant` | `tenants` | 租户主体 |
+| `User` | `users` | 用户账号 |
+| `TenantGeneralSettings` | `tenant_general_settings` | 租户通用配置覆盖层 |
+| `SystemConfig` | `system_configs` | 平台系统配置 |
+| `ImportTemplate` | `import_templates` | 导入映射模板 |
+| `PrinterTemplate` | `printer_templates` | 打印模板配置 |
+| `ImportJob` | `import_jobs` | 异步导入任务 |
+| `Order` | `orders` | 订单主表 |
+| `OrderItem` | `order_items` | 订单行项目 |
+| `Payment` | `payments` | 收款流水 |
+| `PaymentOrder` | `payment_orders` | H5 支付单 |
+| `PrintRecordBatch` | `print_record_batches` | 打印回执批次 |
+| `OrderReminder` | `order_reminders` | 催款记录 |
+| `Notice` | `notices` | 系统公告 |
+| `NoticeRead` | `notice_reads` | 公告已读状态 |
+| `TenantCertification` | `tenant_certifications` | 资质审核记录 |
+| `AuditLog` | `audit_logs` | 审计日志 |
+| `IdSequence` | `id_sequences` | 编号序列 |
+
+## 2. 建模规则摘要
+
+- 多租户业务表默认显式包含 `tenantId`。
+- 金额字段统一使用 `Decimal`。
+- 黑盒扩展配置统一使用 `Json`。
+- 闭集字段的实际值以上游枚举事实源为准。
+- `deletedAt` 仅出现在当前 schema 明确声明软删的表中。
+
+## 3. 枚举摘要
+
+当前 schema 使用以下枚举：
+
+- `UserRoleEnum`
+  `OS_SUPER_ADMIN`、`TENANT_OWNER`、`TENANT_OPERATOR`、`TENANT_FINANCE`、`TENANT_VIEWER`
+- `TenantStatusEnum`
+  `active`、`onboarding`、`attention`、`paused`
+- `UserStatusEnum`
+  `active`、`invited`、`locked`、`disabled`
+- `TenantCertificationStatusEnum`
+  `pending_initial_review`、`pending_secondary_review`、`pending_confirmation`、`approved`、`rejected`
+- `AuditTargetTypeEnum`
+  `account`、`role`、`tenant`
+- `AuditResultEnum`
+  `success`、`pending`
+- `OrderStatusEnum`
+  `pending`、`partial`、`paid`、`expired`、`credit`
+- `OrderPayTypeEnum`
+  `cash`、`credit`
+- `OrderImportJobStatusEnum`
+  `pending`、`processing`、`completed`、`failed`
+- `OrderImportConflictPolicyEnum`
+  `skip`、`overwrite`
+- `PaymentMethodEnum`
+  `online`、`cash`、`other_paid`
+- `PaymentChannelEnum`
+  `lakala`
+- `PaymentOrderStatusEnum`
+  `unpaid`、`paying`、`pending_verification`、`paid`、`expired`
+- `CashVerifyStatusEnum`
+  `pending`、`verified`
+- `PaymentRecordStatusEnum`
+  `success`、`partial`、`pending`、`failed`
+- `OrderReminderStatusEnum`
+  `sent`、`failed`
+- `PublishTimingEnum`
+  `immediate`、`scheduled`
+- `NoticeStatusEnum`
+  `published`、`draft`、`offline`
+
+## 4. 模型说明
+
+### 4.1 租户与账号域
+
+**tenants**
 
 ```typescript
 {
-  id: string                // 主键，如 "USR-001"
-  account: string           // 登录账号（全局唯一）
-  name: string              // 姓名
-  phone: string             // 手机号
-  password: string          // 密码（加密存储）
-  tenantId: string | null   // 所属租户 ID，平台用户为 null
-  tenantType: TenantSide   // 用户所属侧：平台用户或租户用户
-  role: string              // 角色名称
-  scope: string             // 数据范围描述
-  status: UserStatus       // 账号状态
-  requiresPasswordReset: boolean // 是否要求下次登录强制修改密码
-  loginAt: string           // 最后登录时间
-  createdAt: string         // 创建时间
-  updatedAt: string         // 更新时间
+  id: string                     // 租户 ID
+  name: string                   // 租户名称
+  contactPhone: string           // 联系电话
+  packageName: string | null     // 套餐名称
+  adminName: string | null       // 管理员姓名
+  region: string | null          // 所在地区
+  status: TenantStatusEnum       // 租户状态
+  rejectReason: string | null    // 驳回原因
+  freezeReason: string | null    // 冻结原因
+  expireAt: string | null        // 到期时间
+  maxCreditDays: number          // 最大账期天数
+  creditReminderDays: number     // 账期提醒提前天数
+  createdAt: string              // 创建时间
+  updatedAt: string              // 更新时间
+  deletedAt: string | null       // 软删时间
 }
 ```
 
-**roles 表**
+关键约束：
+
+- 主键：`id`
+- 表名：`tenants`
+- 当前 schema 使用 `deletedAt` 软删
+
+**users**
 
 ```typescript
 {
-  id: string                // 角色 ID
-  name: string              // 角色名称（同 side 内唯一）
-  side: TenantSide            // 角色归属侧；platform=平台角色，tenant=租户角色
-  permissions: string[]     // 权限项列表
-  isSystem: boolean         // 是否系统内置
-  tenantId: string | null   // 租户自定义角色时关联租户
-  createdAt: string         // 创建时间
-  updatedAt: string         // 更新时间
+  id: string                     // 用户 ID，UUID
+  tenantId: string | null        // 所属租户 ID，平台用户为空
+  account: string                // 登录账号
+  phone: string | null           // 手机号
+  passwordHash: string           // 加密后的密码
+  realName: string               // 真实姓名
+  role: UserRoleEnum             // 角色
+  scope: string | null           // 数据范围描述
+  status: UserStatusEnum         // 账号状态
+  requiresPasswordReset: boolean // 是否要求下次登录修改密码
+  loginAt: string | null         // 最近登录时间
+  createdAt: string              // 创建时间
+  updatedAt: string              // 更新时间
+  deletedAt: string | null       // 软删时间
 }
 ```
 
-**permissions 表**（权限树）
+关键约束：
+
+- 主键：`id`
+- 唯一键：`account`
+- 索引：`tenantId`、`status`
+- 表名：`users`
+- 当前 schema 使用 `deletedAt` 软删
+
+**tenant_general_settings**
 
 ```typescript
 {
-  id: string                // 权限节点 ID
-  label: string             // 权限名称
-  parentId: string | null   // 父节点 ID；顶级节点为 null
-  sort: number              // 排序值
-}
-```
-
-### 1.2 租户域
-
-**tenants 表**
-
-```typescript
-{
-  id: string                // 如 "TEN-001"
-  name: string              // 租户名称
-  packageName: string       // 套餐名称
-  admin: string             // 管理员姓名
-  region: string            // 地区
-  channels: string[]        // 支付通道
-  merchants: number         // 商户数
-  users: number             // 账号数
-  monthlyFlow: number       // 本月流水（元）
-  dueInDays: number         // 距到期天数
-  lastActiveAt: string      // 最近活跃时间
-  status: TenantStatus       // 租户状态
-  rejectReason: string | null // 驳回原因
-  freezeReason: string | null // 冻结原因
-  createdAt: string         // 创建时间
-  updatedAt: string         // 更新时间
-}
-```
-
-**tenant_certifications 表**（资质审核）
-
-```typescript
-{
-  id: string                // 资质记录 ID
-  tenantId: string          // 关联租户 ID
-  type: string              // "企业实名认证" | "经营资质补充" | "法人身份证更新"
-  licenseUrl: string        // 营业执照或资质文件地址
-  legalPerson: string       // 法人姓名
-  legalIdCard: string       // 法人身份证号
-  contactPhone: string      // 联系电话
-  remark: string | null     // 提交备注
-  submitAt: string          // 提交时间
-  status: TenantCertificationStatus // 审核状态
-  comment: string | null    // 审核备注
-  rejectReason: string | null // 驳回原因
-  reviewedAt: string | null // 最近审核时间
-  createdAt: string         // 创建时间
-  updatedAt: string         // 更新时间
-}
-```
-
-**tenant_general_settings 表**（租户通用配置覆盖层）
-
-```typescript
-{
-  id: string                // 配置记录 ID
-  tenantId: string          // 关联租户 ID
-  companyName: string | null // 企业名称覆盖值
-  contactPerson: string | null // 联系人覆盖值
-  contactPhone: string | null // 联系电话覆盖值
-  address: string | null    // 企业地址覆盖值
-  licenseNo: string | null  // 营业执照号覆盖值
-  qrCodeExpiry: number | null // 收款二维码有效期覆盖值（天）
-  notifySeller: boolean | null // 是否通知业务员
-  notifyOwner: boolean | null // 是否通知老板
-  notifyFinance: boolean | null // 是否通知财务
+  tenantId: string                // 租户 ID
+  companyName: string | null      // 企业名称覆盖值
+  contactPerson: string | null    // 联系人覆盖值
+  contactPhone: string | null     // 联系电话覆盖值
+  address: string | null          // 地址覆盖值
+  licenseNo: string | null        // 营业执照号覆盖值
+  qrCodeExpiry: number | null     // 收款码有效期覆盖值
+  notifySeller: boolean | null    // 是否通知业务员
+  notifyOwner: boolean | null     // 是否通知老板
+  notifyFinance: boolean | null   // 是否通知财务
   creditRemindDays: number | null // 账期提醒提前天数覆盖值
   dailyReportPush: boolean | null // 是否开启日报推送
-  createdAt: string         // 创建时间
-  updatedAt: string         // 更新时间
+  createdAt: string               // 创建时间
+  updatedAt: string               // 更新时间
 }
 ```
 
-**约束说明：**
+关键约束：
 
-- `tenantId` 唯一索引
-- 仅保存租户覆盖值；未覆盖字段由平台默认配置补齐
+- 主键：`tenantId`
+- 与 `tenants` 一对一
+- 表名：`tenant_general_settings`
 
-**printer_templates 表**（租户打印配置）
+**tenant_certifications**
 
 ```typescript
 {
-  id: string                // 打印配置记录 ID
-  tenantId: string          // 关联租户 ID
-  importTemplateId: string   // 绑定的导入映射模板 ID
-  config: any                // JSON: 前端维护的完整打印配置快照，服务端不解析内部结构
+  id: string                            // 资质记录 ID
+  tenantId: string                      // 租户 ID
+  type: string                          // 资质类型
+  licenseUrl: string                    // 资质文件地址
+  legalPerson: string                   // 法人姓名
+  legalIdCard: string                   // 法人身份证号
+  contactPhone: string                  // 联系电话
+  remark: string | null                 // 提交备注
+  status: TenantCertificationStatusEnum // 审核状态
+  comment: string | null                // 审核备注
+  rejectReason: string | null           // 驳回原因
+  submitAt: string                      // 提交时间
+  reviewedAt: string | null             // 审核时间
+  createdAt: string                     // 创建时间
+  updatedAt: string                     // 更新时间
+}
+```
+
+关键约束：
+
+- 主键：`id`
+- 索引：`(tenantId, submitAt)`、`(status, submitAt)`
+- 表名：`tenant_certifications`
+
+**system_configs**
+
+```typescript
+{
+  group: string           // 配置分组
+  key: string             // 配置键
+  value: string           // 配置值
+  note: string | null     // 备注说明
+}
+```
+
+关键约束：
+
+- 复合主键：`(group, key)`
+- 表名：`system_configs`
+
+**audit_logs**
+
+```typescript
+{
+  id: number                      // 日志 ID，BigInt 自增
+  actor: string                   // 操作人
+  action: string                  // 操作动作
+  target: string                  // 操作对象
+  targetType: AuditTargetTypeEnum // 操作对象类型
+  tenantId: string | null         // 关联租户 ID
+  result: AuditResultEnum         // 执行结果
+  ip: string | null               // 来源 IP
+  time: string                    // 操作时间
+}
+```
+
+关键约束：
+
+- 主键：`id`，`BigInt` 自增
+- 索引：`(tenantId, time)`、`(targetType, time)`
+- 表名：`audit_logs`
+
+### 4.2 导入与打印域
+
+**import_templates**
+
+```typescript
+{
+  id: number                 // 模板 ID，BigInt 自增
+  tenantId: string           // 租户 ID
+  name: string               // 模板名称
+  isDefault: boolean         // 是否默认模板
+  defaultFields: any         // 默认字段映射数组，Json
+  customerFields: any        // 自定义字段映射数组，Json
+  createdAt: string          // 创建时间
+  updatedAt: string          // 更新时间
+  deletedAt: string | null   // 软删时间
+}
+```
+
+关键约束：
+
+- 主键：`id`
+- 唯一键：`(tenantId, name)`
+- 索引：`tenantId`
+- 表名：`import_templates`
+- 当前 schema 使用 `deletedAt` 软删
+
+**printer_templates**
+
+```typescript
+{
+  id: number                 // 打印模板 ID，BigInt 自增
+  tenantId: string           // 租户 ID
+  importTemplateId: number   // 绑定的导入模板 ID，BigInt
+  config: any                // 打印配置快照，Json
   configVersion: number      // 配置版本号
-  remark: string | null     // 备注信息
-  updatedBy: string | null  // 最近更新人
-  createdAt: string         // 创建时间
-  updatedAt: string         // 更新时间
+  remark: string | null      // 备注
+  updatedBy: string | null   // 最近更新人
+  createdAt: string          // 创建时间
+  updatedAt: string          // 更新时间
 }
 ```
 
-**约束说明：**
+关键约束：
 
-- `(tenantId, importTemplateId)` 唯一索引
-- 若某张映射模板不存在自定义配置，则前端回退本地默认打印模板
+- 主键：`id`
+- 唯一键：`importTemplateId`
+- 唯一键：`(tenantId, importTemplateId)`
+- 表名：`printer_templates`
 
-### 1.3 订单域
-
-**orders 表**
+**import_jobs**
 
 ```typescript
 {
-  id: string                // 如 "PLT-20260325-001"
-  tenantId: string          // 所属租户
-  sourceOrderNo: string | null // ERP 源订单号（用于聚合）
-  groupKey: string | null   // 防重判定辅键
-  mappingTemplateId: string | null // 绑定的导入模板 ID
-  qrCodeToken: string       // 订单级 H5 公开路由标识，送货单二维码直接使用
-  customer: string          // 客户名称
-  customerPhone: string     // 客户电话
-  customerAddress: string   // 客户地址
-  totalAmount: number       // 订单总金额（元）
-  paid: number              // 已收金额（元）
-  customerFieldValues: any  // JSON: 动态模板映射的自定义字段
-  status: OrderStatus         // 订单收款状态
-  payType: OrderPayType    // 结算方式
-  prints: number            // 打印次数
-  creditDays: number | null // 账期天数
-  creditDueDate: string | null // 账期到期日
-  orderTime: string         // 下单时间
-  voided: boolean           // 是否已作废
-  voidReason: string | null // 作废原因
-  voidedAt: string | null   // 作废时间
-  createdAt: string         // 创建时间
-  updatedAt: string         // 更新时间
+  id: string                               // 导入任务 ID
+  tenantId: string                         // 租户 ID
+  status: OrderImportJobStatusEnum         // 任务状态
+  conflictPolicy: OrderImportConflictPolicyEnum // 冲突处理策略
+  snapshot: any | null                     // 导入快照，Json
+  submittedCount: number                   // 提交总数
+  processedCount: number                   // 已处理数量
+  successCount: number                     // 成功数量
+  skippedCount: number                     // 跳过数量
+  overwrittenCount: number                 // 覆盖数量
+  failedCount: number                      // 失败数量
+  failedOrders: any | null                 // 失败订单明细，Json
+  conflictDetails: any | null              // 冲突明细，Json
+  startedAt: string | null                 // 开始时间
+  heartbeatAt: string | null               // 最近心跳时间
+  completedAt: string | null               // 完成时间
+  lastError: string | null                 // 最近一次任务错误
+  createdAt: string                        // 创建时间
+  updatedAt: string                        // 更新时间
 }
 ```
 
-**约束说明：**
+关键约束：
 
-- `qrCodeToken` 唯一索引
-- 创建订单与导入订单时同步生成 `qrCodeToken`
+- 主键：`id`
+- 索引：`(tenantId, status)`、`(status, heartbeatAt)`
+- 表名：`import_jobs`
 
-**order_items 表**（订单行项目，H5 展示用）
+**print_record_batches**
 
 ```typescript
 {
-  id: string                // 行项目 ID
-  orderId: string           // 关联订单
-  skuName: string           // 商品名称
-  skuSpec: string | null    // 规格
-  unit: string              // 单位
-  quantity: number          // 数量
-  unitPrice: number         // 单价
-  lineAmount: number        // 行金额
+  id: string                  // 批次 ID
+  tenantId: string            // 租户 ID
+  requestId: string           // 前端请求批次号
+  operatorId: string | null   // 操作人 ID，UUID
+  orderIds: any               // 订单 ID 列表，Json
+  totalCount: number          // 订单总数
+  successCount: number        // 成功累计打印次数的订单数
+  remark: string | null       // 备注
+  createdAt: string           // 创建时间
 }
 ```
 
-**import_templates 表**（Excel 导入映射模板）
+关键约束：
+
+- 主键：`id`
+- 唯一键：`(tenantId, requestId)`
+- 表名：`print_record_batches`
+
+### 4.3 订单域
+
+**orders**
 
 ```typescript
 {
-  id: string                // 导入模板 ID
-  tenantId: string          // 关联租户 ID
-  name: string              // 模板名称
-  isDefault: boolean        // 是否默认模板
-  defaultFields: any        // JSON: 系统默认字段映射数组
-  customerFields: any       // JSON: 租户自定义字段映射数组
-  createdAt: string         // 创建时间
-  updatedAt: string         // 更新时间
+  id: string                         // 订单 ID
+  tenantId: string                   // 租户 ID
+  sourceOrderNo: string | null       // 源订单号
+  groupKey: string | null            // 防重辅键
+  mappingTemplateId: number | null   // 映射模板 ID，BigInt
+  qrCodeToken: string                // H5 支付路由标识
+  customer: string                   // 客户名称
+  customerPhone: string              // 客户电话
+  customerAddress: string            // 客户地址
+  totalAmount: string                // 订单总金额，Decimal(12, 2)
+  paid: string                       // 已收金额，Decimal(12, 2)
+  customerFieldValues: any | null    // 动态字段值，Json
+  status: OrderStatusEnum            // 订单状态
+  payType: OrderPayTypeEnum          // 结算方式
+  prints: number                     // 打印次数
+  creditDays: number | null          // 账期天数
+  creditDueDate: string | null       // 账期到期日
+  orderTime: string                  // 下单时间
+  voided: boolean                    // 是否已作废
+  voidReason: string | null          // 作废原因
+  voidedAt: string | null            // 作废时间
+  createdAt: string                  // 创建时间
+  updatedAt: string                  // 更新时间
+  deletedAt: string | null           // 软删时间
 }
 ```
 
-**import_jobs 表**（异步导入任务）
+关键约束：
+
+- 主键：`id`
+- 唯一键：`qrCodeToken`
+- 唯一键：`(tenantId, sourceOrderNo)`
+- 索引：`(tenantId, status)`、`(tenantId, payType)`、`(tenantId, orderTime)`、`mappingTemplateId`
+- 表名：`orders`
+- 当前 schema 使用 `deletedAt` 软删
+
+**order_items**
 
 ```typescript
 {
-  id: string                // 导入任务 ID
-  tenantId: string          // 关联租户 ID
-  status: OrderImportJobStatus // 任务状态
-  conflictPolicy: OrderImportConflictPolicy // 冲突处理策略：skip | overwrite
-  snapshot: any | null      // JSON: 正式导入使用的快照，供任务恢复与重试复用
-  submittedCount: number    // 提交处理的订单数
-  processedCount: number    // 已处理订单数
-  successCount: number      // 成功入库数
-  skippedCount: number      // 跳过数量
-  overwrittenCount: number  // 覆盖更新数量
-  failedCount: number       // 失败数量
-  failedOrders: any         // JSON: 失败订单日志
-  conflictDetails: any      // JSON: 重复冲突判定策略与结果追溯
-  startedAt: string | null  // 开始执行时间
-  heartbeatAt: string | null // 最近心跳时间，用于识别卡死任务
-  completedAt: string | null // 完成时间
-  lastError: string | null  // 最近一次任务级错误
-  createdAt: string         // 创建时间
-  updatedAt: string         // 更新时间
+  id: number                 // 行项目 ID，BigInt 自增
+  orderId: string            // 所属订单 ID
+  skuId: string | null       // 商品主数据 ID
+  skuName: string            // 商品名称
+  skuSpec: string | null     // 商品规格
+  unit: string               // 单位
+  quantity: string           // 数量，Decimal(12, 3)
+  unitPrice: string          // 单价，Decimal(12, 2)
+  lineAmount: string         // 行金额，Decimal(12, 2)
 }
 ```
 
-**print_record_batches 表**（打印回执批次幂等）
+关键约束：
+
+- 主键：`id`
+- 索引：`orderId`
+- 表名：`order_items`
+
+**order_reminders**
 
 ```typescript
 {
-  id: string                // 打印回执批次 ID
-  tenantId: string          // 关联租户 ID
-  requestId: string         // 前端回执批次号；同租户下唯一
-  operatorId: string | null // 操作人 ID
-  orderIds: any             // JSON: 本次提交的订单 ID 列表（服务端去重后持久化）
-  totalCount: number        // 本批次去重后的订单总数
-  successCount: number      // 成功累计打印次数的订单数
-  remark: string | null     // 备注信息
-  createdAt: string         // 创建时间
+  id: string                      // 催款记录 ID
+  tenantId: string                // 租户 ID
+  orderId: string                 // 订单 ID
+  operatorId: string | null       // 操作人 ID，UUID
+  channels: string[]              // 发送渠道列表
+  status: OrderReminderStatusEnum // 发送状态
+  sentAt: string                  // 发送时间
+  createdAt: string               // 创建时间
 }
 ```
 
-**约束说明：**
+关键约束：
 
-- `(tenantId, requestId)` 唯一索引
-- 用于 `POST /orders/print-records` 的批次级幂等，不承担逐单打印审计明细
+- 主键：`id`
+- 索引：`(tenantId, sentAt)`、`(orderId, sentAt)`
+- 表名：`order_reminders`
 
-### 1.4 支付域
+### 4.4 支付域
 
-**payments 表**（收款流水）
+**payments**
 
 ```typescript
 {
-  id: string                // 流水号，如 "PAY-20260330-001"
-  tenantId: string          // 关联租户 ID
-  orderId: string           // 关联订单号
-  customer: string          // 客户名称
-  amount: number            // 收款金额（元）
-  channel: string           // 支付通道编码，如 lakala | cash | other_paid
-  fee: number               // 手续费（元）
-  net: number               // 到账金额（元）
-  status: PaymentRecordStatus // 流水状态
-  paidAt: string            // 支付完成时间
-  createdAt: string         // 创建时间
+  id: string                      // 收款流水 ID
+  tenantId: string                // 租户 ID
+  orderId: string                 // 订单 ID
+  customer: string                // 客户名称
+  amount: string                  // 收款金额，Decimal(12, 2)
+  channel: string                 // 支付通道编码
+  fee: string                     // 手续费，Decimal(12, 2)
+  net: string                     // 到账金额，Decimal(12, 2)
+  status: PaymentRecordStatusEnum // 流水状态
+  gatewayTradeNo: string | null   // 第三方交易单号
+  paidAt: string                  // 支付完成时间
+  createdAt: string               // 创建时间
+  updatedAt: string               // 更新时间
 }
 ```
 
-**payment_orders 表**（H5 支付单，对接网关用）
+关键约束：
+
+- 主键：`id`
+- 唯一键：`gatewayTradeNo`
+- 索引：`(tenantId, paidAt)`、`orderId`
+- 表名：`payments`
+
+**payment_orders**
 
 ```typescript
 {
-  id: string                // 支付单号
-  tenantId: string          // 关联租户 ID
-  orderId: string           // 关联业务订单 ID
-  amount: number            // 本次支付单金额
-  status: PaymentOrderStatus // H5 支付状态
-  paymentMethod: PaymentMethod | null // 用户选择的支付方式
-  channel: PaymentChannel | null // 实际支付渠道
-  statusMessage: string | null // 状态补充说明
-  // 线下支付信息
-  offlineRemark: string | null // 线下支付备注
-  cashVerifyStatus: CashVerifyStatus | null // 现金核销状态
-  offlineSubmittedAt: string | null // 线下支付提交时间
-  cashVerifiedAt: string | null // 现金核销完成时间
-  // 网关信息
-  gatewayTradeNo: string | null  // 第三方支付单号
-  lastInitiatedAt: string | null // 最近一次发起在线支付时间
-  paidAt: string | null     // 实际支付完成时间
-  createdAt: string         // 创建时间
-  updatedAt: string         // 更新时间
+  id: string                               // 支付单 ID
+  tenantId: string                         // 租户 ID
+  orderId: string                          // 订单 ID
+  amount: string                           // 本次支付金额，Decimal(12, 2)
+  status: PaymentOrderStatusEnum           // 支付单状态
+  paymentMethod: PaymentMethodEnum | null  // 支付方式
+  channel: PaymentChannelEnum | null       // 实际支付渠道
+  statusMessage: string | null             // 状态说明
+  offlineRemark: string | null             // 线下支付备注
+  cashVerifyStatus: CashVerifyStatusEnum | null // 现金核销状态
+  offlineSubmittedAt: string | null        // 线下支付提交时间
+  cashVerifiedAt: string | null            // 现金核销时间
+  gatewayTradeNo: string | null            // 第三方交易单号
+  lastInitiatedAt: string | null           // 最近一次发起支付时间
+  paidAt: string | null                    // 实际支付完成时间
+  createdAt: string                        // 创建时间
+  updatedAt: string                        // 更新时间
 }
 ```
 
-**约束说明：**
+关键约束：
 
-- H5 支付状态统一采用 `unpaid / paying / pending_verification / paid / expired`
-- 当状态为 `expired` 时，允许再次调用支付发起链路，刷新网关单信息并进入新一轮支付流程
+- 主键：`id`
+- 唯一键：`gatewayTradeNo`
+- 索引：`(tenantId, status)`、`orderId`
+- 表名：`payment_orders`
 
+### 4.5 公告域
 
-
-### 1.5 计费域
-
-**packages 表**（套餐定义）
+**notices**
 
 ```typescript
 {
-  id: string                // 套餐 ID
-  name: string              // "基础版" | "标准版" | "旗舰版"
-  price: string             // 价格描述，如 "¥4,999/年"
-  rate: string              // 费率描述，如 "费率 4‰"
-  strategy: string          // 策略说明
-  features: string[]        // 套餐功能列表
-  tenants: number           // 在用租户数（可计算）
-  status: BillingPackageStatus // 套餐状态
-  createdAt: string         // 创建时间
-  updatedAt: string         // 更新时间
+  id: string                     // 公告 ID
+  title: string                  // 公告标题
+  content: string                // 公告正文
+  planVersion: string | null     // 版本范围
+  audience: string | null        // 发布范围
+  timing: PublishTimingEnum      // 发布时间类型
+  scheduledAt: string | null     // 预约发布时间
+  reminder: boolean              // 是否开启提醒
+  isDraft: boolean               // 是否草稿
+  status: NoticeStatusEnum       // 公告状态
+  publishAt: string | null       // 实际发布时间
+  createdAt: string              // 创建时间
+  updatedAt: string              // 更新时间
 }
 ```
 
-**contracts 表**
+关键约束：
+
+- 主键：`id`
+- 表名：`notices`
+
+**notice_reads**
 
 ```typescript
 {
-  contractNo: string        // 如 "HT-202603-001"
-  tenantId: string          // 关联租户 ID
-  type: ContractType // 合同类型
-  packageName: string       // 关联套餐名称
-  contactName: string       // 联系人姓名
-  phone: string             // 联系电话
-  annualFee: string         // 年费金额
-  rate: string              // 费率说明
-  serviceStart: string      // 服务开始时间
-  serviceEnd: string        // 服务结束时间
-  status: ContractStatus // 合同状态
-  signLink: string | null   // 电子签链接
-  smsSent: boolean          // 是否已发送签署短信
-  remark: string | null     // 备注信息
-  terminateReason: string | null // 终止原因
-  approvedAt: string | null // 审批通过时间
-  createdAt: string         // 创建时间
-  updatedAt: string         // 更新时间
+  noticeId: string             // 公告 ID
+  tenantId: string             // 租户 ID
+  userId: string               // 用户 ID，UUID
+  isRead: boolean              // 是否已读
+  readAt: string | null        // 已读时间
 }
 ```
 
-**invoices 表**
+关键约束：
+
+- 复合主键：`(noticeId, tenantId, userId)`
+- 索引：`(tenantId, userId, isRead)`
+- 表名：`notice_reads`
+
+### 4.6 编号域
+
+**id_sequences**
 
 ```typescript
 {
-  billNo: string            // 如 "INV-001"
-  tenantId: string          // 关联租户 ID
-  amount: string            // 开票金额
-  cycle: string             // 结算周期，如 "2026-03"
-  status: InvoiceStatus // 发票状态
-  taxRate: number | null    // 税率
-  issuedAt: string | null   // 开票时间
-  voidReason: string | null // 作废原因
-  voidedAt: string | null   // 作废时间
-  createdAt: string         // 创建时间
+  prefix: string              // 编号前缀
+  dateKey: string             // 日期键
+  currentVal: number          // 当前序列值，BigInt
 }
 ```
 
-### 1.6 运维域
+关键约束：
 
-**notices 表**（系统公告）
+- 复合主键：`(prefix, dateKey)`
+- 表名：`id_sequences`
 
-```typescript
-{
-  id: string                // 公告 ID
-  title: string             // 公告标题
-  content: string           // 公告正文
-  planVersion: string       // 套餐版本范围
-  audience: string          // 发布范围
-  timing: PublishTiming // 发布时间类型
-  scheduledAt: string | null // 预约发布时间
-  reminder: boolean         // 24小时二次提醒
-  isDraft: boolean          // 是否草稿
-  status: NoticeStatus // 公告状态
-  publishAt: string | null  // 实际发布时间
-  createdAt: string         // 创建时间
-  updatedAt: string         // 更新时间
-}
-```
+## 5. 同步规则
 
-**notice_reads 表**（公告已读状态）
-
-```typescript
-{
-  id: string                // 已读记录 ID
-  noticeId: string          // 关联公告 ID
-  tenantId: string          // 关联租户 ID
-  userId: string            // 关联用户 ID
-  isRead: boolean           // 是否已读
-  readAt: string | null     // 已读时间
-}
-```
-
-**tickets 表**
-
-```typescript
-{
-  no: string                // 如 "TK-2301"
-  tenantId: string          // 提单租户 ID
-  issue: string             // 工单问题描述
-  assignee: string          // 当前处理人
-  status: TicketStatus // 工单状态
-  resolution: string | null // 处理结论
-  createdAt: string         // 创建时间
-  updatedAt: string         // 更新时间
-}
-```
-
-**ticket_replies 表**
-
-```typescript
-{
-  id: string                // 回复记录 ID
-  ticketNo: string          // 关联工单编号
-  content: string           // 回复内容
-  attachments: string[]     // 附件地址列表
-  repliedBy: string         // 回复人
-  repliedAt: string         // 回复时间
-}
-```
-
-**audit_logs 表**
-
-```typescript
-{
-  id: string                // 日志 ID
-  actor: string             // 操作人
-  action: string            // 操作名称
-  target: string            // 操作对象
-  targetType: AuditTargetType // 操作对象类型
-  tenantId: string | null   // 关联租户 ID；平台操作可为空
-  result: AuditResult // 执行结果
-  ip: string | null         // 操作来源 IP
-  time: string              // 操作时间
-}
-```
-
-**order_reminders 表**
-
-```typescript
-{
-  id: string                // 催款记录 ID
-  tenantId: string          // 关联租户 ID
-  orderId: string           // 关联订单 ID
-  operatorId: string | null // 操作人 ID
-  channels: string[]        // 实际发送渠道，如 ["sms", "wechat"]
-  status: 'sent' | 'failed' // 发送结果状态
-  sentAt: string            // 发送时间
-  createdAt: string         // 创建时间
-}
-```
-
-**alert_rules 表**
-
-```typescript
-{
-  id: string                // 规则 ID
-  name: string              // 规则名称
-  trigger: string           // 触发条件描述
-  channel: string           // 通知通道
-  enabled: boolean          // 是否启用
-  createdAt: string         // 创建时间
-  updatedAt: string         // 更新时间
-}
-```
-
-**security_policies 表**
-
-```typescript
-{
-  id: string                // 策略 ID
-  title: string             // 策略标题
-  detail: string            // 策略说明
-  enabled: boolean          // 是否启用
-}
-```
-
-**ip_whitelist 表**
-
-```typescript
-{
-  id: string                // 白名单记录 ID
-  label: string             // 标识名称
-  cidr: string              // 白名单网段
-}
-```
-
-**period_policies 表**（单行配置）
-
-```typescript
-{
-  sessionHours: number      // 会话有效时长，默认 8
-  passwordDays: number      // 密码过期周期，默认 90
-  retentionDays: number     // 审计日志保留天数，默认 180
-}
-```
-
-**system_configs 表**（平台默认配置源）
-
-```typescript
-{
-  group: string             // "平台默认参数" | "邮件通道" | "短信通道"
-  key: string               // 配置键
-  value: string             // 配置值
-  note: string              // 配置说明
-}
-```
-
-**说明：**
-
-- 在 `/settings/general` 场景中，`system_configs` 提供平台默认值来源
-- 租户个性化覆盖值存放在 `tenant_general_settings`，最终对前端返回“平台默认 + 租户覆盖”的合并结果
-
-**service_configs 表**
-
-```typescript
-{
-  id: string                // 配置记录 ID
-  name: string              // 配置名称
-  category: string          // 配置分类
-  key: string               // 配置键
-  provider: string          // 服务提供方
-  note: string              // 备注说明
-}
-```
-
-**service_providers 表**（外部服务商）
-
-```typescript
-{
-  id: string                // 服务商记录 ID
-  name: string              // 服务商名称
-  category: string          // "消息通道" | "资质审核" | "合同管理"
-  contactName: string       // 联系人姓名
-  contactPhone: string      // 联系电话
-  status: ServiceProviderStatus // 接入状态
-  score: string             // 综合评分
-  updatedAt: string         // 最近更新时间
-}
-```
-
-## 二、建表汇总
-
-| # | 表名 | 说明 | 关联的前端 |
-|---|------|------|-----------|
-| 1 | users | 用户账号 | Admin + Tenant |
-| 2 | roles | 角色模板 | Admin + Tenant |
-| 3 | permissions | 权限树 | Admin + Tenant |
-| 4 | tenants | 租户 | Admin + Tenant |
-| 5 | tenant_certifications | 资质审核 | Admin + Tenant |
-| 6 | tenant_general_settings | 租户通用配置覆盖层 | Tenant |
-| 7 | printer_templates | 打印模板配置 | Tenant |
-| 8 | orders | 订单 | Admin + Tenant + H5 |
-| 9 | order_items | 订单行项目 | Admin + Tenant + H5 |
-| 10 | import_templates | 导入模板 | Tenant |
-| 11 | import_jobs | 异步导入任务 | Tenant |
-| 12 | print_record_batches | 打印回执批次幂等 | Tenant |
-| 13 | payments | 收款流水 | Admin + Tenant |
-| 14 | payment_orders | H5 支付单 | H5 + Tenant（核销） |
-| 15 | packages | 套餐定义 | Admin |
-| 16 | contracts | 合同 | Admin |
-| 17 | invoices | 账单 | Admin |
-| 18 | notices | 系统公告 | Admin（写）+ Tenant（读） |
-| 19 | notice_reads | 公告已读状态 | Tenant |
-| 20 | tickets | 工单 | Admin |
-| 21 | ticket_replies | 工单回复 | Admin |
-| 22 | audit_logs | 操作日志 | Admin + Tenant |
-| 23 | alert_rules | 告警规则 | Admin |
-| 24 | security_policies | 安全策略 | Admin |
-| 25 | ip_whitelist | IP 白名单 | Admin |
-| 26 | period_policies | 周期策略 | Admin |
-| 27 | system_configs | 平台默认配置源 | Admin |
-| 28 | service_configs | 服务接入配置 | Admin |
-| 29 | service_providers | 外部服务商 | Admin |
-| — | **合计** | **29 张表** | — |
+- 本文不先于 `schema.prisma` 演进。
+- 新增、删除、重命名字段或约束后，应在 `schema.prisma` 稳定后再同步本文。
+- 如果本文与 `schema.prisma` 冲突，以 `apps/api/prisma/schema.prisma` 为准。
