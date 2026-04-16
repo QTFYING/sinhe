@@ -25,8 +25,8 @@ export interface TenantOrderItem {
   mappingTemplateId?: string
   qrCodeToken?: string
   customer: string
-  skuName: string
-  lineAmount: number
+  customerPhone: string
+  customerAddress: string
   totalAmount: number
   paid: number
   status: OrderStatus
@@ -34,7 +34,7 @@ export interface TenantOrderItem {
   prints: number
   orderTime: string
   lineItems: OrderLineItem[]
-  customerValues?: Record<string, string>
+  customerFieldValues?: Record<string, string>
   voided: boolean
   voidReason?: string
   voidedAt?: string
@@ -48,15 +48,15 @@ export interface AdminOrderItem {
   mappingTemplateId?: string
   qrCodeToken?: string
   customer: string
-  skuName: string
-  lineAmount: number
+  customerPhone: string
+  customerAddress: string
   totalAmount: number
   paid: number
   status: OrderStatus
   payType: OrderPayType
   orderTime: string
   lineItems: OrderLineItem[]
-  customerValues?: Record<string, string>
+  customerFieldValues?: Record<string, string>
   voided: boolean
   voidReason?: string
   voidedAt?: string
@@ -79,6 +79,8 @@ export interface AdminOrderListQuery {
 
 export interface CreateOrderRequest {
   customer: string
+  customerPhone?: string
+  customerAddress?: string
   summary?: string
   amount: number
   paid?: number
@@ -89,6 +91,8 @@ export interface CreateOrderRequest {
 
 export interface UpdateOrderRequest {
   customer?: string
+  customerPhone?: string
+  customerAddress?: string
   summary?: string
   amount?: number
   paid?: number
@@ -142,11 +146,12 @@ export interface OrderImportPreviewOrder {
   sourceOrderNo: string
   groupKey?: string
   customer: string
-  skuName: string
-  lineAmount: number | string
+  customerPhone: string
+  customerAddress: string
   totalAmount: number | string
   orderTime: string
-  customerValues: Record<string, string>
+  payType: OrderPayType
+  customerFieldValues: Record<string, string>
   lineItems: OrderLineItem[]
 }
 
@@ -154,11 +159,12 @@ export interface OrderImportPreviewOrderResult {
   sourceOrderNo: string
   groupKey?: string
   customer: string
-  skuName: string
-  lineAmount: number
+  customerPhone: string
+  customerAddress: string
   totalAmount: number
   orderTime: string
-  customerValues: Record<string, string>
+  payType: OrderPayType
+  customerFieldValues: Record<string, string>
   mappingTemplateId?: string
   lineItems: OrderLineItem[]
 }

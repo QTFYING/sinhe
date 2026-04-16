@@ -167,13 +167,13 @@
   mappingTemplateId: string | null // 绑定的导入模板 ID
   qrCodeToken: string       // 订单级 H5 公开路由标识，送货单二维码直接使用
   customer: string          // 客户名称
-  skuName: string           // 主商品名称
-  lineAmount: number        // 主展示行金额（元）
+  customerPhone: string     // 客户电话
+  customerAddress: string   // 客户地址
   totalAmount: number       // 订单总金额（元）
   paid: number              // 已收金额（元）
-  customerValues: any       // JSON: 动态模板映射的自定义字段
+  customerFieldValues: any  // JSON: 动态模板映射的自定义字段
   status: OrderStatus         // 订单收款状态
-  payType: OrderPayType    // 付款方式
+  payType: OrderPayType    // 结算方式
   prints: number            // 打印次数
   creditDays: number | null // 账期天数
   creditDueDate: string | null // 账期到期日
