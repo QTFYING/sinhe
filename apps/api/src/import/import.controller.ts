@@ -3,7 +3,6 @@ import {
   Controller,
   Get,
   Param,
-  ParseUUIDPipe,
   Post,
   Put,
   UseGuards,
@@ -17,9 +16,9 @@ import type {
   OrderImportPreviewResponse,
   OrderImportSubmitRequest,
   OrderImportSubmitResponse,
-  OrderImportTemplateMutationResponse,
   OrderImportTemplate,
   OrderImportTemplateField,
+  OrderImportTemplateMutationResponse,
   UpdateOrderImportTemplateRequest,
 } from '@shou/types/contracts';
 import { CurrentUser, JwtPayload } from '../auth/decorators/current-user.decorator';
@@ -85,13 +84,13 @@ export class ImportController {
   }
 
   @ApiOperation({ summary: '更新导入模板' })
-  @ApiParam({ name: 'id', description: '导入模板 ID', format: 'uuid' })
+  @ApiParam({ name: 'id', description: '导入模板 ID' })
   @ApiOkResponse({ type: OrderImportTemplateMutationResponseSwagger })
   @Put('import/templates/:id')
   @Roles(UserRoleEnum.TENANT_OWNER)
   async updateImportTemplate(
     @CurrentUser() currentUser: JwtPayload,
-    @Param('id', new ParseUUIDPipe()) id: string,
+    @Param('id') id: string,
     @Body() request: UpdateImportTemplateDto,
   ): Promise<OrderImportTemplateMutationResponse> {
     return this.importService.updateImportTemplate(
@@ -124,13 +123,13 @@ export class ImportController {
   }
 
   @ApiOperation({ summary: '查询导入任务进度' })
-  @ApiParam({ name: 'jobId', description: '导入任务 ID', format: 'uuid' })
+  @ApiParam({ name: 'jobId', description: '导入任务 ID' })
   @ApiOkResponse({ type: OrderImportJobResponseSwagger })
   @Get('orders/import/jobs/:jobId')
   @Roles(UserRoleEnum.TENANT_OWNER, UserRoleEnum.TENANT_OPERATOR)
   async getImportJob(
     @CurrentUser() currentUser: JwtPayload,
-    @Param('jobId', new ParseUUIDPipe()) jobId: string,
+    @Param('jobId') jobId: string,
   ): Promise<OrderImportJobResponse> {
     return this.importService.getImportJob(currentUser, jobId);
   }

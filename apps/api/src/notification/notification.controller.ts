@@ -1,4 +1,4 @@
-import { Controller, Get, Param, ParseUUIDPipe, Post, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, Param, Post, Query, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiExtraModels, ApiOkResponse, ApiOperation, ApiParam, ApiTags } from '@nestjs/swagger';
 import type { TenantNotificationRecordItem } from '@shou/types/contracts';
 import type { PaginatedResponse } from '@shou/types/common';
@@ -39,7 +39,7 @@ export class NotificationController {
   }
 
   @ApiOperation({ summary: '标记公告已读' })
-  @ApiParam({ name: 'id', description: '公告 ID', format: 'uuid' })
+  @ApiParam({ name: 'id', description: '公告 ID' })
   @ApiOkResponse({ description: '标记成功', schema: { type: 'null' } })
   @Post(':id/read-records')
   @Roles(
@@ -50,7 +50,7 @@ export class NotificationController {
   )
   async markAsRead(
     @CurrentUser() currentUser: JwtPayload,
-    @Param('id', new ParseUUIDPipe()) noticeId: string,
+    @Param('id') noticeId: string,
   ): Promise<null> {
     return this.notificationService.markAsRead(currentUser, noticeId);
   }

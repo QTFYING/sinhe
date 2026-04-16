@@ -117,7 +117,7 @@ export class TenantBatchActionResponseSwagger {
   @ApiProperty({ description: '成功数量', example: 8 })
   successCount!: number;
 
-  @ApiProperty({ description: '失败的 ID 列表', type: [String], example: ['uuid-1', 'uuid-2'] })
+  @ApiProperty({ description: '失败的 ID 列表', type: [String], example: ['T100001', 'T100002'] })
   failedIds!: string[];
 }
 

@@ -1,10 +1,11 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsIn, IsOptional, IsUUID } from 'class-validator';
+import { IsIn, IsNotEmpty, IsOptional, IsString } from 'class-validator';
 import { OrderImportConflictPolicyEnum } from '@shou/types/enums';
 
 export class SubmitOrderImportDto {
-  @ApiProperty({ description: '预检批次 ID', format: 'uuid' })
-  @IsUUID()
+  @ApiProperty({ description: '预检批次 ID' })
+  @IsString()
+  @IsNotEmpty()
   previewId!: string;
 
   @ApiPropertyOptional({

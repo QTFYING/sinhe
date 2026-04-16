@@ -1253,9 +1253,20 @@ export class ImportService implements OnModuleInit, OnModuleDestroy {
   }
 
   private readPayType(value: unknown): OrderPayType | undefined {
-    return value === OrderPayTypeEnum.CREDIT ? OrderPayTypeEnum.CREDIT
-      : value === OrderPayTypeEnum.CASH ? OrderPayTypeEnum.CASH
-        : undefined;
+    const resolved = this.readString(value)?.toLowerCase();
+    if (!resolved) {
+      return undefined;
+    }
+
+    if (['credit', '账期'].includes(resolved)) {
+      return OrderPayTypeEnum.CREDIT;
+    }
+
+    if (['cash', '现款', '现金'].includes(resolved)) {
+      return OrderPayTypeEnum.CASH;
+    }
+
+    return undefined;
   }
 
   private toImportJobStatus(status: PrismaImportJobStatusEnum): OrderImportJobStatus {

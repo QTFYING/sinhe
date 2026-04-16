@@ -2,15 +2,13 @@ import { Type } from 'class-transformer';
 import { ApiProperty } from '@nestjs/swagger';
 import {
   IsArray,
-  IsEnum,
+  IsDefined,
   IsNotEmpty,
   IsObject,
   IsOptional,
   IsString,
-  IsUUID,
   ValidateNested,
 } from 'class-validator';
-import { OrderPayTypeEnum } from '@shou/types/enums';
 import { OrderLineItemDto } from '../../order/dto/order-line-item.dto';
 
 export class ImportPreviewOrderDto {
@@ -40,6 +38,7 @@ export class ImportPreviewOrderDto {
   customerAddress!: string;
 
   @ApiProperty({ description: '订单总金额', example: 48 })
+  @IsDefined()
   totalAmount!: number | string;
 
   @ApiProperty({ description: '下单时间', example: '2026-04-15 09:30:00' })
@@ -47,9 +46,10 @@ export class ImportPreviewOrderDto {
   @IsNotEmpty()
   orderTime!: string;
 
-  @ApiProperty({ description: '结算方式', enum: Object.values(OrderPayTypeEnum), example: OrderPayTypeEnum.CASH })
-  @IsEnum(OrderPayTypeEnum)
-  payType!: (typeof OrderPayTypeEnum)[keyof typeof OrderPayTypeEnum];
+  @ApiProperty({ description: '结算方式', example: 'cash' })
+  @IsString()
+  @IsNotEmpty()
+  payType!: string;
 
   @ApiProperty({
     description: '模板自定义字段值',
@@ -68,8 +68,9 @@ export class ImportPreviewOrderDto {
 }
 
 export class ImportPreviewDto {
-  @ApiProperty({ description: '导入模板 ID', format: 'uuid' })
-  @IsUUID()
+  @ApiProperty({ description: '导入模板 ID' })
+  @IsString()
+  @IsNotEmpty()
   templateId!: string;
 
   @ApiProperty({ description: '前端根据映射模板回填后的标准订单数组', type: [ImportPreviewOrderDto] })

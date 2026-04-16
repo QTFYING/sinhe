@@ -6,7 +6,6 @@ import {
   IsInt,
   IsOptional,
   IsString,
-  IsUUID,
   Max,
   Min,
 } from 'class-validator';
@@ -43,9 +42,9 @@ export class ListOrdersQueryDto {
   @IsEnum(OrderPayTypeEnum)
   payType?: (typeof OrderPayTypeEnum)[keyof typeof OrderPayTypeEnum];
 
-  @ApiPropertyOptional({ description: '导入模板 ID', example: 'c92a1e5b-87f0-4d61-9c26-6141d81df7fa' })
+  @ApiPropertyOptional({ description: '导入模板 ID', example: '1' })
   @IsOptional()
-  @IsUUID()
+  @IsString()
   templateId?: string;
 
   @ApiPropertyOptional({ description: '开始日期', example: '2026-04-01' })

@@ -19,18 +19,18 @@ export class IdGeneratorService {
    */
   async nextDailyId(prefix: string, digits: number): Promise<string> {
     const rows = await this.prisma.$queryRaw<
-      { current_val: bigint; date_key: Date }[]
+      { currentVal: bigint; dateKey: Date }[]
     >`
-      INSERT INTO id_sequences (prefix, date_key, current_val)
+      INSERT INTO id_sequences (prefix, "dateKey", "currentVal")
       VALUES (${prefix}, CURRENT_DATE, 1)
-      ON CONFLICT (prefix, date_key)
-      DO UPDATE SET current_val = id_sequences.current_val + 1
-      RETURNING current_val, date_key
+      ON CONFLICT (prefix, "dateKey")
+      DO UPDATE SET "currentVal" = id_sequences."currentVal" + 1
+      RETURNING "currentVal", "dateKey"
     `;
 
-    const { current_val, date_key } = rows[0];
-    const dateStr = dayjs(date_key).format('YYYYMMDD');
-    const seq = String(current_val).padStart(digits, '0');
+    const { currentVal, dateKey } = rows[0];
+    const dateStr = dayjs(dateKey).format('YYYYMMDD');
+    const seq = String(currentVal).padStart(digits, '0');
     return `${prefix}${dateStr}${seq}`;
   }
 

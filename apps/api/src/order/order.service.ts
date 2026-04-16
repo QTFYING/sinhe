@@ -274,7 +274,7 @@ export class OrderService {
     request: OrderPrintRecordRequest,
   ): Promise<OrderPrintRecordResponse> {
     const tenantId = this.getTenantId(currentUser);
-    const orderIds = this.normalizeUuidArray(request.orderIds, 'orderIds');
+    const orderIds = this.normalizeIdArray(request.orderIds, 'orderIds');
     const requestId = request.requestId?.trim() || undefined;
 
     if (requestId) {
@@ -1011,7 +1011,7 @@ export class OrderService {
     return date;
   }
 
-  private normalizeUuidArray(values: string[], label: string): string[] {
+  private normalizeIdArray(values: string[], label: string): string[] {
     const normalized = Array.from(new Set(values.map((item) => item.trim()).filter(Boolean)));
     if (normalized.length === 0) {
       throw new BadRequestException(`${label} 不能为空`);

@@ -4,7 +4,6 @@ import {
   Get,
   Ip,
   Param,
-  ParseUUIDPipe,
   Patch,
   Post,
   Query,
@@ -110,13 +109,13 @@ export class TenantAdminController {
   }
 
   @ApiOperation({ summary: '创建租户审核决议' })
-  @ApiParam({ name: 'id', description: '租户 ID', format: 'uuid' })
+  @ApiParam({ name: 'id', description: '租户 ID' })
   @ApiOkResponse({ type: TenantAuditDecisionResponseSwagger })
   @Post(':id/audit-decisions')
   @Roles(UserRoleEnum.OS_SUPER_ADMIN)
   async createAuditDecision(
     @CurrentUser() currentUser: JwtPayload,
-    @Param('id', new ParseUUIDPipe()) tenantId: string,
+    @Param('id') tenantId: string,
     @Body() request: CreateTenantAuditDecisionDto,
     @Ip() ip: string,
   ): Promise<TenantAuditDecisionResponse> {
@@ -145,13 +144,13 @@ export class TenantAdminController {
   }
 
   @ApiOperation({ summary: '创建租户续费记录' })
-  @ApiParam({ name: 'id', description: '租户 ID', format: 'uuid' })
+  @ApiParam({ name: 'id', description: '租户 ID' })
   @ApiOkResponse({ type: TenantRenewalResponseSwagger })
   @Post(':id/renewals')
   @Roles(UserRoleEnum.OS_SUPER_ADMIN)
   async createRenewal(
     @CurrentUser() currentUser: JwtPayload,
-    @Param('id', new ParseUUIDPipe()) tenantId: string,
+    @Param('id') tenantId: string,
     @Body() request: CreateTenantRenewalDto,
     @Ip() ip: string,
   ): Promise<TenantRenewalResponse> {
@@ -164,13 +163,13 @@ export class TenantAdminController {
   }
 
   @ApiOperation({ summary: '更新租户状态' })
-  @ApiParam({ name: 'id', description: '租户 ID', format: 'uuid' })
+  @ApiParam({ name: 'id', description: '租户 ID' })
   @ApiOkResponse({ type: TenantStatusMutationResponseSwagger })
   @Patch(':id')
   @Roles(UserRoleEnum.OS_SUPER_ADMIN)
   async patchStatus(
     @CurrentUser() currentUser: JwtPayload,
-    @Param('id', new ParseUUIDPipe()) tenantId: string,
+    @Param('id') tenantId: string,
     @Body() request: PatchTenantStatusDto,
     @Ip() ip: string,
   ): Promise<TenantStatusMutationResponse> {
@@ -217,13 +216,13 @@ export class TenantAdminController {
   }
 
   @ApiOperation({ summary: '创建资质审核决议' })
-  @ApiParam({ name: 'id', description: '资质记录 ID', format: 'uuid' })
+  @ApiParam({ name: 'id', description: '资质记录 ID' })
   @ApiOkResponse({ type: TenantCertificationReviewDecisionResponseSwagger })
   @Post('certifications/:id/review-decisions')
   @Roles(UserRoleEnum.OS_SUPER_ADMIN)
   async createCertificationReviewDecision(
     @CurrentUser() currentUser: JwtPayload,
-    @Param('id', new ParseUUIDPipe()) certificationId: string,
+    @Param('id') certificationId: string,
     @Body() request: CreateTenantCertificationReviewDecisionDto,
     @Ip() ip: string,
   ): Promise<TenantCertificationReviewDecisionResponse> {

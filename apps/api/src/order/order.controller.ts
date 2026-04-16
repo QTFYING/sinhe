@@ -3,7 +3,6 @@ import {
   Controller,
   Get,
   Param,
-  ParseUUIDPipe,
   Patch,
   Post,
   Put,
@@ -126,7 +125,7 @@ export class OrderController {
   }
 
   @ApiOperation({ summary: '获取订单详情' })
-  @ApiParam({ name: 'id', description: '订单 ID', format: 'uuid' })
+  @ApiParam({ name: 'id', description: '订单 ID' })
   @ApiOkResponse({
     schema: {
       oneOf: [
@@ -144,7 +143,7 @@ export class OrderController {
     UserRoleEnum.TENANT_VIEWER,
   )
   async getOrder(
-    @Param('id', new ParseUUIDPipe()) id: string,
+    @Param('id') id: string,
     @CurrentUser() currentUser: JwtPayload,
   ): Promise<TenantOrderItem | AdminOrderItem> {
     return this.orderService.getOrder(id, currentUser);
@@ -162,39 +161,39 @@ export class OrderController {
   }
 
   @ApiOperation({ summary: '更新订单' })
-  @ApiParam({ name: 'id', description: '订单 ID', format: 'uuid' })
+  @ApiParam({ name: 'id', description: '订单 ID' })
   @ApiOkResponse({ type: TenantOrderItemSwagger })
   @Put(':id')
   @Roles(UserRoleEnum.TENANT_OWNER, UserRoleEnum.TENANT_OPERATOR)
   async updateOrder(
     @CurrentUser() currentUser: JwtPayload,
-    @Param('id', new ParseUUIDPipe()) id: string,
+    @Param('id') id: string,
     @Body() request: UpdateOrderDto,
   ): Promise<TenantOrderItem> {
     return this.orderService.updateOrder(currentUser, id, request as UpdateOrderRequest);
   }
 
   @ApiOperation({ summary: '更新订单作废状态' })
-  @ApiParam({ name: 'id', description: '订单 ID', format: 'uuid' })
+  @ApiParam({ name: 'id', description: '订单 ID' })
   @ApiOkResponse({ type: TenantOrderItemSwagger })
   @Patch(':id')
   @Roles(UserRoleEnum.TENANT_OWNER, UserRoleEnum.TENANT_OPERATOR)
   async voidOrder(
     @CurrentUser() currentUser: JwtPayload,
-    @Param('id', new ParseUUIDPipe()) id: string,
+    @Param('id') id: string,
     @Body() request: VoidOrderDto,
   ): Promise<TenantOrderItem> {
     return this.orderService.voidOrder(currentUser, id, request as VoidOrderRequest);
   }
 
   @ApiOperation({ summary: '创建催款提醒记录' })
-  @ApiParam({ name: 'id', description: '订单 ID', format: 'uuid' })
+  @ApiParam({ name: 'id', description: '订单 ID' })
   @ApiOkResponse({ type: CreateOrderReminderResponseSwagger })
   @Post(':id/reminders')
   @Roles(UserRoleEnum.TENANT_OWNER, UserRoleEnum.TENANT_FINANCE)
   async createReminder(
     @CurrentUser() currentUser: JwtPayload,
-    @Param('id', new ParseUUIDPipe()) id: string,
+    @Param('id') id: string,
     @Body() request: CreateOrderReminderDto,
   ): Promise<CreateOrderReminderResponse> {
     return this.orderService.createReminder(
@@ -205,13 +204,13 @@ export class OrderController {
   }
 
   @ApiOperation({ summary: '创建回款记录' })
-  @ApiParam({ name: 'id', description: '订单 ID', format: 'uuid' })
+  @ApiParam({ name: 'id', description: '订单 ID' })
   @ApiOkResponse({ type: CreateOrderReceiptResponseSwagger })
   @Post(':id/receipts')
   @Roles(UserRoleEnum.TENANT_OWNER, UserRoleEnum.TENANT_FINANCE)
   async createReceipt(
     @CurrentUser() currentUser: JwtPayload,
-    @Param('id', new ParseUUIDPipe()) id: string,
+    @Param('id') id: string,
     @Body() request: CreateOrderReceiptDto,
   ): Promise<CreateOrderReceiptResponse> {
     return this.orderService.createReceipt(

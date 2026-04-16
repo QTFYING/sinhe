@@ -55,6 +55,14 @@ function parseOptionalInt(name, defaultValue) {
   return value;
 }
 
+async function ensureIdSequences() {
+  // 业务编号依赖的 PostgreSQL sequence，Prisma schema 无法声明，故在此幂等创建
+  await prisma.$executeRawUnsafe('CREATE SEQUENCE IF NOT EXISTS tenant_seq START 100001');
+  await prisma.$executeRawUnsafe('CREATE SEQUENCE IF NOT EXISTS notice_seq START 1');
+  await prisma.$executeRawUnsafe('CREATE SEQUENCE IF NOT EXISTS cert_seq START 1');
+  console.log('[ok] ID sequences 已就绪 (tenant_seq / notice_seq / cert_seq)');
+}
+
 async function ensureGeneralSettingsDefaults() {
   for (const item of DEFAULT_GENERAL_SETTINGS_CONFIGS) {
     await prisma.systemConfig.upsert({
@@ -216,6 +224,7 @@ async function ensureTenantAndOwner() {
 
 async function main() {
   console.log('开始执行生产初始化...');
+  await ensureIdSequences();
   await ensureGeneralSettingsDefaults();
   await ensureOsAdmin();
   await ensureTenantAndOwner();

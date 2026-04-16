@@ -190,25 +190,25 @@ export class SettingsController {
   }
 
   @ApiOperation({ summary: '获取单张映射模板打印配置' })
-  @ApiParam({ name: 'importTemplateId', description: '导入映射模板 ID', format: 'uuid' })
+  @ApiParam({ name: 'importTemplateId', description: '导入映射模板 ID' })
   @ApiOkResponse({ type: GetPrintingConfigDetailResponseSwagger })
   @Get('printing/:importTemplateId')
   @Roles(UserRoleEnum.TENANT_OWNER)
   async getPrintingConfigDetail(
     @CurrentUser() currentUser: JwtPayload,
-    @Param('importTemplateId', new ParseUUIDPipe()) importTemplateId: string,
+    @Param('importTemplateId') importTemplateId: string,
   ): Promise<GetPrintingConfigDetailResponse> {
     return this.settingsService.getPrintingConfigDetail(currentUser, importTemplateId);
   }
 
   @ApiOperation({ summary: '保存单张映射模板打印配置' })
-  @ApiParam({ name: 'importTemplateId', description: '导入映射模板 ID', format: 'uuid' })
+  @ApiParam({ name: 'importTemplateId', description: '导入映射模板 ID' })
   @ApiOkResponse({ type: UpdatePrintingConfigResponseSwagger })
   @Put('printing/:importTemplateId')
   @Roles(UserRoleEnum.TENANT_OWNER)
   async updatePrintingConfig(
     @CurrentUser() currentUser: JwtPayload,
-    @Param('importTemplateId', new ParseUUIDPipe()) importTemplateId: string,
+    @Param('importTemplateId') importTemplateId: string,
     @Body() request: UpdatePrintingConfigDto,
     @Ip() ip: string,
   ): Promise<UpdatePrintingConfigResponse> {

@@ -5,7 +5,6 @@ import {
   IsNumber,
   IsOptional,
   IsString,
-  IsUUID,
   MaxLength,
   Min,
 } from 'class-validator';
@@ -13,7 +12,7 @@ import {
 export class OrderLineItemDto {
   @ApiPropertyOptional({ description: '行项目 ID' })
   @IsOptional()
-  @IsUUID()
+  @IsString()
   itemId?: string;
 
   @ApiPropertyOptional({ description: '商品主数据 ID', example: 'SKU-001' })

@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, ParseUUIDPipe, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Query, UseGuards } from '@nestjs/common';
 import {
   ApiBearerAuth,
   ApiExtraModels,
@@ -143,13 +143,13 @@ export class TenantPaymentController {
   }
 
   @ApiOperation({ summary: '创建现金核销记录' })
-  @ApiParam({ name: 'id', description: '订单 ID', format: 'uuid' })
+  @ApiParam({ name: 'id', description: '订单 ID' })
   @ApiOkResponse({ type: CreateCashVerificationResponseSwagger })
   @Post('orders/:id/cash-verifications')
   @Roles(UserRoleEnum.TENANT_FINANCE)
   async createCashVerification(
     @CurrentUser() currentUser: JwtPayload,
-    @Param('id', new ParseUUIDPipe()) orderId: string,
+    @Param('id') orderId: string,
   ): Promise<CreateCashVerificationResponse> {
     return this.paymentService.createCashVerification(currentUser, orderId);
   }

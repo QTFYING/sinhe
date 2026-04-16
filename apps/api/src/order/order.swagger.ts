@@ -37,7 +37,7 @@ export class TenantOrderItemSwagger {
   @ApiPropertyOptional({ description: '防重辅键', example: 'ERP20260410001#张三' })
   groupKey?: string;
 
-  @ApiPropertyOptional({ description: '导入映射模板 ID', example: 'c92a1e5b-87f0-4d61-9c26-6141d81df7fa' })
+  @ApiPropertyOptional({ description: '导入映射模板 ID', example: '1' })
   mappingTemplateId?: string;
 
   @ApiPropertyOptional({ description: '订单二维码令牌', example: '0b8f8ad4d034c46f...' })
@@ -104,7 +104,7 @@ export class AdminOrderItemSwagger {
   @ApiPropertyOptional({ description: '防重辅键', example: 'ERP20260410001#张三' })
   groupKey?: string;
 
-  @ApiPropertyOptional({ description: '导入映射模板 ID', example: 'c92a1e5b-87f0-4d61-9c26-6141d81df7fa' })
+  @ApiPropertyOptional({ description: '导入映射模板 ID', example: '1' })
   mappingTemplateId?: string;
 
   @ApiPropertyOptional({ description: '订单二维码令牌', example: '0b8f8ad4d034c46f...' })
