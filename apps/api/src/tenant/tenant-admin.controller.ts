@@ -22,8 +22,10 @@ import { UserRoleEnum } from '@prisma/client';
 import type {
   CreateTenantAuditBatchRequest,
   CreateTenantAuditDecisionRequest,
+  TenantAuditDecisionResponse,
   CreateTenantCertificationReviewDecisionRequest,
   CreateTenantRenewalRequest,
+  TenantRenewalResponse,
   CreateTenantRequest,
   CreateTenantStatusChangeBatchRequest,
   PatchTenantStatusRequest,
@@ -34,6 +36,7 @@ import type {
   TenantMemberItem,
   TenantMemberListQuery,
   TenantRecordItem,
+  TenantStatusMutationResponse,
 } from '@shou/types/contracts';
 import type { PaginatedResponse } from '@shou/types/common';
 import { CurrentUser, JwtPayload } from '../auth/decorators/current-user.decorator';
@@ -51,12 +54,15 @@ import { ListTenantsQueryDto } from './dto/list-tenants.query.dto';
 import { PatchTenantStatusDto } from './dto/patch-tenant-status.dto';
 import { TenantService } from './tenant.service';
 import {
+  TenantAuditDecisionResponseSwagger,
   TenantBatchActionResponseSwagger,
   TenantCertificationRecordItemSwagger,
   TenantCertificationReviewDecisionResponseSwagger,
   TenantListResponseSwagger,
   TenantMemberListResponseSwagger,
   TenantRecordItemSwagger,
+  TenantRenewalResponseSwagger,
+  TenantStatusMutationResponseSwagger,
 } from './tenant.swagger';
 
 @ApiTags('Admin Tenants')
@@ -64,7 +70,10 @@ import {
 @ApiExtraModels(
   TenantListResponseSwagger,
   TenantRecordItemSwagger,
+  TenantAuditDecisionResponseSwagger,
   TenantBatchActionResponseSwagger,
+  TenantRenewalResponseSwagger,
+  TenantStatusMutationResponseSwagger,
   TenantMemberListResponseSwagger,
   TenantCertificationRecordItemSwagger,
   TenantCertificationReviewDecisionResponseSwagger,
@@ -102,7 +111,7 @@ export class TenantAdminController {
 
   @ApiOperation({ summary: '创建租户审核决议' })
   @ApiParam({ name: 'id', description: '租户 ID', format: 'uuid' })
-  @ApiOkResponse({ type: TenantRecordItemSwagger })
+  @ApiOkResponse({ type: TenantAuditDecisionResponseSwagger })
   @Post(':id/audit-decisions')
   @Roles(UserRoleEnum.OS_SUPER_ADMIN)
   async createAuditDecision(
@@ -110,7 +119,7 @@ export class TenantAdminController {
     @Param('id', new ParseUUIDPipe()) tenantId: string,
     @Body() request: CreateTenantAuditDecisionDto,
     @Ip() ip: string,
-  ): Promise<TenantRecordItem> {
+  ): Promise<TenantAuditDecisionResponse> {
     return this.tenantService.createTenantAuditDecision(
       currentUser,
       tenantId,
@@ -137,7 +146,7 @@ export class TenantAdminController {
 
   @ApiOperation({ summary: '创建租户续费记录' })
   @ApiParam({ name: 'id', description: '租户 ID', format: 'uuid' })
-  @ApiOkResponse({ type: TenantRecordItemSwagger })
+  @ApiOkResponse({ type: TenantRenewalResponseSwagger })
   @Post(':id/renewals')
   @Roles(UserRoleEnum.OS_SUPER_ADMIN)
   async createRenewal(
@@ -145,7 +154,7 @@ export class TenantAdminController {
     @Param('id', new ParseUUIDPipe()) tenantId: string,
     @Body() request: CreateTenantRenewalDto,
     @Ip() ip: string,
-  ): Promise<TenantRecordItem> {
+  ): Promise<TenantRenewalResponse> {
     return this.tenantService.createTenantRenewal(
       currentUser,
       tenantId,
@@ -156,7 +165,7 @@ export class TenantAdminController {
 
   @ApiOperation({ summary: '更新租户状态' })
   @ApiParam({ name: 'id', description: '租户 ID', format: 'uuid' })
-  @ApiOkResponse({ type: TenantRecordItemSwagger })
+  @ApiOkResponse({ type: TenantStatusMutationResponseSwagger })
   @Patch(':id')
   @Roles(UserRoleEnum.OS_SUPER_ADMIN)
   async patchStatus(
@@ -164,7 +173,7 @@ export class TenantAdminController {
     @Param('id', new ParseUUIDPipe()) tenantId: string,
     @Body() request: PatchTenantStatusDto,
     @Ip() ip: string,
-  ): Promise<TenantRecordItem> {
+  ): Promise<TenantStatusMutationResponse> {
     return this.tenantService.patchTenantStatus(
       currentUser,
       tenantId,

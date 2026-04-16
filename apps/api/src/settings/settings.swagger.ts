@@ -153,16 +153,11 @@ export class UpdatePrintingConfigResponseSwagger {
   @ApiProperty({ description: '导入映射模板 ID' })
   importTemplateId!: string;
 
+  @ApiProperty({ description: '是否存在自定义配置', example: true })
+  hasCustomConfig!: boolean;
+
   @ApiProperty({ description: '最新配置版本号', example: 4 })
   configVersion!: number;
-
-  @ApiProperty({
-    description: '当前生效的打印配置 JSON',
-    type: 'object',
-    additionalProperties: true,
-    example: { page: { width: 210, height: 297 }, fields: [{ key: 'customer', x: 20, y: 30 }] },
-  })
-  config!: Record<string, unknown>;
 
   @ApiProperty({ description: '更新时间', example: '2026-04-11T09:00:00.000Z' })
   updatedAt!: string;

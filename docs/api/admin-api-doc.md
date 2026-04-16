@@ -367,18 +367,10 @@ interface TenantRecord {
 
 ```typescript
 {
-  id: string                   // 租户 ID
-  name: string                 // 租户名称
-  packageName: string          // 套餐名称
-  admin: string                // 管理员姓名
-  region: string               // 地区
-  channels: string[]           // 已开通支付通道列表
-  merchants: number            // 商户数
-  users: number                // 账号数
-  monthlyFlow: number          // 本月流水（元）
-  dueInDays: number            // 距到期天数
-  lastActiveAt: string         // 最近活跃时间
-  status: TenantStatus         // 租户状态
+  tenantId: string             // 租户 ID
+  status: TenantStatus         // 审核后的租户状态
+  rejectReason?: string | null // 驳回原因；通过时为空
+  reviewedAt: string           // 审核完成时间
 }
 ```
 
@@ -402,18 +394,11 @@ interface TenantRecord {
 
 ```typescript
 {
-  id: string                   // 租户 ID
-  name: string                 // 租户名称
-  packageName: string          // 套餐名称
-  admin: string                // 管理员姓名
-  region: string               // 地区
-  channels: string[]           // 已开通支付通道列表
-  merchants: number            // 商户数
-  users: number                // 账号数
-  monthlyFlow: number          // 本月流水（元）
-  dueInDays: number            // 距到期天数
-  lastActiveAt: string         // 最近活跃时间
-  status: TenantStatus         // 租户状态
+  tenantId: string             // 租户 ID
+  packageName: string          // 续费后生效的套餐名称
+  status: TenantStatus         // 续费后的租户状态
+  expireAt: string             // 新的到期时间
+  renewedAt: string            // 续费完成时间
 }
 ```
 
@@ -467,18 +452,10 @@ interface TenantRecord {
 
 ```typescript
 {
-  id: string                   // 租户 ID
-  name: string                 // 租户名称
-  packageName: string          // 套餐名称
-  admin: string                // 管理员姓名
-  region: string               // 地区
-  channels: string[]           // 已开通支付通道列表
-  merchants: number            // 商户数
-  users: number                // 账号数
-  monthlyFlow: number          // 本月流水（元）
-  dueInDays: number            // 距到期天数
-  lastActiveAt: string         // 最近活跃时间
-  status: TenantStatus         // 租户状态
+  tenantId: string             // 租户 ID
+  status: TenantStatus         // 变更后的租户状态
+  freezeReason?: string | null // 冻结原因；解冻时为空
+  effectiveAt: string          // 状态生效时间
 }
 ```
 
@@ -1352,10 +1329,8 @@ interface ContractRecord {
 ```typescript
 {
   contractNo: string
-  tenant: string
-  type: ContractType
-  expireAt: string
   status: ContractStatus
+  effectiveAt: string
   terminateReason?: string
 }
 ```
@@ -1383,10 +1358,8 @@ interface ContractRecord {
 ```typescript
 {
   contractNo: string
-  tenant: string
-  type: ContractType
-  expireAt: string
   status: ContractStatus
+  effectiveAt: string
   terminateReason?: string
 }
 ```
@@ -1882,10 +1855,9 @@ interface TicketReplyResult {
 ```typescript
 {
   no: string
-  tenant: string
-  issue: string
   assignee: string
   status: TicketStatus
+  assignedAt: string
 }
 ```
 
@@ -1910,10 +1882,9 @@ interface TicketReplyResult {
 ```typescript
 {
   no: string
-  tenant: string
-  issue: string
-  assignee: string
   status: TicketStatus
+  resolution?: string
+  closedAt: string
 }
 ```
 

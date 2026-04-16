@@ -84,8 +84,11 @@ async function main() {
   // 2. 租户
   let tenant = await prisma.tenant.findFirst({ where: { name: '华东区饮料总代(测试)' }});
   if (!tenant) {
+    const [{ nextval }] = await prisma.$queryRawUnsafe("SELECT nextval('tenant_seq') AS nextval");
+    const tenantId = `T${String(nextval).padStart(6, '0')}`;
     tenant = await prisma.tenant.create({
       data: {
+        id: tenantId,
         name: '华东区饮料总代(测试)',
         contactPhone: '13888888888',
         maxCreditDays: 45,

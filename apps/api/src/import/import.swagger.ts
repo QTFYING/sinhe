@@ -41,6 +41,20 @@ export class OrderImportTemplateSwagger {
   customerFields!: OrderImportTemplateFieldSwagger[];
 }
 
+export class OrderImportTemplateMutationResponseSwagger {
+  @ApiProperty({ description: '导入模板 ID' })
+  id!: string;
+
+  @ApiProperty({ description: '模板名称', example: '饮品订单模板' })
+  name!: string;
+
+  @ApiProperty({ description: '是否默认模板', example: true })
+  isDefault!: boolean;
+
+  @ApiProperty({ description: '最近更新时间', example: '2026-04-15T09:00:00.000Z' })
+  updatedAt!: string;
+}
+
 export class OrderImportPreviewOrderSwagger {
   @ApiProperty({ description: '源订单号', example: 'SO-20260415-001' })
   sourceOrderNo!: string;

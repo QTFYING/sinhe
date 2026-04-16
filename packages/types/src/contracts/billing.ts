@@ -68,6 +68,13 @@ export interface CreateContractApprovalRequest {
   remark?: string
 }
 
+export interface ContractActionResponse {
+  contractNo: string
+  status: ContractStatus
+  effectiveAt: string
+  terminateReason?: string
+}
+
 export interface CreateContractTerminationRequest {
   terminateReason: string
 }

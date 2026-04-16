@@ -405,7 +405,7 @@ export class SettingsService {
     return {
       items: templates.map((template) => {
         const item: PrintingConfigListItem = {
-          importTemplateId: template.id,
+          importTemplateId: String(template.id),
           importTemplateName: template.name,
           hasCustomConfig: Boolean(template.printerTemplate),
         };
@@ -430,14 +430,14 @@ export class SettingsService {
 
     if (!template.printerTemplate) {
       return {
-        importTemplateId: template.id,
+        importTemplateId: String(template.id),
         importTemplateName: template.name,
         hasCustomConfig: false,
       };
     }
 
     return {
-      importTemplateId: template.id,
+      importTemplateId: String(template.id),
       importTemplateName: template.name,
       hasCustomConfig: true,
       configVersion: template.printerTemplate.configVersion,
@@ -458,16 +458,17 @@ export class SettingsService {
     await this.getScopedImportTemplate(currentUser, importTemplateId);
 
     const operator = await this.getOperatorDisplayName(currentUser.userId);
+    const bigTemplateId = BigInt(importTemplateId);
     const template = await this.prisma.printerTemplate.upsert({
       where: {
         tenantId_importTemplateId: {
           tenantId,
-          importTemplateId,
+          importTemplateId: bigTemplateId,
         },
       },
       create: {
         tenantId,
-        importTemplateId,
+        importTemplateId: bigTemplateId,
         config: request.config as Prisma.InputJsonValue,
         configVersion: 1,
         remark: request.remark,
@@ -484,9 +485,9 @@ export class SettingsService {
     });
 
     const result = {
-      importTemplateId: template.importTemplateId,
+      importTemplateId: String(template.importTemplateId),
+      hasCustomConfig: true,
       configVersion: template.configVersion,
-      config: template.config as Record<string, unknown>,
       updatedAt: template.updatedAt.toISOString(),
       updatedBy: template.updatedBy ?? undefined,
       remark: template.remark ?? undefined,
@@ -542,7 +543,7 @@ export class SettingsService {
 
     return {
       list: logs.map((item) => ({
-        id: item.id,
+        id: String(item.id),
         action: item.action,
         operator: item.actor,
         ip: item.ip ?? '',
@@ -565,7 +566,7 @@ export class SettingsService {
 
     const template = await this.prisma.importTemplate.findFirst({
       where: {
-        id: importTemplateId,
+        id: BigInt(importTemplateId),
         tenantId,
         deletedAt: null,
       },

@@ -52,6 +52,8 @@ import { randomBytes } from 'crypto';
 import { JwtPayload } from '../auth/decorators/current-user.decorator';
 import { BusinessException } from '../common/exceptions/business.exception';
 import { paymentConfig } from '../config/payment.config';
+import { IdGeneratorService } from '../id-generator/id-generator.service';
+import { ID_CONFIG } from '../id-generator/id-generator.constants';
 import { PrismaService } from '../prisma/prisma.service';
 import { RedisService } from '../redis/redis.service';
 import {
@@ -67,6 +69,7 @@ export class PaymentService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly redis: RedisService,
+    private readonly idGen: IdGeneratorService,
     @Inject(paymentConfig.KEY)
     private readonly paymentSettings: ConfigType<typeof paymentConfig>,
   ) {}
@@ -97,7 +100,7 @@ export class PaymentService {
         : null,
       offlinePayment: this.toOfflinePaymentInfo(currentPaymentOrder),
       items: order.lineItems.map((item) => ({
-        itemId: item.id,
+        itemId: String(item.id),
         skuId: item.skuId,
         skuName: item.skuName,
         skuSpec: item.skuSpec ?? undefined,
@@ -144,8 +147,10 @@ export class PaymentService {
         }
 
         const gatewayTradeNo = this.generateGatewayTradeNo();
+        const poId = await this.idGen.nextDailyId(ID_CONFIG.PAYMENT_ORDER.prefix, ID_CONFIG.PAYMENT_ORDER.digits);
         await tx.paymentOrder.create({
           data: {
+            id: poId,
             tenantId: currentOrder.tenantId,
             orderId: currentOrder.id,
             amount: this.toPrismaDecimal(payableAmount),
@@ -214,8 +219,10 @@ export class PaymentService {
         }
 
         const now = new Date();
+        const poId = await this.idGen.nextDailyId(ID_CONFIG.PAYMENT_ORDER.prefix, ID_CONFIG.PAYMENT_ORDER.digits);
         const created = await tx.paymentOrder.create({
           data: {
+            id: poId,
             tenantId: currentOrder.tenantId,
             orderId: currentOrder.id,
             amount: this.toPrismaDecimal(payableAmount),
@@ -514,8 +521,10 @@ export class PaymentService {
       const net = amount.minus(fee);
       const paidAt = this.parseDateTime(this.readString(payload.paidAt ?? payload.payTime)) ?? new Date();
 
+      const paymentId = await this.idGen.nextDailyId(ID_CONFIG.PAYMENT.prefix, ID_CONFIG.PAYMENT.digits);
       await tx.payment.create({
         data: {
+          id: paymentId,
           tenantId: order.tenantId,
           orderId: order.id,
           customer: this.cut(order.customer, 100),
@@ -656,8 +665,10 @@ export class PaymentService {
       paidAt: Date;
     },
   ) {
+    const paymentId = await this.idGen.nextDailyId(ID_CONFIG.PAYMENT.prefix, ID_CONFIG.PAYMENT.digits);
     await tx.payment.create({
       data: {
+        id: paymentId,
         tenantId: order.tenantId,
         orderId: order.id,
         customer: this.cut(order.customer, 100),

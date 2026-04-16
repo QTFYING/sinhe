@@ -12,13 +12,15 @@ import { PaymentModule } from './payment/payment.module';
 import { ReportModule } from './report/report.module';
 import { NotificationModule } from './notification/notification.module';
 import { FinanceModule } from './finance/finance.module';
+import { IdGeneratorModule } from './id-generator/id-generator.module';
 import { RequestLoggingMiddleware } from './common/middleware/request-logging.middleware';
 
 @Module({
   imports: [
     EnvironmentModule,
-    PrismaModule, 
-    RedisModule, 
+    PrismaModule,
+    IdGeneratorModule,
+    RedisModule,
     AuthModule, 
     TenantModule, 
     PlatformModule,

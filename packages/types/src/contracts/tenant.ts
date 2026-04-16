@@ -173,6 +173,13 @@ export interface CreateTenantAuditDecisionRequest {
   rejectReason?: string
 }
 
+export interface TenantAuditDecisionResponse {
+  tenantId: string
+  status: TenantStatus
+  rejectReason?: string | null
+  reviewedAt: string
+}
+
 export interface CreateTenantAuditBatchRequest {
   ids: string[]
   action: 'approve'
@@ -186,9 +193,24 @@ export interface CreateTenantRenewalRequest {
   paymentMethod: TenantRenewPaymentMethod
 }
 
+export interface TenantRenewalResponse {
+  tenantId: string
+  packageName: string
+  status: TenantStatus
+  expireAt: string
+  renewedAt: string
+}
+
 export interface PatchTenantStatusRequest {
   action: FreezeAction
   reason?: string
+}
+
+export interface TenantStatusMutationResponse {
+  tenantId: string
+  status: TenantStatus
+  freezeReason?: string | null
+  effectiveAt: string
 }
 
 export interface CreateTenantStatusChangeBatchRequest {

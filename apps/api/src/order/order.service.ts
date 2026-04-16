@@ -43,13 +43,18 @@ import Decimal from 'decimal.js';
 import dayjs from 'dayjs';
 import { randomBytes } from 'crypto';
 import { JwtPayload } from '../auth/decorators/current-user.decorator';
+import { IdGeneratorService } from '../id-generator/id-generator.service';
+import { ID_CONFIG } from '../id-generator/id-generator.constants';
 import { PrismaService } from '../prisma/prisma.service';
 import { ListOrdersQueryDto } from './dto/list-orders.query.dto';
 import { deriveOrderStatus, resolveCreditOrderStatus } from './order.domain';
 
 @Injectable()
 export class OrderService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly idGen: IdGeneratorService,
+  ) {}
 
   async findAll(
     currentUser: JwtPayload,
@@ -119,8 +124,10 @@ export class OrderService {
     const customerPhone = request.customerPhone?.trim() ? this.cut(request.customerPhone.trim(), 30) : '';
     const customerAddress = request.customerAddress?.trim() ? this.cut(request.customerAddress.trim(), 255) : '';
 
+    const orderId = await this.idGen.nextDailyId(ID_CONFIG.ORDER.prefix, ID_CONFIG.ORDER.digits);
     const created = await this.prisma.order.create({
       data: {
+        id: orderId,
         tenantId,
         qrCodeToken: this.generateQrCodeToken(),
         customer,
@@ -273,8 +280,10 @@ export class OrderService {
     if (requestId) {
       try {
         return await this.prisma.$transaction(async (tx) => {
+          const batchId = await this.idGen.nextDailyId(ID_CONFIG.PRINT_RECORD.prefix, ID_CONFIG.PRINT_RECORD.digits);
           const reserved = await tx.printRecordBatch.create({
             data: {
+              id: batchId,
               tenantId,
               requestId,
               operatorId: currentUser.userId,
@@ -365,8 +374,10 @@ export class OrderService {
         throw new NotFoundException('订单不存在');
       }
 
+      const reminderId = await this.idGen.nextDailyId(ID_CONFIG.ORDER_REMINDER.prefix, ID_CONFIG.ORDER_REMINDER.digits);
       await tx.orderReminder.create({
         data: {
+          id: reminderId,
           tenantId,
           orderId,
           operatorId: currentUser.userId,
@@ -471,9 +482,11 @@ export class OrderService {
         false,
       );
       const paidAt = new Date();
+      const paymentId = await this.idGen.nextDailyId(ID_CONFIG.PAYMENT.prefix, ID_CONFIG.PAYMENT.digits);
 
       await tx.payment.create({
         data: {
+          id: paymentId,
           tenantId,
           orderId: order.id,
           customer: this.cut(order.customer, 100),
@@ -518,7 +531,7 @@ export class OrderService {
       where.payType = this.toPrismaOrderPayType(query.payType);
     }
     if (query.templateId) {
-      where.mappingTemplateId = query.templateId;
+      where.mappingTemplateId = BigInt(query.templateId);
     }
     if (query.keyword?.trim()) {
       const keyword = query.keyword.trim();
@@ -734,7 +747,7 @@ export class OrderService {
     id: string;
     sourceOrderNo: string | null;
     groupKey: string | null;
-    mappingTemplateId: string | null;
+    mappingTemplateId: bigint | null;
     qrCodeToken: string;
     customer: string;
     customerPhone?: string | null;
@@ -750,7 +763,7 @@ export class OrderService {
     voidReason: string | null;
     voidedAt: Date | null;
     lineItems: Array<{
-      id: string;
+      id: bigint;
       skuId: string | null;
       skuName: string;
       skuSpec: string | null;
@@ -764,7 +777,7 @@ export class OrderService {
       id: order.id,
       sourceOrderNo: order.sourceOrderNo ?? undefined,
       groupKey: order.groupKey ?? undefined,
-      mappingTemplateId: order.mappingTemplateId ?? undefined,
+      mappingTemplateId: order.mappingTemplateId != null ? String(order.mappingTemplateId) : undefined,
       qrCodeToken: order.qrCodeToken,
       customer: order.customer,
       customerPhone: order.customerPhone ?? '',
@@ -776,7 +789,7 @@ export class OrderService {
       prints: order.prints,
       orderTime: order.orderTime.toISOString(),
       lineItems: order.lineItems.map((item) => ({
-        itemId: item.id,
+        itemId: String(item.id),
         skuId: item.skuId,
         skuName: item.skuName,
         skuSpec: item.skuSpec ?? undefined,
@@ -816,7 +829,7 @@ export class OrderService {
     id: string;
     sourceOrderNo: string | null;
     groupKey: string | null;
-    mappingTemplateId: string | null;
+    mappingTemplateId: bigint | null;
     qrCodeToken: string;
     customer: string;
     customerPhone?: string | null;
@@ -831,7 +844,7 @@ export class OrderService {
     voidReason: string | null;
     voidedAt: Date | null;
     lineItems: Array<{
-      id: string;
+      id: bigint;
       skuId: string | null;
       skuName: string;
       skuSpec: string | null;
@@ -849,14 +862,14 @@ export class OrderService {
       tenant: order.tenant.name,
       sourceOrderNo: order.sourceOrderNo ?? undefined,
       groupKey: order.groupKey ?? undefined,
-      mappingTemplateId: order.mappingTemplateId ?? undefined,
+      mappingTemplateId: order.mappingTemplateId != null ? String(order.mappingTemplateId) : undefined,
       qrCodeToken: order.qrCodeToken,
       customer: order.customer,
       customerPhone: order.customerPhone ?? '',
       customerAddress: order.customerAddress ?? '',
       totalAmount: this.toMoneyNumber(order.totalAmount),
       lineItems: order.lineItems.map((item) => ({
-        itemId: item.id,
+        itemId: String(item.id),
         skuId: item.skuId,
         skuName: item.skuName,
         skuSpec: item.skuSpec ?? undefined,

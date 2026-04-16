@@ -195,10 +195,10 @@ H5 前端                    后端                     支付网关
 | B3 | POST | `/orders` | 创建订单 | TENANT_OWNER, TENANT_OPERATOR | orders |
 | B4 | PUT | `/orders/{id}` | 更新订单 | TENANT_OWNER, TENANT_OPERATOR | orders |
 | B5 | PATCH | `/orders/{id}` | 更新订单作废状态 | TENANT_OWNER | orders |
-| B6 | GET | `/import/default-template` | 获取系统默认映射模板 | TENANT_OWNER, TENANT_OPERATOR | — |
+| B6 | GET | `/import/default-template` | 获取系统默认映射模板 | TENANT_OWNER | — |
 | B7 | GET | `/import/templates` | 导入-获取模板列表 | TENANT_OWNER, TENANT_OPERATOR | import_templates |
-| B8 | POST | `/import/templates` | 导入-创建模板 | TENANT_OWNER, TENANT_OPERATOR | import_templates |
-| B9 | PUT | `/import/templates/:id` | 导入-更新模板 | TENANT_OWNER, TENANT_OPERATOR | import_templates |
+| B8 | POST | `/import/templates` | 导入-创建模板 | TENANT_OWNER | import_templates |
+| B9 | PUT | `/import/templates/:id` | 导入-更新模板 | TENANT_OWNER | import_templates |
 | B10 | POST | `/import/preview` | 导入-订单级预检 | TENANT_OWNER, TENANT_OPERATOR | — |
 | B11 | POST | `/orders/import` | 异步正式导入 | TENANT_OWNER, TENANT_OPERATOR | orders + import_jobs |
 | B12 | GET | `/orders/import/jobs/:jobId` | 查询导入任务进度 | TENANT_OWNER, TENANT_OPERATOR | import_jobs |

@@ -168,8 +168,11 @@ async function ensureTenantAndOwner() {
   });
 
   if (!tenant) {
+    const [{ nextval }] = await prisma.$queryRawUnsafe("SELECT nextval('tenant_seq') AS nextval");
+    const tenantId = `T${String(nextval).padStart(6, '0')}`;
     tenant = await prisma.tenant.create({
       data: {
+        id: tenantId,
         name: tenantName,
         contactPhone: tenantContactPhone,
         maxCreditDays,

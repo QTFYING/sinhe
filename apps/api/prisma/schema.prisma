@@ -121,7 +121,7 @@ enum NoticeStatusEnum {
 }
 
 model Tenant {
-  id                 String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  id                 String           @id @db.VarChar(10)
   name               String           @db.VarChar(100)
   contactPhone       String           @db.VarChar(20)
   packageName        String?          @db.VarChar(100)
@@ -156,7 +156,7 @@ model Tenant {
 
 model User {
   id                    String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  tenantId              String?        @db.Uuid
+  tenantId              String?        @db.VarChar(10)
   account               String         @unique @db.VarChar(50)
   phone                 String?        @db.VarChar(20)
   passwordHash          String         @db.VarChar(255)
@@ -181,8 +181,7 @@ model User {
 }
 
 model TenantGeneralSettings {
-  id               String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  tenantId         String   @unique @db.Uuid
+  tenantId         String   @id @db.VarChar(10)
   companyName      String?  @db.VarChar(100)
   contactPerson    String?  @db.VarChar(50)
   contactPhone     String?  @db.VarChar(20)
@@ -213,8 +212,8 @@ model SystemConfig {
 }
 
 model ImportTemplate {
-  id            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  tenantId      String    @db.Uuid
+  id            BigInt    @id @default(autoincrement())
+  tenantId      String    @db.VarChar(10)
   name          String    @db.VarChar(100)
   isDefault     Boolean   @default(false)
   defaultFields Json      @default("[]")
@@ -233,9 +232,9 @@ model ImportTemplate {
 }
 
 model PrinterTemplate {
-  id               String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  tenantId         String   @db.Uuid
-  importTemplateId String   @unique @db.Uuid
+  id               BigInt   @id @default(autoincrement())
+  tenantId         String   @db.VarChar(10)
+  importTemplateId BigInt   @unique
   config           Json
   configVersion    Int      @default(1)
   remark           String?  @db.VarChar(255)
@@ -251,8 +250,8 @@ model PrinterTemplate {
 }
 
 model ImportJob {
-  id               String                   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  tenantId         String                   @db.Uuid
+  id               String                   @id @db.VarChar(20)
+  tenantId         String                   @db.VarChar(10)
   status           OrderImportJobStatusEnum @default(PENDING)
   conflictPolicy   OrderImportConflictPolicyEnum @default(SKIP)
   snapshot         Json?
@@ -279,11 +278,11 @@ model ImportJob {
 }
 
 model Order {
-  id                String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  tenantId          String           @db.Uuid
+  id                String           @id @db.VarChar(20)
+  tenantId          String           @db.VarChar(10)
   sourceOrderNo     String?          @db.VarChar(100)
   groupKey          String?          @db.VarChar(100)
-  mappingTemplateId String?          @db.Uuid
+  mappingTemplateId BigInt?
   qrCodeToken       String           @unique @db.VarChar(64)
   customer          String           @db.VarChar(100)
   customerPhone     String           @default("") @db.VarChar(30)
@@ -320,8 +319,8 @@ model Order {
 }
 
 model OrderItem {
-  id         String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  orderId    String  @db.Uuid
+  id         BigInt  @id @default(autoincrement())
+  orderId    String  @db.VarChar(20)
   skuId      String? @db.VarChar(50)
   skuName    String  @db.VarChar(200)
   skuSpec    String? @db.VarChar(100)
@@ -337,9 +336,9 @@ model OrderItem {
 }
 
 model Payment {
-  id             String                  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  tenantId       String                  @db.Uuid
-  orderId        String                  @db.Uuid
+  id             String                  @id @db.VarChar(20)
+  tenantId       String                  @db.VarChar(10)
+  orderId        String                  @db.VarChar(20)
   customer       String                  @db.VarChar(100)
   amount         Decimal                 @db.Decimal(12, 2)
   channel        String                  @db.VarChar(50)
@@ -360,9 +359,9 @@ model Payment {
 }
 
 model PaymentOrder {
-  id                 String                 @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  tenantId           String                 @db.Uuid
-  orderId            String                 @db.Uuid
+  id                 String                 @id @db.VarChar(20)
+  tenantId           String                 @db.VarChar(10)
+  orderId            String                 @db.VarChar(20)
   amount             Decimal                @db.Decimal(12, 2)
   status             PaymentOrderStatusEnum @default(UNPAID)
   paymentMethod      PaymentMethodEnum?
@@ -387,8 +386,8 @@ model PaymentOrder {
 }
 
 model PrintRecordBatch {
-  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  tenantId     String   @db.Uuid
+  id           String   @id @db.VarChar(20)
+  tenantId     String   @db.VarChar(10)
   requestId    String   @db.VarChar(100)
   operatorId   String?  @db.Uuid
   orderIds     Json     @default("[]")
@@ -405,9 +404,9 @@ model PrintRecordBatch {
 }
 
 model OrderReminder {
-  id         String                  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  tenantId   String                  @db.Uuid
-  orderId    String                  @db.Uuid
+  id         String                  @id @db.VarChar(20)
+  tenantId   String                  @db.VarChar(10)
+  orderId    String                  @db.VarChar(20)
   operatorId String?                 @db.Uuid
   channels   String[]
   status     OrderReminderStatusEnum @default(SENT)
@@ -424,7 +423,7 @@ model OrderReminder {
 }
 
 model Notice {
-  id          String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  id          String            @id @db.VarChar(10)
   title       String            @db.VarChar(200)
   content     String            @db.Text
   planVersion String?           @db.VarChar(100)
@@ -444,9 +443,8 @@ model Notice {
 }
 
 model NoticeRead {
-  id       String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  noticeId String    @db.Uuid
-  tenantId String    @db.Uuid
+  noticeId String    @db.VarChar(10)
+  tenantId String    @db.VarChar(10)
   userId   String    @db.Uuid
   isRead   Boolean   @default(false)
   readAt   DateTime?
@@ -455,14 +453,14 @@ model NoticeRead {
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@unique([noticeId, tenantId, userId])
+  @@id([noticeId, tenantId, userId])
   @@index([tenantId, userId, isRead])
   @@map("notice_reads")
 }
 
 model TenantCertification {
-  id           String                       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  tenantId     String                       @db.Uuid
+  id           String                       @id @db.VarChar(10)
+  tenantId     String                       @db.VarChar(10)
   type         String                       @db.VarChar(50)
   licenseUrl   String                       @db.VarChar(500)
   legalPerson  String                       @db.VarChar(50)
@@ -485,12 +483,12 @@ model TenantCertification {
 }
 
 model AuditLog {
-  id         String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  id         BigInt              @id @default(autoincrement())
   actor      String              @db.VarChar(50)
   action     String              @db.VarChar(100)
   target     String              @db.VarChar(100)
   targetType AuditTargetTypeEnum
-  tenantId   String?             @db.Uuid
+  tenantId   String?             @db.VarChar(10)
   result     AuditResultEnum     @default(SUCCESS)
   ip         String?             @db.VarChar(64)
   time       DateTime            @default(now())
@@ -500,4 +498,13 @@ model AuditLog {
   @@index([tenantId, time])
   @@index([targetType, time])
   @@map("audit_logs")
+}
+
+model IdSequence {
+  prefix     String   @db.VarChar(10)
+  dateKey    DateTime @db.Date
+  currentVal BigInt   @default(0)
+
+  @@id([prefix, dateKey])
+  @@map("id_sequences")
 }

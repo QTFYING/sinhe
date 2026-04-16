@@ -375,7 +375,7 @@ interface TenantOrderDetail extends TenantOrderListItem {
 ### 3.6 获取系统默认映射模板
 
 - **GET** `/import/default-template`
-- **角色**：TENANT_OWNER, TENANT_OPERATOR
+- **角色**：TENANT_OWNER
 - **描述**：获取系统默认映射模板。租户创建或编辑自定义模板时，必须先以该默认模板为基底填写 `mapStr`，再补充自定义字段。
 
 **响应 data：**
@@ -407,7 +407,7 @@ Array<{
 
 - **GET** `/import/templates`
 - **角色**：TENANT_OWNER, TENANT_OPERATOR
-- **描述**：获取当前租户可用的订单导入模板
+- **描述**：获取当前租户可用的订单导入模板。该接口用于导入页面的模板选择与模板内容读取；模板的创建与维护仍仅限 `TENANT_OWNER`。
 - **关联表**：import_templates
 
 **响应 data：**
@@ -442,7 +442,7 @@ Array<{
 ### 3.8 导入-创建模板
 
 - **POST** `/import/templates`
-- **角色**：TENANT_OWNER, TENANT_OPERATOR
+- **角色**：TENANT_OWNER
 - **关联表**：import_templates
 
 **请求参数：**
@@ -472,18 +472,6 @@ Array<{
   name: string                // 模板名称
   isDefault: boolean          // 是否默认模板
   updatedAt: string           // 最近更新时间
-  defaultFields: Array<{
-    label: string
-    key: string
-    mapStr: string
-    isRequired: boolean
-  }>
-  customerFields: Array<{
-    label: string
-    key: string               // 服务端生成的 customerKeyN
-    mapStr: string
-    isRequired: boolean       // 服务端固定回填 false
-  }>
 }
 ```
 
@@ -493,11 +481,20 @@ Array<{
 - `defaultFields[].mapStr` 由租户填写对应 ERP 列头
 - `customerFields` 由前端提交 `label + mapStr`，服务端统一补 `key=customerKey1...N`
 - 所有 `customerFields[].isRequired` 均由服务端固定为 `false`
+- 创建接口仅返回最小结果摘要；若前端需要完整模板结构，请重新调用 `GET /import/templates`
+- 同租户下模板名称唯一；服务端按去首尾空格后比较，大小写不敏感
+- 同一模板内 `defaultFields + customerFields` 的 `mapStr` 不允许重复
+- `customerFields[].label` 在同一模板内不允许重复
+
+**错误语义：**
+
+- `400`：请求结构不合法，例如缺失系统字段、字段映射为空、固定字段被篡改、模板内映射重复
+- `409`：同租户下模板名称冲突
 
 ### 3.9 导入-更新模板
 
 - **PUT** `/import/templates/{id}`
-- **角色**：TENANT_OWNER, TENANT_OPERATOR
+- **角色**：TENANT_OWNER
 - **关联表**：import_templates
 
 **请求参数：**
@@ -527,22 +524,23 @@ Array<{
   name: string
   isDefault: boolean
   updatedAt: string
-  defaultFields: Array<{
-    label: string
-    key: string
-    mapStr: string
-    isRequired: boolean
-  }>
-  customerFields: Array<{
-    label: string
-    key: string
-    mapStr: string
-    isRequired: boolean
-  }>
 }
 ```
 
 **服务端规则：**
+
+- 更新时仍按整包模板校验，不支持局部跳过系统字段
+- `defaultFields` 必须完整包含 7 个系统字段，且 `key / label / isRequired` 不能改写
+- 更新接口仅返回最小结果摘要；若前端需要完整模板结构，请重新调用 `GET /import/templates`
+- 同租户下模板名称唯一；更新时排除当前模板自身
+- 同一模板内 `defaultFields + customerFields` 的 `mapStr` 不允许重复
+- `customerFields[].label` 在同一模板内不允许重复
+
+**错误语义：**
+
+- `400`：请求结构不合法，例如缺失系统字段、字段映射为空、固定字段被篡改、模板内映射重复
+- `404`：模板不存在，或模板不属于当前租户
+- `409`：同租户下模板名称冲突
 
 - 更新模板时按当前提交内容整体替换模板结构
 - `customerFields` 每次按当前提交数组重新编号
@@ -1579,8 +1577,8 @@ Array<{
 ```typescript
 {
   importTemplateId: string       // 绑定的导入映射模板 ID
+  hasCustomConfig: boolean       // 保存成功后固定为 true
   configVersion: number          // 保存成功后的最新配置版本号
-  config: Record<string, unknown> // 当前生效的打印配置 JSON
   updatedAt: string              // 保存时间
   updatedBy?: string             // 保存人，预留审计能力
   remark?: string                // 备注信息，预留扩展
@@ -1591,6 +1589,7 @@ Array<{
 
 - 服务端按 `tenantId + importTemplateId` 维度保存黑盒打印配置
 - 若该映射模板此前没有自定义配置，则本次保存后 `hasCustomConfig=true`
+- 保存接口仅返回最小结果摘要；若前端需要最新完整配置，请重新调用 `GET /settings/printing/{importTemplateId}`
 - 不支持删除打印配置；未配置时由前端回退默认模板
 - 服务端不承担模板字段级语义校验，也不负责实际打印动作
 

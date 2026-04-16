@@ -121,6 +121,51 @@ export class TenantBatchActionResponseSwagger {
   failedIds!: string[];
 }
 
+export class TenantAuditDecisionResponseSwagger {
+  @ApiProperty({ description: '租户 ID' })
+  tenantId!: string;
+
+  @ApiProperty({ description: '审核后的租户状态', enum: Object.values(TenantStatusEnum), example: TenantStatusEnum.ACTIVE })
+  status!: string;
+
+  @ApiPropertyOptional({ description: '驳回原因', example: '资料不完整' })
+  rejectReason?: string | null;
+
+  @ApiProperty({ description: '审核完成时间', example: '2026-04-16T10:00:00.000Z' })
+  reviewedAt!: string;
+}
+
+export class TenantRenewalResponseSwagger {
+  @ApiProperty({ description: '租户 ID' })
+  tenantId!: string;
+
+  @ApiProperty({ description: '续费后生效的套餐名称', example: '标准版' })
+  packageName!: string;
+
+  @ApiProperty({ description: '续费后的租户状态', enum: Object.values(TenantStatusEnum), example: TenantStatusEnum.ACTIVE })
+  status!: string;
+
+  @ApiProperty({ description: '新的到期时间', example: '2027-04-16T23:59:59.000Z' })
+  expireAt!: string;
+
+  @ApiProperty({ description: '续费完成时间', example: '2026-04-16T10:05:00.000Z' })
+  renewedAt!: string;
+}
+
+export class TenantStatusMutationResponseSwagger {
+  @ApiProperty({ description: '租户 ID' })
+  tenantId!: string;
+
+  @ApiProperty({ description: '变更后的租户状态', enum: Object.values(TenantStatusEnum), example: TenantStatusEnum.PAUSED })
+  status!: string;
+
+  @ApiPropertyOptional({ description: '冻结原因', example: '到期未续费' })
+  freezeReason?: string | null;
+
+  @ApiProperty({ description: '状态生效时间', example: '2026-04-16T10:10:00.000Z' })
+  effectiveAt!: string;
+}
+
 export class TenantMemberItemSwagger {
   @ApiProperty({ description: '用户 ID' })
   id!: string;

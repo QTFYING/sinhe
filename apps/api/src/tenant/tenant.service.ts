@@ -18,9 +18,11 @@ import {
 import type {
   CreateTenantAuditBatchRequest,
   CreateTenantAuditDecisionRequest,
+  TenantAuditDecisionResponse,
   CreateTenantCertificationReviewDecisionRequest,
   CreateTenantRequest,
   CreateTenantRenewalRequest,
+  TenantRenewalResponse,
   CreateTenantStatusChangeBatchRequest,
   CreateUserPasswordResetRequest,
   CreateUserPasswordResetResponse,
@@ -35,6 +37,7 @@ import type {
   TenantMemberItem,
   TenantMemberListQuery,
   TenantRecordItem,
+  TenantStatusMutationResponse,
   UserListQuery,
   UserRecordItem,
   UserStatusUpdateRequest,
@@ -56,6 +59,8 @@ import * as bcrypt from 'bcrypt';
 import Decimal from 'decimal.js';
 import dayjs from 'dayjs';
 import { JwtPayload } from '../auth/decorators/current-user.decorator';
+import { IdGeneratorService } from '../id-generator/id-generator.service';
+import { ID_CONFIG } from '../id-generator/id-generator.constants';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateTenantDto } from './dto/create-tenant.dto';
 
@@ -64,11 +69,16 @@ const DEFAULT_TENANT_CHANNEL = 'lakala';
 
 @Injectable()
 export class TenantService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly idGen: IdGeneratorService,
+  ) {}
 
   async createTenant(createTenantDto: CreateTenantDto) {
+    const tenantId = await this.idGen.nextGlobalId(ID_CONFIG.TENANT.prefix, ID_CONFIG.TENANT.seqName, ID_CONFIG.TENANT.digits);
     return this.prisma.tenant.create({
       data: {
+        id: tenantId,
         name: this.normalizeText(createTenantDto.name, 'name', 100),
         contactPhone: this.normalizeText(createTenantDto.contactPhone, 'contactPhone', 20),
         maxCreditDays: createTenantDto.maxCreditDays,
@@ -141,8 +151,10 @@ export class TenantService {
     ip?: string,
   ): Promise<TenantRecordItem> {
     const dueInDays = this.normalizePositiveInt(request.dueInDays, 'dueInDays');
+    const tenantId = await this.idGen.nextGlobalId(ID_CONFIG.TENANT.prefix, ID_CONFIG.TENANT.seqName, ID_CONFIG.TENANT.digits);
     const created = await this.prisma.tenant.create({
       data: {
+        id: tenantId,
         name: this.normalizeText(request.name, 'name', 100),
         contactPhone: '',
         packageName: this.normalizeText(request.packageName, 'packageName', 100),
@@ -177,7 +189,7 @@ export class TenantService {
     tenantId: string,
     request: CreateTenantAuditDecisionRequest,
     ip?: string,
-  ): Promise<TenantRecordItem> {
+  ): Promise<TenantAuditDecisionResponse> {
     const tenant = await this.getTenantOrThrow(tenantId);
     if (request.action === ReviewActionEnum.REJECT && !request.rejectReason?.trim()) {
       throw new BadRequestException('rejectReason 不能为空');
@@ -193,14 +205,6 @@ export class TenantService {
         rejectReason:
           request.action === ReviewActionEnum.REJECT ? request.rejectReason?.trim() || null : null,
       },
-      include: {
-        users: { where: { deletedAt: null }, select: { id: true, loginAt: true } },
-        payments: {
-          where: { paidAt: { gte: dayjs().startOf('month').toDate() } },
-          select: { amount: true },
-        },
-        paymentOrders: { select: { channel: true } },
-      },
     });
 
     await this.createAuditLog(currentUser, {
@@ -211,7 +215,12 @@ export class TenantService {
       ip,
     });
 
-    return this.toTenantRecordItem(updated);
+    return {
+      tenantId: updated.id,
+      status: this.fromPrismaTenantStatus(updated.status),
+      rejectReason: updated.rejectReason ?? null,
+      reviewedAt: updated.updatedAt.toISOString(),
+    };
   }
 
   async createTenantAuditBatch(
@@ -254,7 +263,7 @@ export class TenantService {
     tenantId: string,
     request: CreateTenantRenewalRequest,
     ip?: string,
-  ): Promise<TenantRecordItem> {
+  ): Promise<TenantRenewalResponse> {
     const tenant = await this.getTenantOrThrow(tenantId);
     const baseDate =
       tenant.expireAt && dayjs(tenant.expireAt).isAfter(dayjs())
@@ -267,14 +276,6 @@ export class TenantService {
         packageName: this.normalizeText(request.packageName, 'packageName', 100),
         expireAt: baseDate.add(request.days, 'day').endOf('day').toDate(),
       },
-      include: {
-        users: { where: { deletedAt: null }, select: { id: true, loginAt: true } },
-        payments: {
-          where: { paidAt: { gte: dayjs().startOf('month').toDate() } },
-          select: { amount: true },
-        },
-        paymentOrders: { select: { channel: true } },
-      },
     });
 
     await this.createAuditLog(currentUser, {
@@ -285,7 +286,13 @@ export class TenantService {
       ip,
     });
 
-    return this.toTenantRecordItem(updated);
+    return {
+      tenantId: updated.id,
+      packageName: updated.packageName ?? '',
+      status: this.fromPrismaTenantStatus(updated.status),
+      expireAt: updated.expireAt?.toISOString() ?? '',
+      renewedAt: updated.updatedAt.toISOString(),
+    };
   }
 
   async patchTenantStatus(
@@ -293,7 +300,7 @@ export class TenantService {
     tenantId: string,
     request: PatchTenantStatusRequest,
     ip?: string,
-  ): Promise<TenantRecordItem> {
+  ): Promise<TenantStatusMutationResponse> {
     const tenant = await this.getTenantOrThrow(tenantId);
     if (request.action === FreezeActionEnum.FREEZE && !request.reason?.trim()) {
       throw new BadRequestException('冻结时 reason 必填');
@@ -309,14 +316,6 @@ export class TenantService {
         freezeReason:
           request.action === FreezeActionEnum.FREEZE ? request.reason?.trim() || null : null,
       },
-      include: {
-        users: { where: { deletedAt: null }, select: { id: true, loginAt: true } },
-        payments: {
-          where: { paidAt: { gte: dayjs().startOf('month').toDate() } },
-          select: { amount: true },
-        },
-        paymentOrders: { select: { channel: true } },
-      },
     });
 
     await this.createAuditLog(currentUser, {
@@ -327,7 +326,12 @@ export class TenantService {
       ip,
     });
 
-    return this.toTenantRecordItem(updated);
+    return {
+      tenantId: updated.id,
+      status: this.fromPrismaTenantStatus(updated.status),
+      freezeReason: updated.freezeReason ?? null,
+      effectiveAt: updated.updatedAt.toISOString(),
+    };
   }
 
   async createTenantStatusChangeBatch(
@@ -492,8 +496,10 @@ export class TenantService {
     ip?: string,
   ): Promise<TenantCertificationSubmitResponse> {
     const tenantId = this.getTenantId(currentUser);
+    const certId = await this.idGen.nextGlobalId(ID_CONFIG.CERTIFICATION.prefix, ID_CONFIG.CERTIFICATION.seqName, ID_CONFIG.CERTIFICATION.digits);
     const created = await this.prisma.tenantCertification.create({
       data: {
+        id: certId,
         tenantId,
         type: '企业实名认证',
         licenseUrl: this.normalizeText(request.licenseUrl, 'licenseUrl', 500),

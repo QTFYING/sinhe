@@ -17,6 +17,7 @@ import type {
   OrderImportPreviewResponse,
   OrderImportSubmitRequest,
   OrderImportSubmitResponse,
+  OrderImportTemplateMutationResponse,
   OrderImportTemplate,
   OrderImportTemplateField,
   UpdateOrderImportTemplateRequest,
@@ -34,6 +35,7 @@ import {
   OrderImportPreviewResponseSwagger,
   OrderImportSubmitResponseSwagger,
   OrderImportTemplateFieldSwagger,
+  OrderImportTemplateMutationResponseSwagger,
   OrderImportTemplateSwagger,
 } from './import.swagger';
 
@@ -42,6 +44,7 @@ import {
 @ApiExtraModels(
   OrderImportTemplateFieldSwagger,
   OrderImportTemplateSwagger,
+  OrderImportTemplateMutationResponseSwagger,
   OrderImportPreviewResponseSwagger,
   OrderImportSubmitResponseSwagger,
   OrderImportJobResponseSwagger,
@@ -54,7 +57,7 @@ export class ImportController {
   @ApiOperation({ summary: '获取系统默认映射模板' })
   @ApiOkResponse({ type: [OrderImportTemplateFieldSwagger] })
   @Get('import/default-template')
-  @Roles(UserRoleEnum.TENANT_OWNER, UserRoleEnum.TENANT_OPERATOR)
+  @Roles(UserRoleEnum.TENANT_OWNER)
   async getDefaultTemplate(): Promise<OrderImportTemplateField[]> {
     return this.importService.getDefaultTemplate();
   }
@@ -68,13 +71,13 @@ export class ImportController {
   }
 
   @ApiOperation({ summary: '创建导入模板' })
-  @ApiOkResponse({ type: OrderImportTemplateSwagger })
+  @ApiOkResponse({ type: OrderImportTemplateMutationResponseSwagger })
   @Post('import/templates')
-  @Roles(UserRoleEnum.TENANT_OWNER, UserRoleEnum.TENANT_OPERATOR)
+  @Roles(UserRoleEnum.TENANT_OWNER)
   async createImportTemplate(
     @CurrentUser() currentUser: JwtPayload,
     @Body() request: CreateImportTemplateDto,
-  ): Promise<OrderImportTemplate> {
+  ): Promise<OrderImportTemplateMutationResponse> {
     return this.importService.createImportTemplate(
       currentUser,
       request as CreateOrderImportTemplateRequest,
@@ -83,14 +86,14 @@ export class ImportController {
 
   @ApiOperation({ summary: '更新导入模板' })
   @ApiParam({ name: 'id', description: '导入模板 ID', format: 'uuid' })
-  @ApiOkResponse({ type: OrderImportTemplateSwagger })
+  @ApiOkResponse({ type: OrderImportTemplateMutationResponseSwagger })
   @Put('import/templates/:id')
-  @Roles(UserRoleEnum.TENANT_OWNER, UserRoleEnum.TENANT_OPERATOR)
+  @Roles(UserRoleEnum.TENANT_OWNER)
   async updateImportTemplate(
     @CurrentUser() currentUser: JwtPayload,
     @Param('id', new ParseUUIDPipe()) id: string,
     @Body() request: UpdateImportTemplateDto,
-  ): Promise<OrderImportTemplate> {
+  ): Promise<OrderImportTemplateMutationResponse> {
     return this.importService.updateImportTemplate(
       currentUser,
       id,

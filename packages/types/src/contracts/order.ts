@@ -128,6 +128,13 @@ export interface OrderImportTemplate {
   customerFields: OrderImportTemplateField[]
 }
 
+export interface OrderImportTemplateMutationResponse {
+  id: string
+  name: string
+  isDefault: boolean
+  updatedAt: string
+}
+
 export interface CreateOrderImportTemplateRequest {
   name: string
   isDefault: boolean

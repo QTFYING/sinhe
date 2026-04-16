@@ -105,8 +105,22 @@ export interface CreateTicketAssignmentRequest {
   assignee: string
 }
 
+export interface TicketAssignmentResponse {
+  no: string
+  assignee: string
+  status: TicketStatus
+  assignedAt: string
+}
+
 export interface CreateTicketClosureRequest {
   resolution?: string
+}
+
+export interface TicketClosureResponse {
+  no: string
+  status: TicketStatus
+  resolution?: string
+  closedAt: string
 }
 
 export interface ServiceProviderRecordItem {

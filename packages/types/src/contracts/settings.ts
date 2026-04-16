@@ -105,8 +105,8 @@ export interface UpdatePrintingConfigRequest {
 
 export interface UpdatePrintingConfigResponse {
   importTemplateId: string
+  hasCustomConfig: boolean
   configVersion: number
-  config: Record<string, unknown>
   updatedAt: string
   updatedBy?: string
   remark?: string

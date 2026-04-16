@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   ForbiddenException,
   Inject,
   Injectable,
@@ -32,6 +33,7 @@ import type {
   OrderImportSubmitRequest,
   OrderImportSubmitResponse,
   OrderImportTemplate,
+  OrderImportTemplateMutationResponse,
   OrderImportTemplateField,
   OrderLineItem,
   UpdateOrderImportTemplateRequest,
@@ -47,6 +49,8 @@ import { randomBytes, randomUUID } from 'crypto';
 import Decimal from 'decimal.js';
 import { JwtPayload } from '../auth/decorators/current-user.decorator';
 import { importConfig } from '../config/import.config';
+import { IdGeneratorService } from '../id-generator/id-generator.service';
+import { ID_CONFIG } from '../id-generator/id-generator.constants';
 import { PrismaService } from '../prisma/prisma.service';
 import { RedisService } from '../redis/redis.service';
 import {
@@ -120,6 +124,7 @@ export class ImportService implements OnModuleInit, OnModuleDestroy {
   constructor(
     private readonly prisma: PrismaService,
     private readonly redis: RedisService,
+    private readonly idGen: IdGeneratorService,
     @Inject(importConfig.KEY)
     private readonly importSettings: ConfigType<typeof importConfig>,
     @Inject(IMPORT_RUNTIME_MODE)
@@ -155,9 +160,10 @@ export class ImportService implements OnModuleInit, OnModuleDestroy {
   async createImportTemplate(
     currentUser: JwtPayload,
     request: CreateOrderImportTemplateRequest,
-  ): Promise<OrderImportTemplate> {
+  ): Promise<OrderImportTemplateMutationResponse> {
     const tenantId = this.getTenantId(currentUser);
     const normalized = this.normalizeTemplatePayload(request);
+    await this.ensureTemplateNameAvailable(tenantId, normalized.name);
 
     const created = await this.prisma.$transaction(async (tx) => {
       if (normalized.isDefault) {
@@ -178,14 +184,14 @@ export class ImportService implements OnModuleInit, OnModuleDestroy {
       });
     });
 
-    return this.toTemplate(created);
+    return this.toTemplateMutationResponse(created);
   }
 
   async updateImportTemplate(
     currentUser: JwtPayload,
     templateId: string,
     request: UpdateOrderImportTemplateRequest,
-  ): Promise<OrderImportTemplate> {
+  ): Promise<OrderImportTemplateMutationResponse> {
     const tenantId = this.getTenantId(currentUser);
     const existing = await this.getScopedTemplate(tenantId, templateId);
     const current = this.toTemplate(existing);
@@ -200,17 +206,18 @@ export class ImportService implements OnModuleInit, OnModuleDestroy {
           mapStr: field.mapStr,
         })),
     });
+    await this.ensureTemplateNameAvailable(tenantId, normalized.name, templateId);
 
     const updated = await this.prisma.$transaction(async (tx) => {
       if (normalized.isDefault) {
         await tx.importTemplate.updateMany({
-          where: { tenantId, deletedAt: null, id: { not: templateId } },
+          where: { tenantId, deletedAt: null, id: { not: BigInt(templateId) } },
           data: { isDefault: false },
         });
       }
 
       return tx.importTemplate.update({
-        where: { id: templateId },
+        where: { id: BigInt(templateId) },
         data: {
           name: normalized.name,
           isDefault: normalized.isDefault,
@@ -220,7 +227,7 @@ export class ImportService implements OnModuleInit, OnModuleDestroy {
       });
     });
 
-    return this.toTemplate(updated);
+    return this.toTemplateMutationResponse(updated);
   }
 
   async previewImport(
@@ -263,8 +270,10 @@ export class ImportService implements OnModuleInit, OnModuleDestroy {
       }
 
       const conflictPolicy = request.conflictPolicy ?? OrderImportConflictPolicyEnum.SKIP;
+      const jobId = await this.idGen.nextDailyId(ID_CONFIG.IMPORT_JOB.prefix, ID_CONFIG.IMPORT_JOB.digits);
       const job = await this.prisma.importJob.create({
         data: {
+          id: jobId,
           tenantId,
           status: PrismaImportJobStatusEnum.PENDING,
           conflictPolicy: this.toPrismaImportConflictPolicy(conflictPolicy),
@@ -346,7 +355,7 @@ export class ImportService implements OnModuleInit, OnModuleDestroy {
     const normalizedOrders: PreparedImportOrder[] = [];
 
     request.orders.forEach((order, index) => {
-      const prepared = this.normalizePreviewOrder(order, index + 1, template.id, customerFieldKeySet);
+      const prepared = this.normalizePreviewOrder(order, index + 1, String(template.id), customerFieldKeySet);
       if ('error' in prepared) {
         invalidErrors.push(...prepared.error);
         return;
@@ -397,7 +406,7 @@ export class ImportService implements OnModuleInit, OnModuleDestroy {
     return {
       previewId: randomUUID(),
       tenantId,
-      templateId: template.id,
+      templateId: String(template.id),
       summary: this.buildPreviewSummary(request.orders.length, validOrders, invalidErrors, duplicateOrders),
       orders: validOrders,
       duplicateOrders: this.uniqueDuplicateOrders(duplicateOrders),
@@ -767,8 +776,9 @@ export class ImportService implements OnModuleInit, OnModuleDestroy {
       };
     }
 
+    const orderId = await this.idGen.nextDailyId(ID_CONFIG.ORDER.prefix, ID_CONFIG.ORDER.digits);
     await client.order.create({
-      data: this.toOrderCreateInput(tenantId, order),
+      data: { ...this.toOrderCreateInput(tenantId, order), id: orderId } as unknown as Prisma.OrderCreateInput,
     });
 
     return { type: 'created' };
@@ -894,7 +904,7 @@ export class ImportService implements OnModuleInit, OnModuleDestroy {
       tenant: { connect: { id: tenantId } },
       sourceOrderNo: order.sourceOrderNo,
       groupKey: order.groupKey,
-      mappingTemplate: { connect: { id: order.mappingTemplateId as string } },
+      mappingTemplate: { connect: { id: BigInt(order.mappingTemplateId as string) } },
       qrCodeToken: this.generateQrCodeToken(),
       customer: this.cut(order.customer, 100),
       customerPhone: this.cut(order.customerPhone, 30),
@@ -916,7 +926,7 @@ export class ImportService implements OnModuleInit, OnModuleDestroy {
   private toOrderUpdateInput(order: PreparedImportOrder): Prisma.OrderUpdateInput {
     return {
       groupKey: order.groupKey,
-      mappingTemplate: { connect: { id: order.mappingTemplateId as string } },
+      mappingTemplate: { connect: { id: BigInt(order.mappingTemplateId as string) } },
       customer: this.cut(order.customer, 100),
       customerPhone: this.cut(order.customerPhone, 30),
       customerAddress: this.cut(order.customerAddress, 255),
@@ -968,12 +978,35 @@ export class ImportService implements OnModuleInit, OnModuleDestroy {
     payload: CreateOrderImportTemplateRequest,
   ): Pick<OrderImportTemplate, 'name' | 'isDefault' | 'defaultFields' | 'customerFields'> {
     const name = this.normalizeRequiredText(payload.name, 'name', 100);
+    const incomingDefaultFields = payload.defaultFields ?? [];
+    if (incomingDefaultFields.length !== DEFAULT_TEMPLATE_FIELDS.length) {
+      throw new BadRequestException(
+        `defaultFields 必须完整包含 ${DEFAULT_TEMPLATE_FIELDS.length} 个系统字段`,
+      );
+    }
+
+    this.ensureNoDuplicate(
+      incomingDefaultFields.map((field) =>
+        this.normalizeRequiredText(field.key, 'defaultFields.key', 50),
+      ),
+      'defaultFields.key',
+    );
+
     const defaultFieldMap = new Map<string, OrderImportTemplateField>(
-      (payload.defaultFields ?? []).map((field: OrderImportTemplateField) => [field.key, field]),
+      incomingDefaultFields.map((field: OrderImportTemplateField) => [field.key, field]),
     );
 
     const defaultFields = DEFAULT_TEMPLATE_FIELDS.map((field) => {
       const input = defaultFieldMap.get(field.key);
+      if (!input) {
+        throw new BadRequestException(`缺少系统字段：${field.key}`);
+      }
+      if (input.label !== field.label) {
+        throw new BadRequestException(`系统字段 ${field.key} 的 label 不允许修改`);
+      }
+      if (input.isRequired !== field.isRequired) {
+        throw new BadRequestException(`系统字段 ${field.key} 的 isRequired 不允许修改`);
+      }
       const mapStr = this.readString(input?.mapStr);
       if (!mapStr) {
         throw new BadRequestException(`${field.label} 的 mapStr 不能为空`);
@@ -1008,6 +1041,7 @@ export class ImportService implements OnModuleInit, OnModuleDestroy {
       };
     });
 
+    this.ensureNoDuplicate(customerFields.map((field) => field.label), 'customerFields.label');
     this.ensureNoDuplicate(
       [...defaultFields, ...customerFields].map((field) => field.mapStr),
       'mapStr',
@@ -1024,16 +1058,42 @@ export class ImportService implements OnModuleInit, OnModuleDestroy {
   private ensureNoDuplicate(values: string[], label: string): void {
     const seen = new Set<string>();
     for (const value of values) {
-      if (seen.has(value)) {
+      const normalized = value.trim().toLowerCase();
+      if (seen.has(normalized)) {
         throw new BadRequestException(`${label} 重复：${value}`);
       }
-      seen.add(value);
+      seen.add(normalized);
+    }
+  }
+
+  private async ensureTemplateNameAvailable(
+    tenantId: string,
+    name: string,
+    excludeTemplateId?: string,
+  ): Promise<void> {
+    const existing = await this.prisma.importTemplate.findFirst({
+      where: {
+        tenantId,
+        deletedAt: null,
+        id: excludeTemplateId ? { not: BigInt(excludeTemplateId) } : undefined,
+        name: {
+          equals: name,
+          mode: 'insensitive',
+        },
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    if (existing) {
+      throw new ConflictException('映射模板名称已存在');
     }
   }
 
   private async getScopedTemplate(tenantId: string, templateId: string) {
     const template = await this.prisma.importTemplate.findFirst({
-      where: { id: templateId, tenantId, deletedAt: null },
+      where: { id: BigInt(templateId), tenantId, deletedAt: null },
     });
     if (!template) {
       throw new NotFoundException('未找到对应的导入模板');
@@ -1121,7 +1181,7 @@ export class ImportService implements OnModuleInit, OnModuleDestroy {
   }
 
   private toTemplate(template: {
-    id: string;
+    id: bigint;
     name: string;
     isDefault: boolean;
     updatedAt: Date;
@@ -1129,12 +1189,26 @@ export class ImportService implements OnModuleInit, OnModuleDestroy {
     customerFields: Prisma.JsonValue;
   }): OrderImportTemplate {
     return {
-      id: template.id,
+      id: String(template.id),
       name: template.name,
       isDefault: template.isDefault,
       updatedAt: template.updatedAt.toISOString(),
       defaultFields: this.asTemplateFields(template.defaultFields),
       customerFields: this.asTemplateFields(template.customerFields),
+    };
+  }
+
+  private toTemplateMutationResponse(template: {
+    id: bigint;
+    name: string;
+    isDefault: boolean;
+    updatedAt: Date;
+  }): OrderImportTemplateMutationResponse {
+    return {
+      id: String(template.id),
+      name: template.name,
+      isDefault: template.isDefault,
+      updatedAt: template.updatedAt.toISOString(),
     };
   }
 
