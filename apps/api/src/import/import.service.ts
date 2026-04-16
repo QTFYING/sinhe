@@ -64,10 +64,11 @@ const IMPORT_PREVIEW_CONSUME_LOCK_SECONDS = 30;
 const DEFAULT_TEMPLATE_FIELDS: OrderImportTemplateField[] = [
   { label: '源订单号', key: 'sourceOrderNo', mapStr: '', isRequired: true },
   { label: '客户名称', key: 'customer', mapStr: '', isRequired: true },
-  { label: '商品名称', key: 'skuName', mapStr: '', isRequired: true },
-  { label: '行金额', key: 'lineAmount', mapStr: '', isRequired: true },
+  { label: '客户电话', key: 'customerPhone', mapStr: '', isRequired: true },
+  { label: '客户地址', key: 'customerAddress', mapStr: '', isRequired: true },
   { label: '总金额', key: 'totalAmount', mapStr: '', isRequired: true },
   { label: '下单时间', key: 'orderTime', mapStr: '', isRequired: true },
+  { label: '结算方式', key: 'payType', mapStr: '', isRequired: true },
 ];
 
 interface PreparedImportOrder {
@@ -75,11 +76,12 @@ interface PreparedImportOrder {
   sourceOrderNo: string;
   groupKey?: string;
   customer: string;
-  skuName: string;
-  lineAmount: number;
+  customerPhone: string;
+  customerAddress: string;
   totalAmount: number;
   orderTime: string;
-  customerValues: Record<string, string>;
+  payType: OrderPayType;
+  customerFieldValues: Record<string, string>;
   mappingTemplateId?: string;
   lineItems: OrderLineItem[];
 }
@@ -412,11 +414,12 @@ export class ImportService implements OnModuleInit, OnModuleDestroy {
     const errors: OrderImportPreviewError[] = [];
     const sourceOrderNo = this.readString(order.sourceOrderNo);
     const customer = this.readString(order.customer);
-    const skuName = this.readString(order.skuName);
+    const customerPhone = this.readString(order.customerPhone);
+    const customerAddress = this.readString(order.customerAddress);
     const groupKey = this.readString(order.groupKey) ?? sourceOrderNo;
-    const lineAmount = this.readMoney(order.lineAmount);
     const totalAmount = this.readMoney(order.totalAmount);
     const orderTime = this.readDate(order.orderTime);
+    const payType = this.readPayType(order.payType);
 
     if (!sourceOrderNo) {
       errors.push({ index, field: 'sourceOrderNo', reason: '源订单号不能为空' });
@@ -424,13 +427,11 @@ export class ImportService implements OnModuleInit, OnModuleDestroy {
     if (!customer) {
       errors.push({ index, sourceOrderNo, field: 'customer', reason: '客户名称不能为空' });
     }
-    if (!skuName) {
-      errors.push({ index, sourceOrderNo, field: 'skuName', reason: '商品名称不能为空' });
+    if (!customerPhone) {
+      errors.push({ index, sourceOrderNo, field: 'customerPhone', reason: '客户电话不能为空' });
     }
-    if (lineAmount === undefined) {
-      errors.push({ index, sourceOrderNo, field: 'lineAmount', reason: '行金额不能为空' });
-    } else if (lineAmount.lte(0)) {
-      errors.push({ index, sourceOrderNo, field: 'lineAmount', reason: '行金额必须大于 0' });
+    if (!customerAddress) {
+      errors.push({ index, sourceOrderNo, field: 'customerAddress', reason: '客户地址不能为空' });
     }
     if (totalAmount === undefined) {
       errors.push({ index, sourceOrderNo, field: 'totalAmount', reason: '总金额不能为空' });
@@ -440,14 +441,31 @@ export class ImportService implements OnModuleInit, OnModuleDestroy {
     if (!orderTime) {
       errors.push({ index, sourceOrderNo, field: 'orderTime', reason: '下单时间格式不正确' });
     }
+    if (!payType) {
+      errors.push({ index, sourceOrderNo, field: 'payType', reason: '结算方式不正确，仅支持 cash 或 credit' });
+    }
 
-    const customerValues = this.normalizeCustomerValues(order.customerValues, customerFieldKeySet, index, sourceOrderNo);
-    errors.push(...customerValues.errors);
+    const customerFieldValues = this.normalizeCustomerFieldValues(
+      order.customerFieldValues,
+      customerFieldKeySet,
+      index,
+      sourceOrderNo,
+    );
+    errors.push(...customerFieldValues.errors);
 
     const lineItems = this.normalizeLineItems(order.lineItems ?? [], index, sourceOrderNo);
     errors.push(...lineItems.errors);
 
-    if (errors.length > 0 || !sourceOrderNo || !customer || !skuName || !lineAmount || !totalAmount || !orderTime) {
+    if (
+      errors.length > 0
+      || !sourceOrderNo
+      || !customer
+      || !customerPhone
+      || !customerAddress
+      || !totalAmount
+      || !orderTime
+      || !payType
+    ) {
       return { error: errors };
     }
 
@@ -457,18 +475,19 @@ export class ImportService implements OnModuleInit, OnModuleDestroy {
         sourceOrderNo,
         groupKey,
         customer,
-        skuName,
-        lineAmount: Number(lineAmount.toFixed(2)),
+        customerPhone,
+        customerAddress,
         totalAmount: Number(totalAmount.toFixed(2)),
         orderTime: orderTime.toISOString(),
-        customerValues: customerValues.values,
+        payType,
+        customerFieldValues: customerFieldValues.values,
         mappingTemplateId: templateId,
         lineItems: lineItems.values,
       },
     };
   }
 
-  private normalizeCustomerValues(
+  private normalizeCustomerFieldValues(
     value: Record<string, string> | undefined,
     customerFieldKeySet: Set<string>,
     index: number,
@@ -485,7 +504,7 @@ export class ImportService implements OnModuleInit, OnModuleDestroy {
         errors.push({
           index,
           sourceOrderNo,
-          field: 'customerValues',
+          field: 'customerFieldValues',
           reason: `自定义字段 key 不存在：${key}`,
         });
         return acc;
@@ -878,20 +897,20 @@ export class ImportService implements OnModuleInit, OnModuleDestroy {
       mappingTemplate: { connect: { id: order.mappingTemplateId as string } },
       qrCodeToken: this.generateQrCodeToken(),
       customer: this.cut(order.customer, 100),
-      skuName: this.cut(order.skuName, 255),
-      lineAmount: this.toPrismaDecimal(this.toMoney(order.lineAmount, 'lineAmount', true)),
+      customerPhone: this.cut(order.customerPhone, 30),
+      customerAddress: this.cut(order.customerAddress, 255),
       totalAmount: this.toPrismaDecimal(this.toMoney(order.totalAmount, 'totalAmount')),
       paid: this.toPrismaDecimal(new Decimal(0)),
-      customerValues: order.customerValues as unknown as Prisma.InputJsonValue,
+      customerFieldValues: order.customerFieldValues as unknown as Prisma.InputJsonValue,
       status: PrismaOrderStatusEnum.PENDING,
-      payType: PrismaOrderPayTypeEnum.CASH,
+      payType: this.toPrismaOrderPayType(order.payType),
       prints: 0,
       orderTime: new Date(order.orderTime),
       voided: false,
       lineItems: {
         create: order.lineItems.map((item) => this.toLineItemInput(item)),
       },
-    };
+    } as unknown as Prisma.OrderCreateInput;
   }
 
   private toOrderUpdateInput(order: PreparedImportOrder): Prisma.OrderUpdateInput {
@@ -899,13 +918,13 @@ export class ImportService implements OnModuleInit, OnModuleDestroy {
       groupKey: order.groupKey,
       mappingTemplate: { connect: { id: order.mappingTemplateId as string } },
       customer: this.cut(order.customer, 100),
-      skuName: this.cut(order.skuName, 255),
-      lineAmount: this.toPrismaDecimal(this.toMoney(order.lineAmount, 'lineAmount', true)),
+      customerPhone: this.cut(order.customerPhone, 30),
+      customerAddress: this.cut(order.customerAddress, 255),
       totalAmount: this.toPrismaDecimal(this.toMoney(order.totalAmount, 'totalAmount')),
       paid: this.toPrismaDecimal(new Decimal(0)),
-      customerValues: order.customerValues as unknown as Prisma.InputJsonValue,
+      customerFieldValues: order.customerFieldValues as unknown as Prisma.InputJsonValue,
       status: PrismaOrderStatusEnum.PENDING,
-      payType: PrismaOrderPayTypeEnum.CASH,
+      payType: this.toPrismaOrderPayType(order.payType),
       orderTime: new Date(order.orderTime),
       voided: false,
       voidReason: null,
@@ -914,7 +933,7 @@ export class ImportService implements OnModuleInit, OnModuleDestroy {
         deleteMany: {},
         create: order.lineItems.map((item) => this.toLineItemInput(item)),
       },
-    };
+    } as unknown as Prisma.OrderUpdateInput;
   }
 
   private toLineItemInput(item: OrderLineItem): Prisma.OrderItemCreateWithoutOrderInput {
@@ -934,11 +953,12 @@ export class ImportService implements OnModuleInit, OnModuleDestroy {
       sourceOrderNo: order.sourceOrderNo,
       groupKey: order.groupKey,
       customer: order.customer,
-      skuName: order.skuName,
-      lineAmount: order.lineAmount,
+      customerPhone: order.customerPhone,
+      customerAddress: order.customerAddress,
       totalAmount: order.totalAmount,
       orderTime: order.orderTime,
-      customerValues: order.customerValues,
+      payType: order.payType,
+      customerFieldValues: order.customerFieldValues,
       mappingTemplateId: order.mappingTemplateId,
       lineItems: order.lineItems,
     };
@@ -1158,6 +1178,12 @@ export class ImportService implements OnModuleInit, OnModuleDestroy {
     return new Decimal(numeric).toDecimalPlaces(2);
   }
 
+  private readPayType(value: unknown): OrderPayType | undefined {
+    return value === OrderPayTypeEnum.CREDIT ? OrderPayTypeEnum.CREDIT
+      : value === OrderPayTypeEnum.CASH ? OrderPayTypeEnum.CASH
+        : undefined;
+  }
+
   private toImportJobStatus(status: PrismaImportJobStatusEnum): OrderImportJobStatus {
     switch (status) {
       case PrismaImportJobStatusEnum.PENDING:
@@ -1203,6 +1229,12 @@ export class ImportService implements OnModuleInit, OnModuleDestroy {
       default:
         return OrderStatusEnum.PENDING;
     }
+  }
+
+  private toPrismaOrderPayType(payType: OrderPayType): PrismaOrderPayTypeEnum {
+    return payType === OrderPayTypeEnum.CREDIT
+      ? PrismaOrderPayTypeEnum.CREDIT
+      : PrismaOrderPayTypeEnum.CASH;
   }
 
   private toDecimal(

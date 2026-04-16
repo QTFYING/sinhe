@@ -19,6 +19,20 @@ export class CreateOrderDto {
   @MaxLength(100)
   customer!: string;
 
+  @ApiPropertyOptional({ description: '客户电话', example: '13800138000' })
+  @IsOptional()
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(30)
+  customerPhone?: string;
+
+  @ApiPropertyOptional({ description: '客户地址', example: '深圳市福田区深南大道1001号' })
+  @IsOptional()
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(255)
+  customerAddress?: string;
+
   @ApiPropertyOptional({ description: '商品摘要', example: '农夫山泉 550ml、康师傅冰红茶' })
   @IsOptional()
   @IsString()

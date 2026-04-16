@@ -2,6 +2,7 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
   OrderImportConflictPolicyEnum,
   OrderImportJobStatusEnum,
+  OrderPayTypeEnum,
   OrderStatusEnum,
 } from '@shou/types/enums';
 import { OrderLineItemSwagger } from '../order/order.swagger';
@@ -50,11 +51,11 @@ export class OrderImportPreviewOrderSwagger {
   @ApiProperty({ description: '客户名称', example: '深圳华强贸易' })
   customer!: string;
 
-  @ApiProperty({ description: '主商品名称', example: '农夫山泉 550ml' })
-  skuName!: string;
+  @ApiProperty({ description: '客户电话', example: '13800138000' })
+  customerPhone!: string;
 
-  @ApiProperty({ description: '主展示行金额（元）', example: 24 })
-  lineAmount!: number;
+  @ApiProperty({ description: '客户地址', example: '深圳市福田区深南大道1001号' })
+  customerAddress!: string;
 
   @ApiProperty({ description: '订单总金额（元）', example: 48 })
   totalAmount!: number;
@@ -63,12 +64,19 @@ export class OrderImportPreviewOrderSwagger {
   orderTime!: string;
 
   @ApiProperty({
+    description: '结算方式',
+    enum: Object.values(OrderPayTypeEnum),
+    example: OrderPayTypeEnum.CASH,
+  })
+  payType!: string;
+
+  @ApiProperty({
     description: '模板自定义字段值',
     type: 'object',
     additionalProperties: { type: 'string' },
     example: { customerKey1: 'MD001', customerKey2: '张三' },
   })
-  customerValues!: Record<string, string>;
+  customerFieldValues!: Record<string, string>;
 
   @ApiPropertyOptional({ description: '关联映射模板 ID' })
   mappingTemplateId?: string;

@@ -116,21 +116,23 @@ export class OrderService {
     const status = this.resolveRequestedStatus(request.status, payType, amount, paid, false);
     const orderDate = this.parseDate(request.date, 'date') ?? new Date();
     const customer = this.normalizeRequiredText(request.customer, 'customer', 100);
+    const customerPhone = request.customerPhone?.trim() ? this.cut(request.customerPhone.trim(), 30) : '';
+    const customerAddress = request.customerAddress?.trim() ? this.cut(request.customerAddress.trim(), 255) : '';
 
     const created = await this.prisma.order.create({
       data: {
         tenantId,
         qrCodeToken: this.generateQrCodeToken(),
         customer,
-        skuName: this.cut(request.summary?.trim() || '手工创建订单', 255),
-        lineAmount: this.toPrismaDecimal(amount),
+        customerPhone,
+        customerAddress,
         totalAmount: this.toPrismaDecimal(amount),
         paid: this.toPrismaDecimal(paid),
         status: this.toPrismaOrderStatus(status),
         payType: this.toPrismaOrderPayType(payType),
         prints: 0,
         orderTime: orderDate,
-      },
+      } as unknown as Prisma.OrderCreateInput,
       include: { lineItems: true },
     });
 
@@ -184,11 +186,6 @@ export class OrderService {
       const payType = request.payType ?? this.fromPrismaOrderPayType(existing.payType);
       const status = this.resolveRequestedStatus(request.status, payType, amount, paid, false);
       const orderTime = request.date ? this.parseDate(request.date, 'date') : existing.orderTime;
-      const resolvedSkuName = normalizedLineItems?.[0]?.skuName
-        ?? (request.summary !== undefined ? this.cut(request.summary.trim(), 255) : existing.skuName);
-      const resolvedLineAmount = normalizedLineItems
-        ? this.toMoney(normalizedLineItems[0]?.lineAmount ?? Number(amount.toFixed(2)), 'lineAmount', true)
-        : (request.amount !== undefined ? amount : this.decimal(existing.lineAmount));
       const updated = await tx.order.update({
         where: { id: existing.id },
         data: {
@@ -196,24 +193,30 @@ export class OrderService {
             request.customer !== undefined
               ? this.normalizeRequiredText(request.customer, 'customer', 100)
               : existing.customer,
-          skuName: resolvedSkuName,
-          lineAmount: this.toPrismaDecimal(resolvedLineAmount),
+          customerPhone:
+            request.customerPhone !== undefined
+              ? this.cut(request.customerPhone.trim(), 30)
+              : ((existing as { customerPhone?: string | null }).customerPhone ?? ''),
+          customerAddress:
+            request.customerAddress !== undefined
+              ? this.cut(request.customerAddress.trim(), 255)
+              : ((existing as { customerAddress?: string | null }).customerAddress ?? ''),
           totalAmount: this.toPrismaDecimal(amount),
           paid: this.toPrismaDecimal(paid),
           status: this.toPrismaOrderStatus(status),
           payType: this.toPrismaOrderPayType(payType),
           orderTime,
-          customerValues:
+          customerFieldValues:
             request.customFieldValues !== undefined
               ? (request.customFieldValues as unknown as Prisma.InputJsonValue)
               : undefined,
           lineItems: normalizedLineItems
-            ? {
+              ? {
                 deleteMany: {},
                 create: normalizedLineItems.map((item) => this.toLineItemCreateInput(item)),
               }
             : undefined,
-        },
+        } as unknown as Prisma.OrderUpdateInput,
         include: { lineItems: true },
       });
 
@@ -523,8 +526,9 @@ export class OrderService {
         { sourceOrderNo: { contains: keyword, mode: 'insensitive' } },
         { groupKey: { contains: keyword, mode: 'insensitive' } },
         { customer: { contains: keyword, mode: 'insensitive' } },
-        { skuName: { contains: keyword, mode: 'insensitive' } },
-      ];
+        { customerPhone: { contains: keyword, mode: 'insensitive' } },
+        { customerAddress: { contains: keyword, mode: 'insensitive' } },
+      ] as unknown as Prisma.OrderWhereInput[];
     }
     if (query.dateFrom || query.dateTo) {
       where.orderTime = {};
@@ -555,9 +559,10 @@ export class OrderService {
         { sourceOrderNo: { contains: keyword, mode: 'insensitive' } },
         { groupKey: { contains: keyword, mode: 'insensitive' } },
         { customer: { contains: keyword, mode: 'insensitive' } },
-        { skuName: { contains: keyword, mode: 'insensitive' } },
+        { customerPhone: { contains: keyword, mode: 'insensitive' } },
+        { customerAddress: { contains: keyword, mode: 'insensitive' } },
         { tenant: { name: { contains: keyword, mode: 'insensitive' } } },
-      ];
+      ] as unknown as Prisma.OrderWhereInput[];
     }
 
     const [orders, total] = await Promise.all([
@@ -732,11 +737,11 @@ export class OrderService {
     mappingTemplateId: string | null;
     qrCodeToken: string;
     customer: string;
-    skuName: string;
-    lineAmount: Prisma.Decimal;
+    customerPhone?: string | null;
+    customerAddress?: string | null;
     totalAmount: Prisma.Decimal;
     paid: Prisma.Decimal;
-    customerValues: Prisma.JsonValue | null;
+    customerFieldValues?: Prisma.JsonValue | null;
     status: PrismaOrderStatusEnum;
     payType: PrismaOrderPayTypeEnum;
     prints: number;
@@ -762,8 +767,8 @@ export class OrderService {
       mappingTemplateId: order.mappingTemplateId ?? undefined,
       qrCodeToken: order.qrCodeToken,
       customer: order.customer,
-      skuName: order.skuName,
-      lineAmount: this.toMoneyNumber(order.lineAmount),
+      customerPhone: order.customerPhone ?? '',
+      customerAddress: order.customerAddress ?? '',
       totalAmount: this.toMoneyNumber(order.totalAmount),
       paid: this.toMoneyNumber(order.paid),
       status: this.fromPrismaOrderStatus(order.status),
@@ -780,7 +785,7 @@ export class OrderService {
         unitPrice: this.toMoneyNumber(item.unitPrice),
         lineAmount: this.toMoneyNumber(item.lineAmount),
       })),
-      customerValues: this.toCustomerValues(order.customerValues),
+      customerFieldValues: this.toCustomerFieldValues(order.customerFieldValues ?? null),
       voided: order.voided,
       voidReason: order.voidReason ?? undefined,
       voidedAt: order.voidedAt?.toISOString(),
@@ -814,11 +819,11 @@ export class OrderService {
     mappingTemplateId: string | null;
     qrCodeToken: string;
     customer: string;
-    skuName: string;
-    lineAmount: Prisma.Decimal;
+    customerPhone?: string | null;
+    customerAddress?: string | null;
     totalAmount: Prisma.Decimal;
     paid: Prisma.Decimal;
-    customerValues: Prisma.JsonValue | null;
+    customerFieldValues?: Prisma.JsonValue | null;
     status: PrismaOrderStatusEnum;
     payType: PrismaOrderPayTypeEnum;
     orderTime: Date;
@@ -847,8 +852,8 @@ export class OrderService {
       mappingTemplateId: order.mappingTemplateId ?? undefined,
       qrCodeToken: order.qrCodeToken,
       customer: order.customer,
-      skuName: order.skuName,
-      lineAmount: this.toMoneyNumber(order.lineAmount),
+      customerPhone: order.customerPhone ?? '',
+      customerAddress: order.customerAddress ?? '',
       totalAmount: this.toMoneyNumber(order.totalAmount),
       lineItems: order.lineItems.map((item) => ({
         itemId: item.id,
@@ -860,7 +865,7 @@ export class OrderService {
         unitPrice: this.toMoneyNumber(item.unitPrice),
         lineAmount: this.toMoneyNumber(item.lineAmount),
       })),
-      customerValues: this.toCustomerValues(order.customerValues),
+      customerFieldValues: this.toCustomerFieldValues(order.customerFieldValues ?? null),
       paid: this.toMoneyNumber(order.paid),
       status: this.fromPrismaOrderStatus(order.status),
       payType: this.fromPrismaOrderPayType(order.payType),
@@ -887,7 +892,7 @@ export class OrderService {
     };
   }
 
-  private toCustomerValues(value: Prisma.JsonValue | null): Record<string, string> | undefined {
+  private toCustomerFieldValues(value: Prisma.JsonValue | null): Record<string, string> | undefined {
     if (!value || typeof value !== 'object' || Array.isArray(value)) {
       return undefined;
     }

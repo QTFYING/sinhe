@@ -87,7 +87,7 @@ export class PaymentService {
       customer: order.customer,
       amount: this.toMoneyNumber(order.totalAmount),
       paidAmount: this.toMoneyNumber(order.paid),
-      summary: order.skuName,
+      summary: this.buildOrderSummary(order.lineItems),
       date: order.orderTime.toISOString(),
       status,
       statusMessage: currentPaymentOrder?.statusMessage ?? undefined,
@@ -564,6 +564,21 @@ export class PaymentService {
     }
 
     return order;
+  }
+
+  private buildOrderSummary(
+    lineItems: Array<{ skuName: string; quantity: Prisma.Decimal }>,
+  ): string {
+    if (lineItems.length === 0) {
+      return '订单商品';
+    }
+
+    const [first, ...rest] = lineItems;
+    const firstQuantity = this.toDecimalNumber(first.quantity, 3);
+    const quantityText = Number.isInteger(firstQuantity) ? String(firstQuantity) : firstQuantity.toFixed(3);
+    return rest.length > 0
+      ? `${first.skuName}×${quantityText}等${lineItems.length}件`
+      : `${first.skuName}×${quantityText}`;
   }
 
   private async getLatestPaymentOrder(

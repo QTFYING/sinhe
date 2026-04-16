@@ -46,11 +46,11 @@ export class TenantOrderItemSwagger {
   @ApiProperty({ description: '客户名称', example: '深圳华强贸易' })
   customer!: string;
 
-  @ApiProperty({ description: '主商品名称', example: '农夫山泉 550ml' })
-  skuName!: string;
+  @ApiProperty({ description: '客户电话', example: '13800138000' })
+  customerPhone!: string;
 
-  @ApiProperty({ description: '主展示行金额（元）', example: 48 })
-  lineAmount!: number;
+  @ApiProperty({ description: '客户地址', example: '深圳市福田区深南大道1001号' })
+  customerAddress!: string;
 
   @ApiProperty({ description: '订单总金额（元）', example: 198.5 })
   totalAmount!: number;
@@ -61,7 +61,7 @@ export class TenantOrderItemSwagger {
   @ApiProperty({ description: '订单状态', enum: Object.values(OrderStatusEnum), example: OrderStatusEnum.PARTIAL })
   status!: string;
 
-  @ApiProperty({ description: '付款方式', enum: Object.values(OrderPayTypeEnum), example: OrderPayTypeEnum.CASH })
+  @ApiProperty({ description: '结算方式', enum: Object.values(OrderPayTypeEnum), example: OrderPayTypeEnum.CASH })
   payType!: string;
 
   @ApiProperty({ description: '打印次数', example: 2 })
@@ -79,7 +79,7 @@ export class TenantOrderItemSwagger {
     additionalProperties: { type: 'string' },
     example: { customerCode: 'C-001', deliveryRoute: 'A区' },
   })
-  customerValues?: Record<string, string>;
+  customerFieldValues?: Record<string, string>;
 
   @ApiProperty({ description: '是否已作废', example: false })
   voided!: boolean;
@@ -113,11 +113,11 @@ export class AdminOrderItemSwagger {
   @ApiProperty({ description: '客户名称', example: '深圳华强贸易' })
   customer!: string;
 
-  @ApiProperty({ description: '主商品名称', example: '农夫山泉 550ml' })
-  skuName!: string;
+  @ApiProperty({ description: '客户电话', example: '13800138000' })
+  customerPhone!: string;
 
-  @ApiProperty({ description: '主展示行金额（元）', example: 48 })
-  lineAmount!: number;
+  @ApiProperty({ description: '客户地址', example: '深圳市福田区深南大道1001号' })
+  customerAddress!: string;
 
   @ApiProperty({ description: '订单总金额（元）', example: 198.5 })
   totalAmount!: number;
@@ -131,7 +131,7 @@ export class AdminOrderItemSwagger {
     additionalProperties: { type: 'string' },
     example: { customerCode: 'C-001', deliveryRoute: 'A区' },
   })
-  customerValues?: Record<string, string>;
+  customerFieldValues?: Record<string, string>;
 
   @ApiProperty({ description: '已收金额（元）', example: 100 })
   paid!: number;
@@ -139,7 +139,7 @@ export class AdminOrderItemSwagger {
   @ApiProperty({ description: '订单状态', enum: Object.values(OrderStatusEnum), example: OrderStatusEnum.PARTIAL })
   status!: string;
 
-  @ApiProperty({ description: '付款方式', enum: Object.values(OrderPayTypeEnum), example: OrderPayTypeEnum.CASH })
+  @ApiProperty({ description: '结算方式', enum: Object.values(OrderPayTypeEnum), example: OrderPayTypeEnum.CASH })
   payType!: string;
 
   @ApiProperty({ description: '下单时间', example: '2026-04-10T12:00:00.000Z' })

@@ -2,6 +2,7 @@ import { Type } from 'class-transformer';
 import { ApiProperty } from '@nestjs/swagger';
 import {
   IsArray,
+  IsEnum,
   IsNotEmpty,
   IsObject,
   IsOptional,
@@ -9,6 +10,7 @@ import {
   IsUUID,
   ValidateNested,
 } from 'class-validator';
+import { OrderPayTypeEnum } from '@shou/types/enums';
 import { OrderLineItemDto } from '../../order/dto/order-line-item.dto';
 
 export class ImportPreviewOrderDto {
@@ -27,13 +29,15 @@ export class ImportPreviewOrderDto {
   @IsNotEmpty()
   customer!: string;
 
-  @ApiProperty({ description: '主商品名称', example: '农夫山泉 550ml' })
+  @ApiProperty({ description: '客户电话', example: '13800138000' })
   @IsString()
   @IsNotEmpty()
-  skuName!: string;
+  customerPhone!: string;
 
-  @ApiProperty({ description: '主展示行金额', example: 24 })
-  lineAmount!: number | string;
+  @ApiProperty({ description: '客户地址', example: '深圳市福田区深南大道1001号' })
+  @IsString()
+  @IsNotEmpty()
+  customerAddress!: string;
 
   @ApiProperty({ description: '订单总金额', example: 48 })
   totalAmount!: number | string;
@@ -43,6 +47,10 @@ export class ImportPreviewOrderDto {
   @IsNotEmpty()
   orderTime!: string;
 
+  @ApiProperty({ description: '结算方式', enum: Object.values(OrderPayTypeEnum), example: OrderPayTypeEnum.CASH })
+  @IsEnum(OrderPayTypeEnum)
+  payType!: (typeof OrderPayTypeEnum)[keyof typeof OrderPayTypeEnum];
+
   @ApiProperty({
     description: '模板自定义字段值',
     type: 'object',
@@ -50,7 +58,7 @@ export class ImportPreviewOrderDto {
     example: { customerKey1: 'MD001', customerKey2: '张三' },
   })
   @IsObject()
-  customerValues!: Record<string, string>;
+  customerFieldValues!: Record<string, string>;
 
   @ApiProperty({ description: '订单明细', type: [OrderLineItemDto] })
   @IsArray()
