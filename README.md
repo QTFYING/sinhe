@@ -1,54 +1,74 @@
 # 经销商订单收款平台
 
-本仓库是一个基于 `Turborepo` 与 `pnpm workspace` 组织的后端单仓项目，当前核心应用为 `apps/api`。
+基于 `Turborepo` 与 `pnpm workspace` 的后端单仓项目，当前核心应用是 `apps/api`。
 
-## 当前状态
+## 项目定位
 
-项目目前已完成首轮后端落地，当前处于“按稳定契约持续迭代、联调补强与技术债收口”的阶段。
+当前仓库已进入稳定迭代阶段，主链路集中在：
 
-当前应以以下内容作为事实源和执行依据：
+- Admin / Tenant / H5 共用后端
+- 订单录入、订单导入、支付、核销
+- H5 扫码支付
+- 独立 `import-worker` 导入任务处理
+
+## 治理入口
+
+对全局项目持续生效的约束入口只有这些：
+
+1. `README.md`
+2. `AGENTS.md`
+3. `.codex/skills/*`
+4. `docs/api/*.md`
+
+涉及接口、字段、枚举、状态机、数据模型时，默认按以下顺序判断事实：
 
 1. `docs/api/*.md`
 2. `packages/types/src/enums`
 3. `packages/types/src/contracts`
 4. `docs/prisma/data-model-reference.md`
-5. `design/api-implementation-plan.md`
-6. `design/api-technical-debt.md`
-7. `design/api-regression-checklist.md`
+5. `apps/api` 实现代码
+6. Swagger / OpenAPI
 
-说明：
+其中：
 
-1. `apps/api` 中仍有少量早期 MVP 残留代码，仅可作为历史实现参考。
-2. 主链路接口、枚举、contracts 与数据模型已经形成当前稳定基线。
-3. Swagger 是联调产物，不是设计源。
+- `docs/api` 定义业务语义
+- `enums` 定义闭集值
+- `contracts` 只做结构投影
+- `data-model-reference` 只做建模同步
+- Swagger / OpenAPI 只是联调产物
 
-## 技术栈
+## 非事实源
 
-- 后端框架：NestJS 10
-- ORM：Prisma
-- 数据库：PostgreSQL
-- 缓存与会话：Redis
-- 接口文档：Swagger
-- 工作区管理：pnpm workspace
-- 构建编排：Turborepo
+以下目录只提供背景，不作为编码依据：
 
-## 目录结构
+- `design/`
+- `notes/`
+- `review/`
+- `docs/archived/`
+
+## 目录概览
 
 ```text
 .
-├── AGENTS.md                         # 代理执行规则
+├── README.md
+├── AGENTS.md
 ├── apps/
-│   └── api/                          # NestJS 后端服务
-├── design/                           # 活文档与归档设计手册
-├── docs/                             # API、枚举、数据模型等正式文档
+│   └── api/
+├── docs/
+│   ├── api/
+│   ├── enums/
+│   ├── prisma/
+│   ├── deployment/
+│   └── archived/
+├── .codex/
+│   └── skills/
 ├── packages/
-│   ├── types/                        # 共享枚举与 contracts
-│   └── utils/                        # 共享工具
-├── review/                           # 评审记录与阶段说明
-├── scripts/                          # 数据初始化脚本
-├── package.json                      # 根脚本
-├── pnpm-workspace.yaml               # 工作区定义
-└── turbo.json                        # Turborepo 任务编排
+│   ├── types/
+│   └── utils/
+├── scripts/
+├── design/
+├── notes/
+└── review/
 ```
 
 ## 环境要求
@@ -59,79 +79,80 @@
 - Redis
 - Docker 可选
 
-## 本地启动
+## 快速启动
 
 ### 1. 安装依赖
 
-```powershell
+```bash
 pnpm install
 ```
 
-### 2. 启动 PostgreSQL 与 Redis
+### 2. 准备环境变量
 
-推荐使用 Docker：
+```bash
+cp apps/api/.env.example apps/api/.env
+```
 
-```powershell
+### 3. 启动基础设施
+
+```bash
 docker-compose up -d
 ```
 
-如果不使用 Docker，也可以本机自行安装 PostgreSQL 与 Redis，并确保连接信息与 `apps/api/.env` 保持一致。
+### 4. 同步 Prisma
 
-### 3. 推送 Prisma schema 并生成客户端
-
-```powershell
-pnpm --filter api prisma:push
-pnpm --filter api prisma:generate
+```bash
+pnpm -F api prisma:push
+pnpm -F api prisma:generate
 ```
 
-### 4. 初始化测试数据
+### 5. 初始化数据
 
-```powershell
+```bash
 pnpm db:seed
 ```
 
-默认会创建以下测试账号：
+默认测试账号：
 
-- OS 管理员：`admin` / `123456`
-- 租户老板：`boss` / `123456`
+- `admin` / `123456`
+- `boss` / `123456`
 
-### 5. 启动开发服务
+### 6. 启动服务
 
-```powershell
-pnpm run dev
+```bash
+pnpm dev:api
+```
+
+如需独立导入 Worker：
+
+```bash
+pnpm dev:worker
 ```
 
 默认地址：
 
-- API：`http://localhost:3000`
-- Swagger：`http://localhost:3000/api/docs`
+- API: `http://localhost:3000`
+- Swagger: `http://localhost:3000/api/docs`
 
 ## 常用命令
 
-### 根目录
-
-```powershell
-pnpm run dev
-pnpm run build
-pnpm run lint
-pnpm run format
+```bash
+pnpm dev
+pnpm dev:api
+pnpm dev:worker
+pnpm build
+pnpm check:backend
 pnpm db:seed
 pnpm db:init
-```
-
-### API 应用
-
-```powershell
-pnpm --filter api dev
-pnpm --filter api build
-pnpm --filter api start:debug
-pnpm --filter api prisma:push
-pnpm --filter api prisma:generate
+pnpm -F api test:smoke
+pnpm -F api test:backend-regression
 ```
 
 ## 环境变量
 
-主要使用 `apps/api/.env`：
+模板文件：`apps/api/.env.example`
+
+常用变量：
 
 ```env
 DATABASE_URL=
@@ -145,73 +166,33 @@ IMPORT_JOB_WORKER_ENABLED=
 LAKALA_CASHIER_URL_PREFIX=
 ```
 
-建议以 `apps/api/.env.example` 作为本地配置模板。
+## 阅读顺序
 
-生产初始化脚本 `pnpm db:init` 还会读取以下变量：
+1. `README.md`
+2. `AGENTS.md`
+3. `docs/api/api-architecture-overview.md`
+4. 对应业务域的 `docs/api/*.md`
+5. `packages/types/src/enums`
+6. `packages/types/src/contracts`
+7. `docs/prisma/data-model-reference.md`
+8. 对应 `apps/api/src/*`
 
-```env
-INIT_OS_ADMIN_USERNAME=
-INIT_OS_ADMIN_PASSWORD=
-INIT_OS_ADMIN_REAL_NAME=
-INIT_TENANT_NAME=
-INIT_TENANT_CONTACT_PHONE=
-INIT_TENANT_OWNER_USERNAME=
-INIT_TENANT_OWNER_PASSWORD=
-INIT_TENANT_OWNER_REAL_NAME=
-INIT_TENANT_MAX_CREDIT_DAYS=
-INIT_TENANT_CREDIT_REMINDER_DAYS=
-```
-
-## 核心文档入口
-
-### 业务与接口
+## 关键文档
 
 - `docs/api/api-architecture-overview.md`
 - `docs/api/admin-api-doc.md`
 - `docs/api/tenant-api-doc.md`
 - `docs/api/h5-api-doc.md`
-
-### 枚举与类型
-
 - `docs/enums/enum-manual.md`
-- `packages/types/src/enums`
-- `packages/types/src/contracts`
-
-### 数据模型
-
 - `docs/prisma/data-model-reference.md`
-- `apps/api/prisma/schema.prisma`
+- `docs/deployment/env.md`
+- `docs/deployment/local-start-and-aliyun-release-runbook.md`
+- `docs/deployment/server_deployment.md`
 
-### 执行手册
+## 开发约束摘要
 
-- `design/api-implementation-plan.md`
-- `design/api-technical-debt.md`
-- `design/api-regression-checklist.md`
+- 先看契约，再看实现。
+- 不让 Swagger 反向定义接口。
+- 不恢复已废弃的旧语义，例如 `/print/jobs`、`erpOrderNo`、`templateId`、`customFields`、旧 `payStatus` 主流程。
 
-### 历史归档
-
-- 若后续再次产生阶段性过程文档，统一放入 `design/archived/`
-
-## 阅读顺序
-
-建议按以下顺序阅读本仓库：
-
-1. `README.md`
-2. `AGENTS.md`
-3. `docs/api/api-architecture-overview.md`
-4. `docs/api/*.md`
-5. `docs/enums/enum-manual.md`
-6. `docs/prisma/data-model-reference.md`
-7. `design/api-implementation-plan.md`
-8. `design/api-technical-debt.md`
-9. `design/api-regression-checklist.md`
-
-## 开发约束
-
-1. 先看文档，再看旧代码。
-2. 不让 Swagger 反向定义接口。
-3. 不恢复已废弃的旧语义，例如 `/print/jobs`、`erpOrderNo`、`templateId`、`customFields`、旧 `payStatus` 主流程。
-4. `docs/api` 定业务结构，`enums` 定闭集值，`contracts` 跟随投影，`data-model-reference` 做建模同步。
-
-更严格的代理执行规则见 `AGENTS.md`。
-
+更严格的代理约束见 `AGENTS.md`。
