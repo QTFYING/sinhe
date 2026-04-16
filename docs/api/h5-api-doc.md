@@ -72,6 +72,11 @@
 }
 ```
 
+**补充说明：**
+
+- `summary` 由服务端基于 `items` 聚合生成，不依赖订单头保留 `skuName / lineAmount`
+- `qrCodeToken` 仍然只作为订单公开路由标识，不承载订单自定义字段值
+
 ### 错误场景
 
 | code | 场景 |

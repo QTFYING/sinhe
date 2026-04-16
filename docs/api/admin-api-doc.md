@@ -859,13 +859,15 @@ interface AdminOrder {
   mappingTemplateId?: string   // 关联的导入模板
   qrCodeToken?: string         // 订单级 H5 公开路由标识，仅供查看与排障
   customer: string             // 客户名称
+  customerPhone: string        // 客户电话
+  customerAddress: string      // 客户地址
   lineItems: any[]             // 商品明细 (对应 OrderItem 结构)
-  customFieldValues?: Record<string, string> // 模板动态映射的自定义字段
-  amount: number               // 订单金额（元）
+  customerFieldValues?: Record<string, string> // 模板动态映射的自定义字段
+  totalAmount: number          // 订单金额（元）
   paid: number                 // 已收金额（元）
   status: OrderStatus          // 收款状态
-  payType: OrderPayType        // 现款 | 账期
-  date: string                 // 订单日期 YYYY-MM-DD
+  payType: OrderPayType        // 结算方式：现款 | 账期
+  orderTime: string            // 下单时间
   voided: boolean              // 是否已作废（防物理删除）
   voidReason?: string          // 作废原因
   voidedAt?: string            // 作废时间
@@ -893,7 +895,7 @@ interface AdminOrder {
 {
   page: number                 // 页码
   pageSize: number             // 每页条数
-  keyword?: string             // 搜索订单号、客户、租户
+  keyword?: string             // 搜索订单号、客户、客户电话、客户地址、租户
 }
 ```
 
@@ -909,6 +911,8 @@ interface AdminOrder {
     mappingTemplateId?: string // 导入模板 ID
     qrCodeToken?: string       // 订单级 H5 公开路由标识
     customer: string           // 客户名称
+    customerPhone: string      // 客户电话
+    customerAddress: string    // 客户地址
     lineItems: Array<{
       itemId?: string          // 行项目 ID
       skuId?: string | null    // 商品主数据 ID
@@ -919,12 +923,12 @@ interface AdminOrder {
       unitPrice: number        // 单价
       lineAmount: number       // 行金额
     }>
-    customFieldValues?: Record<string, string> // 动态自定义字段
-    amount: number             // 订单金额（元）
+    customerFieldValues?: Record<string, string> // 动态自定义字段
+    totalAmount: number        // 订单金额（元）
     paid: number               // 已收金额（元）
     status: OrderStatus        // 收款状态
-    payType: OrderPayType      // 付款方式
-    date: string               // 下单日期
+    payType: OrderPayType      // 结算方式
+    orderTime: string          // 下单时间
     voided: boolean            // 是否已作废
     voidReason?: string        // 作废原因
     voidedAt?: string          // 作废时间
@@ -950,6 +954,8 @@ interface AdminOrder {
   mappingTemplateId?: string   // 导入模板 ID
   qrCodeToken?: string         // 订单级 H5 公开路由标识，仅查看不生成
   customer: string             // 客户名称
+  customerPhone: string        // 客户电话
+  customerAddress: string      // 客户地址
   lineItems: Array<{
     itemId?: string            // 行项目 ID
     skuId?: string | null      // 商品主数据 ID
@@ -960,12 +966,12 @@ interface AdminOrder {
     unitPrice: number          // 单价（元）
     lineAmount: number         // 行金额（元）
   }>
-  customFieldValues?: Record<string, string> // 动态自定义字段
-  amount: number               // 订单金额（元）
+  customerFieldValues?: Record<string, string> // 动态自定义字段
+  totalAmount: number          // 订单金额（元）
   paid: number                 // 已收金额（元）
   status: OrderStatus          // 收款状态
-  payType: OrderPayType        // 现款 | 账期
-  date: string                 // 订单日期
+  payType: OrderPayType        // 结算方式：现款 | 账期
+  orderTime: string            // 下单时间
   voided: boolean              // 是否已作废
   voidReason?: string          // 作废原因
   voidedAt?: string            // 作废时间

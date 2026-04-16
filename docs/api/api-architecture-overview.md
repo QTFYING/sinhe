@@ -208,10 +208,11 @@ H5 前端                    后端                     支付网关
 **导入接口详细说明（已确认决策）：**
 - 完整链路为：`GET /import/default-template` → `GET/POST/PUT /import/templates` → `POST /import/preview` → `POST /orders/import` → `GET /orders/import/jobs/:jobId`
 - 模板结构统一为 `{ defaultFields, customerFields }`，不再使用旧三段式 `sourceColumns / fields / mappings`
-- `defaultFields` 固定 6 项：`sourceOrderNo / customer / skuName / lineAmount / totalAmount / orderTime`
+- `defaultFields` 固定 7 项：`sourceOrderNo / customer / customerPhone / customerAddress / totalAmount / orderTime / payType`
 - `customerFields` 与默认字段结构一致，但由服务端生成 `customerKey1...N`，且 `isRequired=false`
 - 前端 SheetJS 解析 Excel 后，必须先按模板把数据回填成标准订单数组，再调用 `/import/preview`
 - `/import/preview` 请求体采用 `{ templateId, orders }`，直接提交订单级标准结构，不再上传原始 `rows`
+- 订单级标准结构中的动态字段值统一命名为 `customerFieldValues`，不再使用 `customerValues`
 - `/orders/import` 只接收 `{ previewId, conflictPolicy? }`，不再支持直传 `orders / rows / templateId`
 - `/import/preview` 同步执行，目标是快速反馈；`/orders/import` 异步执行，正式入队后交由 `import-worker` 处理
 - `previewId` 为正式导入唯一凭证，且成功创建 `jobId` 后一次性消费
@@ -225,9 +226,9 @@ H5 前端                    后端                     支付网关
 {
   page: number
   pageSize: number
-  keyword?: string         // 搜索订单号、ERP源单号、客户名
+  keyword?: string         // 搜索订单号、ERP源单号、客户名、客户电话、客户地址
   status?: OrderStatus     // pending | partial | paid | expired | credit
-  payType?: OrderPayType
+  payType?: OrderPayType   // 结算方式：cash | credit
   templateId?: string      // 按导入模板类型过滤订单
   dateFrom?: string        // YYYY-MM-DD
   dateTo?: string          // YYYY-MM-DD

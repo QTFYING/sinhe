@@ -190,7 +190,7 @@ interface OrderImportTemplate {
   name: string                 // 模板名称
   isDefault: boolean           // 是否默认模板
   updatedAt: string            // 最近更新时间
-  defaultFields: OrderImportTemplateField[]  // 系统默认字段，固定 6 项
+  defaultFields: OrderImportTemplateField[]  // 系统默认字段，固定 7 项
   customerFields: OrderImportTemplateField[] // 租户自定义字段
 }
 
@@ -199,14 +199,14 @@ interface TenantOrderListItem {
   sourceOrderNo: string        // 源订单号
   groupKey?: string            // 辅助分组/防重键；未显式提供时通常回退为 sourceOrderNo
   customer: string             // 客户名称
-  skuName: string              // 主商品名称
-  lineAmount: number           // 主展示行金额（元）
+  customerPhone: string        // 客户电话
+  customerAddress: string      // 客户地址
   totalAmount: number          // 订单总金额（元）
   orderTime: string            // 下单时间
-  customerValues: Record<string, string> // 模板自定义字段值
+  customerFieldValues: Record<string, string> // 模板自定义字段值
   paid: number                 // 已收金额（元）
   status: OrderStatus          // 收款状态
-  payType: OrderPayType        // 付款方式
+  payType: OrderPayType        // 结算方式
   prints: number               // 打印次数
   mappingTemplateId?: string   // 关联映射模板 ID
   qrCodeToken?: string         // 订单级 H5 支付跳转令牌，前端据此生成 `/pay/:token`
@@ -231,9 +231,9 @@ interface TenantOrderDetail extends TenantOrderListItem {
 {
   page?: number                // 默认 1
   pageSize?: number            // 默认 200
-  keyword?: string             // 搜索订单号、源订单号、客户名称
+  keyword?: string             // 搜索订单号、源订单号、客户名称、客户电话、客户地址
   status?: OrderStatus         // 状态筛选
-  payType?: OrderPayType       // 付款方式筛选
+  payType?: OrderPayType       // 结算方式筛选
   templateId?: string          // 按导入模板过滤
   dateFrom?: string            // 按 orderTime 范围过滤，开始日期 YYYY-MM-DD
   dateTo?: string              // 按 orderTime 范围过滤，结束日期 YYYY-MM-DD
@@ -249,14 +249,14 @@ interface TenantOrderDetail extends TenantOrderListItem {
     sourceOrderNo: string      // 源订单号
     groupKey?: string          // 辅助分组/防重键
     customer: string           // 客户名称
-    skuName: string            // 主商品名称
-    lineAmount: number         // 主展示行金额（元）
+    customerPhone: string      // 客户电话
+    customerAddress: string    // 客户地址
     totalAmount: number        // 订单总金额（元）
     orderTime: string          // 下单时间
-    customerValues: Record<string, string> // 模板自定义字段值
+    customerFieldValues: Record<string, string> // 模板自定义字段值
     paid: number               // 已收金额（元）
     status: OrderStatus        // 收款状态
-    payType: OrderPayType      // 付款方式
+    payType: OrderPayType      // 结算方式
     prints: number             // 打印次数
     mappingTemplateId?: string // 关联映射模板 ID
     qrCodeToken?: string       // 订单级 H5 支付跳转令牌
@@ -284,14 +284,14 @@ interface TenantOrderDetail extends TenantOrderListItem {
   sourceOrderNo: string        // 源订单号
   groupKey?: string            // 辅助分组/防重键
   customer: string             // 客户名称
-  skuName: string              // 主商品名称
-  lineAmount: number           // 主展示行金额（元）
+  customerPhone: string        // 客户电话
+  customerAddress: string      // 客户地址
   totalAmount: number          // 订单总金额（元）
   orderTime: string            // 下单时间
-  customerValues: Record<string, string> // 模板自定义字段值
+  customerFieldValues: Record<string, string> // 模板自定义字段值
   paid: number                 // 已收金额（元）
   status: OrderStatus          // 收款状态
-  payType: OrderPayType        // 付款方式
+  payType: OrderPayType        // 结算方式
   prints: number               // 累计打印次数
   mappingTemplateId?: string   // 关联映射模板 ID
   qrCodeToken?: string         // 订单级 H5 支付跳转令牌，前端据此生成 `/pay/:token`
@@ -345,14 +345,14 @@ interface TenantOrderDetail extends TenantOrderListItem {
   sourceOrderNo: string        // 源订单号
   groupKey?: string            // 辅助分组/防重键
   customer: string             // 客户名称
-  skuName: string              // 主商品名称
-  lineAmount: number           // 主展示行金额（元）
+  customerPhone: string        // 客户电话
+  customerAddress: string      // 客户地址
   totalAmount: number          // 订单总金额（元）
   orderTime: string            // 下单时间
-  customerValues: Record<string, string> // 模板自定义字段值
+  customerFieldValues: Record<string, string> // 模板自定义字段值
   paid: number                 // 已收金额（元）
   status: OrderStatus          // 收款状态
-  payType: OrderPayType        // 付款方式
+  payType: OrderPayType        // 结算方式
   prints: number               // 打印次数
   mappingTemplateId?: string   // 关联映射模板 ID
   qrCodeToken?: string         // 订单级 H5 支付跳转令牌
@@ -395,10 +395,11 @@ Array<{
 [
   { "label": "源订单号", "key": "sourceOrderNo", "mapStr": "", "isRequired": true },
   { "label": "客户名称", "key": "customer", "mapStr": "", "isRequired": true },
-  { "label": "商品名称", "key": "skuName", "mapStr": "", "isRequired": true },
-  { "label": "行金额", "key": "lineAmount", "mapStr": "", "isRequired": true },
+  { "label": "客户电话", "key": "customerPhone", "mapStr": "", "isRequired": true },
+  { "label": "客户地址", "key": "customerAddress", "mapStr": "", "isRequired": true },
   { "label": "总金额", "key": "totalAmount", "mapStr": "", "isRequired": true },
-  { "label": "下单时间", "key": "orderTime", "mapStr": "", "isRequired": true }
+  { "label": "下单时间", "key": "orderTime", "mapStr": "", "isRequired": true },
+  { "label": "结算方式", "key": "payType", "mapStr": "", "isRequired": true },
 ]
 ```
 
@@ -434,7 +435,7 @@ Array<{
 
 **业务规则：**
 
-- `defaultFields` 固定 6 项，字段 key 与 `GET /import/default-template` 保持一致
+- `defaultFields` 固定 7 项，字段 key 与 `GET /import/default-template` 保持一致
 - `customerFields` 为租户自定义字段，结构与默认字段一致
 - 当前模板列表只返回新结构，不再返回旧三段式 `sourceColumns / fields / mappings`
 
@@ -488,7 +489,7 @@ Array<{
 
 **服务端规则：**
 
-- `defaultFields` 必须完整包含 6 个系统字段，且 `key / label / isRequired` 不能改写
+- `defaultFields` 必须完整包含 7 个系统字段，且 `key / label / isRequired` 不能改写
 - `defaultFields[].mapStr` 由租户填写对应 ERP 列头
 - `customerFields` 由前端提交 `label + mapStr`，服务端统一补 `key=customerKey1...N`
 - 所有 `customerFields[].isRequired` 均由服务端固定为 `false`
@@ -562,11 +563,12 @@ Array<{
   orders: Array<{
     sourceOrderNo: string                // 源订单号
     customer: string                     // 客户名称
-    skuName: string                      // 主商品名称
-    lineAmount: number | string          // 主展示行金额
+    customerPhone: string                // 客户电话
+    customerAddress: string              // 客户地址
     totalAmount: number | string         // 订单总金额
     orderTime: string                    // 下单时间
-    customerValues: Record<string, string> // 模板自定义字段值
+    payType: OrderPayType                // 结算方式：cash | credit
+    customerFieldValues: Record<string, string> // 模板自定义字段值
     lineItems: Array<{
       itemId?: string                    // 行项目 ID
       skuId?: string | null              // 商品主数据 ID
@@ -590,11 +592,12 @@ Array<{
     {
       "sourceOrderNo": "SO-20260415-001",
       "customer": "深圳华强贸易",
-      "skuName": "农夫山泉550ml",
-      "lineAmount": 24,
+      "customerPhone": "13800138000",
+      "customerAddress": "深圳市福田区深南大道1001号",
       "totalAmount": 48,
       "orderTime": "2026-04-15 09:30:00",
-      "customerValues": {
+      "payType": "cash",
+      "customerFieldValues": {
         "customerKey1": "MD001",
         "customerKey2": "张三"
       },
@@ -630,11 +633,12 @@ Array<{
     sourceOrderNo: string      // 源订单号
     groupKey?: string          // 辅助分组/防重键
     customer: string           // 客户名称
-    skuName: string            // 主商品名称
-    lineAmount: number         // 主展示行金额（元）
+    customerPhone: string      // 客户电话
+    customerAddress: string    // 客户地址
     totalAmount: number        // 订单总金额（元）
     orderTime: string          // 下单时间
-    customerValues: Record<string, string> // 模板自定义字段值
+    payType: OrderPayType      // 结算方式
+    customerFieldValues: Record<string, string> // 模板自定义字段值
     mappingTemplateId?: string // 关联映射模板 ID
     lineItems: Array<{
       itemId?: string          // 行项目 ID
@@ -667,8 +671,9 @@ Array<{
 **预检规则：**
 
 - `orders` 必须为非空数组
-- 每张订单必须包含 6 个默认字段值：`sourceOrderNo / customer / skuName / lineAmount / totalAmount / orderTime`
-- `customerValues` 中的 key 必须全部命中该模板的 `customerFields[].key`
+- 每张订单必须包含 7 个默认字段值：`sourceOrderNo / customer / customerPhone / customerAddress / totalAmount / orderTime / payType`
+- `customerFieldValues` 中的 key 必须全部命中该模板的 `customerFields[].key`
+- `payType` 当前只允许 `cash / credit`
 - `lineItems` 可为空数组；非空时继续沿用当前行项目结构校验
 - `invalidOrders.length === 0` 时，前端才应继续触发正式导入
 
