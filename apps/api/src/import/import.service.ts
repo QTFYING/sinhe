@@ -57,7 +57,12 @@ import {
   resolveImportJobFinalStatus,
   shouldStartImportJobImmediately,
 } from './import-job.worker.helpers';
-import { IMPORT_RUNTIME_MODE, type ImportRuntimeMode } from './import.constants';
+import {
+  IMPORT_PREVIEW_MAX_LINE_ITEMS,
+  IMPORT_PREVIEW_MAX_ORDERS,
+  IMPORT_RUNTIME_MODE,
+  type ImportRuntimeMode,
+} from './import.constants';
 
 /** 预检快照在 Redis 中的保留时长：15 分钟；超时未发起正式导入则需要重新预检 */
 const IMPORT_PREVIEW_TTL_SECONDS = 900;
@@ -427,6 +432,19 @@ export class ImportService implements OnModuleInit, OnModuleDestroy {
   ): Promise<PreviewSnapshot> {
     if (!request.orders?.length) {
       throw new BadRequestException('导入预检至少需要一张订单');
+    }
+    if (request.orders.length > IMPORT_PREVIEW_MAX_ORDERS) {
+      throw new BadRequestException(`单次预检最多支持 ${IMPORT_PREVIEW_MAX_ORDERS} 条订单`);
+    }
+
+    const totalLineItemCount = request.orders.reduce(
+      (sum, order) => sum + (Array.isArray(order.lineItems) ? order.lineItems.length : 0),
+      0,
+    );
+    if (totalLineItemCount > IMPORT_PREVIEW_MAX_LINE_ITEMS) {
+      throw new BadRequestException(
+        `订单明细总数 ${totalLineItemCount} 超过上限 ${IMPORT_PREVIEW_MAX_LINE_ITEMS}，请减少明细或分批导入`,
+      );
     }
 
     const template = this.toTemplate(await this.getScopedTemplate(tenantId, request.templateId));

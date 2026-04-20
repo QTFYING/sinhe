@@ -1,6 +1,8 @@
 import { Type } from 'class-transformer';
 import { ApiProperty } from '@nestjs/swagger';
 import {
+  ArrayMaxSize,
+  ArrayMinSize,
   IsArray,
   IsDefined,
   IsNotEmpty,
@@ -10,6 +12,7 @@ import {
   ValidateNested,
 } from 'class-validator';
 import { OrderLineItemDto } from '../../order/dto/order-line-item.dto';
+import { IMPORT_PREVIEW_MAX_ORDERS } from '../import.constants';
 
 export class ImportPreviewOrderDto {
   @ApiProperty({ description: '源订单号', example: 'SO-20260415-001' })
@@ -73,8 +76,16 @@ export class ImportPreviewDto {
   @IsNotEmpty()
   templateId!: string;
 
-  @ApiProperty({ description: '前端根据映射模板回填后的标准订单数组', type: [ImportPreviewOrderDto] })
+  @ApiProperty({
+    description: `前端根据映射模板回填后的标准订单数组，单次最多 ${IMPORT_PREVIEW_MAX_ORDERS} 条`,
+    type: [ImportPreviewOrderDto],
+    maxItems: IMPORT_PREVIEW_MAX_ORDERS,
+  })
   @IsArray()
+  @ArrayMinSize(1, { message: '导入预检至少需要一张订单' })
+  @ArrayMaxSize(IMPORT_PREVIEW_MAX_ORDERS, {
+    message: `单次预检最多支持 ${IMPORT_PREVIEW_MAX_ORDERS} 条订单`,
+  })
   @ValidateNested({ each: true })
   @Type(() => ImportPreviewOrderDto)
   orders!: ImportPreviewOrderDto[];

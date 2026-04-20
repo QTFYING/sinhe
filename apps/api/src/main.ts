@@ -1,13 +1,25 @@
 import { NestFactory } from '@nestjs/core';
 import { ConfigService } from '@nestjs/config';
+import { json, urlencoded } from 'express';
 import { AppModule } from './app.module';
 import { ValidationPipe } from '@nestjs/common';
 import { ResponseInterceptor } from './common/interceptors/response.interceptor';
 import { GlobalExceptionFilter } from './common/filters/business-exception.filter';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import { IMPORT_PREVIEW_BODY_LIMIT, PRINTING_CONFIG_BODY_LIMIT } from './import/import.constants';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  // 关闭 Nest 默认 body parser，改按路由分档挂 express 中间件
+  const app = await NestFactory.create(AppModule, { bodyParser: false });
+
+  // 大 body 例外：导入预检
+  app.use('/api/import/preview', json({ limit: IMPORT_PREVIEW_BODY_LIMIT }));
+  // 中 body 例外：打印模板配置（前缀匹配，GET 无 body 不受影响）
+  app.use('/api/settings/printing', json({ limit: PRINTING_CONFIG_BODY_LIMIT }));
+  // 其他所有路由：沿用 Express 原厂默认 100KB
+  app.use(json());
+  app.use(urlencoded({ extended: true }));
+
   const configService = app.get(ConfigService);
   const corsOrigins = configService.get<string[]>('app.corsOrigins') ?? [];
   const port = configService.get<number>('app.port') ?? 3000;
