@@ -1,11 +1,11 @@
-import { NestFactory } from '@nestjs/core';
+import { ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { NestFactory } from '@nestjs/core';
+import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { json, urlencoded } from 'express';
 import { AppModule } from './app.module';
-import { ValidationPipe } from '@nestjs/common';
-import { ResponseInterceptor } from './common/interceptors/response.interceptor';
 import { GlobalExceptionFilter } from './common/filters/business-exception.filter';
-import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import { ResponseInterceptor } from './common/interceptors/response.interceptor';
 import { IMPORT_PREVIEW_BODY_LIMIT, PRINTING_CONFIG_BODY_LIMIT } from './import/import.constants';
 
 async function bootstrap() {
@@ -49,12 +49,12 @@ async function bootstrap() {
 
   // 2. 配置 Swagger 在线接口文档
   const config = new DocumentBuilder()
-    .setTitle('经销商平台后服务 API (自动文档)')
-    .setDescription('通过查看这个页面，外部团队可以轻松了解本系统的所有可用接口。')
+    .setTitle('收钱吧 API 文档')
+    .setDescription('前后端联调契约规范，自动生成在线接口文档')
     .setVersion('1.0.0')
     .addBearerAuth() // 开启全局 JWT Token 传递功能
     .build();
-    
+
   const document = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('api/docs', app, document, {
     jsonDocumentUrl: 'api/docs-json', // 提供给前端的一键拉取生成 JSON 端点
