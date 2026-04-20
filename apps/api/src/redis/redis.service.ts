@@ -214,6 +214,14 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
     await this.client.set(key, JSON.stringify(value), { EX: ttlSeconds });
   }
 
+  async setJsonIfAbsent(key: string, value: unknown, ttlSeconds: number): Promise<boolean> {
+    const result = await this.client.set(key, JSON.stringify(value), {
+      NX: true,
+      EX: ttlSeconds,
+    });
+    return result === 'OK';
+  }
+
   async getJson<T>(key: string): Promise<T | null> {
     const result = await this.client.get(key);
     if (!result) {

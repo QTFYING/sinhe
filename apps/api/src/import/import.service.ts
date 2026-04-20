@@ -59,11 +59,20 @@ import {
 } from './import-job.worker.helpers';
 import { IMPORT_RUNTIME_MODE, type ImportRuntimeMode } from './import.constants';
 
-const IMPORT_PREVIEW_TTL_SECONDS = 3600;
+/** 预检快照在 Redis 中的保留时长：15 分钟；超时未发起正式导入则需要重新预检 */
+const IMPORT_PREVIEW_TTL_SECONDS = 900;
+/** 导入任务轮询间隔：每 5 秒扫一次可执行任务（pending / 心跳过期的 processing） */
 const IMPORT_JOB_POLL_INTERVAL_MS = 5000;
+/** 单个导入任务的执行锁 TTL：30 分钟；防止同一 job 被多个 worker 同时执行 */
 const IMPORT_JOB_LOCK_TTL_SECONDS = 1800;
+/** 任务心跳过期阈值：超过 2 分钟无心跳的 processing 任务被视为僵尸，允许被重新拾起 */
 const IMPORT_JOB_STALE_SECONDS = 120;
+/** previewId 消费锁 TTL：30 秒；防止同一 previewId 并发提交造成重复建 job */
 const IMPORT_PREVIEW_CONSUME_LOCK_SECONDS = 30;
+/** 同一用户预检执行锁 TTL：30 秒；防止同一用户双击/并发触发多次预检 */
+const IMPORT_USER_PREVIEW_LOCK_SECONDS = 30;
+/** 同一用户活动导入任务占位 TTL：24 小时；用于跨请求识别"该用户已有任务在跑" */
+const IMPORT_USER_ACTIVE_JOB_TTL_SECONDS = 86400;
 
 const DEFAULT_TEMPLATE_FIELDS: OrderImportTemplateField[] = [
   { label: '源订单号', key: 'sourceOrderNo', mapStr: '', isRequired: true },
@@ -94,10 +103,20 @@ interface PreviewSnapshot {
   previewId: string;
   tenantId: string;
   templateId: string;
+  /** 预检生成时绑定的租户导入代际号；正式导入时与当前租户值比对，落后即失效 */
+  importRevision: number;
+  submittedByUserId?: string;
   summary: OrderImportPreviewSummary;
   orders: PreparedImportOrder[];
   duplicateOrders: OrderImportDuplicateOrder[];
   invalidOrders: OrderImportPreviewError[];
+}
+
+interface UserImportJobState {
+  jobId: string;
+  status: OrderImportJobStatus;
+  createdAt: number;
+  updatedAt: number;
 }
 
 interface ImportJobProgress {
@@ -235,18 +254,29 @@ export class ImportService implements OnModuleInit, OnModuleDestroy {
     request: OrderImportPreviewRequest,
   ): Promise<OrderImportPreviewResponse> {
     const tenantId = this.getTenantId(currentUser);
-    const snapshot = await this.buildPreviewSnapshot(tenantId, request);
+    await this.ensureUserHasNoActiveImportJob(tenantId, currentUser.userId);
 
-    await this.redis.setJson(this.getPreviewKey(snapshot.previewId), snapshot, IMPORT_PREVIEW_TTL_SECONDS);
+    const userPreviewLockKey = this.getUserPreviewLockKey(tenantId, currentUser.userId);
+    const userPreviewLockValue = await this.redis.acquireLock(userPreviewLockKey, IMPORT_USER_PREVIEW_LOCK_SECONDS);
+    if (!userPreviewLockValue) {
+      throw new BadRequestException('当前用户已有预检进行中，请等待预检完成后再试');
+    }
 
-    return {
-      previewId: snapshot.previewId,
-      templateId: snapshot.templateId,
-      summary: snapshot.summary,
-      orders: snapshot.orders.map((order) => this.toPreviewOrderResult(order)),
-      duplicateOrders: snapshot.duplicateOrders,
-      invalidOrders: snapshot.invalidOrders,
-    };
+    try {
+      const snapshot = await this.buildPreviewSnapshot(tenantId, request);
+      await this.redis.setJson(this.getPreviewKey(snapshot.previewId), snapshot, IMPORT_PREVIEW_TTL_SECONDS);
+
+      return {
+        previewId: snapshot.previewId,
+        templateId: snapshot.templateId,
+        summary: snapshot.summary,
+        orders: snapshot.orders.map((order) => this.toPreviewOrderResult(order)),
+        duplicateOrders: snapshot.duplicateOrders,
+        invalidOrders: snapshot.invalidOrders,
+      };
+    } finally {
+      await this.redis.releaseLock(userPreviewLockKey, userPreviewLockValue).catch(() => false);
+    }
   }
 
   async submitOrderImport(
@@ -269,25 +299,75 @@ export class ImportService implements OnModuleInit, OnModuleDestroy {
         throw new BadRequestException('没有可导入的有效订单');
       }
 
+      // 事前检查：若快照绑定的 importRevision 已落后于租户当前值，预检结果整体失效
+      const tenantRevisionCheck = await this.prisma.tenant.findUnique({
+        where: { id: tenantId },
+        select: { importRevision: true },
+      });
+      if (!tenantRevisionCheck) {
+        throw new NotFoundException('租户不存在');
+      }
+      if (tenantRevisionCheck.importRevision !== snapshot.importRevision) {
+        throw new BadRequestException('预检结果已失效，租户导入状态已更新，请重新预检');
+      }
+
+      await this.ensureUserHasNoActiveImportJob(tenantId, currentUser.userId);
+
       const conflictPolicy = request.conflictPolicy ?? OrderImportConflictPolicyEnum.SKIP;
       const jobId = await this.idGen.nextDailyId(ID_CONFIG.IMPORT_JOB.prefix, ID_CONFIG.IMPORT_JOB.digits);
-      const job = await this.prisma.importJob.create({
-        data: {
-          id: jobId,
-          tenantId,
-          status: PrismaImportJobStatusEnum.PENDING,
-          conflictPolicy: this.toPrismaImportConflictPolicy(conflictPolicy),
-          snapshot: snapshot as unknown as Prisma.InputJsonValue,
-          submittedCount: snapshot.orders.length,
-          processedCount: 0,
-          successCount: 0,
-          skippedCount: 0,
-          overwrittenCount: 0,
-          failedCount: 0,
-          failedOrders: [],
-          conflictDetails: [],
-        },
-      });
+      const jobSnapshot: PreviewSnapshot = {
+        ...snapshot,
+        submittedByUserId: currentUser.userId,
+      };
+      const activeJobStateKey = this.getUserActiveImportJobKey(tenantId, currentUser.userId);
+      const activeJobReserved = await this.redis.setJsonIfAbsent(
+        activeJobStateKey,
+        this.buildUserImportJobState(jobId, OrderImportJobStatusEnum.PENDING),
+        IMPORT_USER_ACTIVE_JOB_TTL_SECONDS,
+      );
+      if (!activeJobReserved) {
+        const activeState = await this.getActiveUserImportJobState(tenantId, currentUser.userId);
+        throw new BadRequestException(
+          activeState
+            ? this.buildActiveImportJobMessage(activeState)
+            : '当前用户已有导入任务进行中，请稍后再试',
+        );
+      }
+
+      let job;
+      try {
+        job = await this.prisma.$transaction(async (tx) => {
+          // 乐观锁：只有当租户 importRevision 仍等于快照绑定值时才允许推进
+          const tenantUpdate = await tx.tenant.updateMany({
+            where: { id: tenantId, importRevision: snapshot.importRevision },
+            data: { importRevision: { increment: 1 } },
+          });
+          if (tenantUpdate.count === 0) {
+            throw new BadRequestException('预检结果已失效，租户导入状态已更新，请重新预检');
+          }
+
+          return tx.importJob.create({
+            data: {
+              id: jobId,
+              tenantId,
+              status: PrismaImportJobStatusEnum.PENDING,
+              conflictPolicy: this.toPrismaImportConflictPolicy(conflictPolicy),
+              snapshot: jobSnapshot as unknown as Prisma.InputJsonValue,
+              submittedCount: snapshot.orders.length,
+              processedCount: 0,
+              successCount: 0,
+              skippedCount: 0,
+              overwrittenCount: 0,
+              failedCount: 0,
+              failedOrders: [],
+              conflictDetails: [],
+            },
+          });
+        });
+      } catch (error) {
+        await this.clearUserImportJobState(tenantId, currentUser.userId, jobId);
+        throw error;
+      }
 
       await this.redis.delete(this.getPreviewKey(request.previewId));
 
@@ -350,6 +430,10 @@ export class ImportService implements OnModuleInit, OnModuleDestroy {
     }
 
     const template = this.toTemplate(await this.getScopedTemplate(tenantId, request.templateId));
+    const { importRevision } = await this.prisma.tenant.findUniqueOrThrow({
+      where: { id: tenantId },
+      select: { importRevision: true },
+    });
     const customerFieldKeySet = new Set(template.customerFields.map((field) => field.key));
     const invalidErrors: OrderImportPreviewError[] = [];
     const normalizedOrders: PreparedImportOrder[] = [];
@@ -407,6 +491,7 @@ export class ImportService implements OnModuleInit, OnModuleDestroy {
       previewId: randomUUID(),
       tenantId,
       templateId: String(template.id),
+      importRevision,
       summary: this.buildPreviewSummary(request.orders.length, validOrders, invalidErrors, duplicateOrders),
       orders: validOrders,
       duplicateOrders: this.uniqueDuplicateOrders(duplicateOrders),
@@ -680,6 +765,12 @@ export class ImportService implements OnModuleInit, OnModuleDestroy {
           lastError: null,
         },
       });
+      await this.setUserImportJobState(
+        job.tenantId,
+        snapshot.submittedByUserId,
+        jobId,
+        OrderImportJobStatusEnum.PROCESSING,
+      );
 
       await this.processImportJob(
         job.id,
@@ -738,6 +829,7 @@ export class ImportService implements OnModuleInit, OnModuleDestroy {
         lastError: null,
       },
     });
+    await this.clearUserImportJobState(tenantId, snapshot.submittedByUserId, jobId);
   }
 
   private async applyImportOrder(
@@ -885,7 +977,7 @@ export class ImportService implements OnModuleInit, OnModuleDestroy {
   }
 
   private async markImportJobFailed(jobId: string, message: string): Promise<void> {
-    await this.prisma.importJob.update({
+    const job = await this.prisma.importJob.update({
       where: { id: jobId },
       data: {
         status: PrismaImportJobStatusEnum.FAILED,
@@ -893,7 +985,14 @@ export class ImportService implements OnModuleInit, OnModuleDestroy {
         heartbeatAt: new Date(),
         lastError: this.cut(message, 500),
       },
+      select: {
+        tenantId: true,
+        snapshot: true,
+      },
     });
+
+    const snapshot = this.asPreviewSnapshot(job.snapshot);
+    await this.clearUserImportJobState(job.tenantId, snapshot?.submittedByUserId, jobId);
   }
 
   private toOrderCreateInput(
@@ -1146,6 +1245,114 @@ export class ImportService implements OnModuleInit, OnModuleDestroy {
     return snapshot;
   }
 
+  private async ensureUserHasNoActiveImportJob(tenantId: string, userId: string): Promise<void> {
+    const activeState = await this.getActiveUserImportJobState(tenantId, userId);
+    if (activeState) {
+      throw new BadRequestException(this.buildActiveImportJobMessage(activeState));
+    }
+  }
+
+  private async getActiveUserImportJobState(
+    tenantId: string,
+    userId: string,
+  ): Promise<UserImportJobState | null> {
+    const stateKey = this.getUserActiveImportJobKey(tenantId, userId);
+    const state = await this.redis.getJson<UserImportJobState>(stateKey);
+    if (!state) {
+      return null;
+    }
+
+    const job = await this.prisma.importJob.findFirst({
+      where: { id: state.jobId, tenantId },
+      select: { status: true },
+    });
+    if (
+      !job
+      || job.status === PrismaImportJobStatusEnum.COMPLETED
+      || job.status === PrismaImportJobStatusEnum.FAILED
+    ) {
+      await this.redis.delete(stateKey);
+      return null;
+    }
+
+    const status = this.toImportJobStatus(job.status);
+    if (status !== state.status) {
+      const nextState: UserImportJobState = {
+        ...state,
+        status,
+        updatedAt: Date.now(),
+      };
+      await this.redis.setJson(stateKey, nextState, IMPORT_USER_ACTIVE_JOB_TTL_SECONDS);
+      return nextState;
+    }
+
+    return state;
+  }
+
+  private buildUserImportJobState(jobId: string, status: OrderImportJobStatus): UserImportJobState {
+    const now = Date.now();
+    return {
+      jobId,
+      status,
+      createdAt: now,
+      updatedAt: now,
+    };
+  }
+
+  private async setUserImportJobState(
+    tenantId: string,
+    userId: string | undefined,
+    jobId: string,
+    status: OrderImportJobStatus,
+  ): Promise<void> {
+    if (!userId) {
+      return;
+    }
+
+    await this.redis.setJson(
+      this.getUserActiveImportJobKey(tenantId, userId),
+      this.buildUserImportJobState(jobId, status),
+      IMPORT_USER_ACTIVE_JOB_TTL_SECONDS,
+    );
+  }
+
+  private async clearUserImportJobState(
+    tenantId: string,
+    userId: string | undefined,
+    jobId: string,
+  ): Promise<void> {
+    if (!userId) {
+      return;
+    }
+
+    const stateKey = this.getUserActiveImportJobKey(tenantId, userId);
+    const state = await this.redis.getJson<UserImportJobState>(stateKey);
+    if (!state || state.jobId !== jobId) {
+      return;
+    }
+
+    await this.redis.delete(stateKey);
+  }
+
+  private buildActiveImportJobMessage(state: UserImportJobState): string {
+    return `当前用户已有导入任务${this.describeImportJobStatus(state.status)}，jobId=${state.jobId}，请通过 /orders/import/jobs/${state.jobId} 查询进度`;
+  }
+
+  private describeImportJobStatus(status: OrderImportJobStatus): string {
+    switch (status) {
+      case OrderImportJobStatusEnum.PENDING:
+        return '正在排队';
+      case OrderImportJobStatusEnum.PROCESSING:
+        return '正在处理';
+      case OrderImportJobStatusEnum.COMPLETED:
+        return '已完成';
+      case OrderImportJobStatusEnum.FAILED:
+        return '已失败';
+      default:
+        return '正在处理';
+    }
+  }
+
   private async findExistingOrder(
     client: Prisma.TransactionClient | PrismaService,
     tenantId: string,
@@ -1380,6 +1587,14 @@ export class ImportService implements OnModuleInit, OnModuleDestroy {
 
   private getImportJobLockKey(jobId: string): string {
     return `import:job:lock:${jobId}`;
+  }
+
+  private getUserPreviewLockKey(tenantId: string, userId: string): string {
+    return `import:user:${tenantId}:${userId}:preview`;
+  }
+
+  private getUserActiveImportJobKey(tenantId: string, userId: string): string {
+    return `import:user:${tenantId}:${userId}:job`;
   }
 
   private getTenantId(currentUser: JwtPayload): string {

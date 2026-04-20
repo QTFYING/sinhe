@@ -2,6 +2,7 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
   OrderImportConflictPolicyEnum,
   OrderImportJobStatusEnum,
+  OrderImportTemplateFieldSourceTypeEnum,
   OrderPayTypeEnum,
   OrderStatusEnum,
 } from '@shou/types/enums';
@@ -19,6 +20,13 @@ export class OrderImportTemplateFieldSwagger {
 
   @ApiProperty({ description: '是否系统必填', example: true })
   isRequired!: boolean;
+
+  @ApiProperty({
+    description: '字段来源',
+    enum: Object.values(OrderImportTemplateFieldSourceTypeEnum),
+    example: OrderImportTemplateFieldSourceTypeEnum.LIST,
+  })
+  type!: string;
 }
 
 export class OrderImportTemplateSwagger {
@@ -259,6 +267,6 @@ export class OrderImportJobResponseSwagger {
   @ApiProperty({ description: '冲突处理明细', type: [OrderImportJobConflictDetailSwagger] })
   conflictDetails!: OrderImportJobConflictDetailSwagger[];
 
-  @ApiPropertyOptional({ description: '任务完成时间', example: '2026-04-15T10:00:00.000Z' })
+  @ApiPropertyOptional({ description: '完成时间', example: '2026-04-15T10:00:00.000Z' })
   completedAt?: string;
 }

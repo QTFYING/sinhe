@@ -133,6 +133,7 @@ model Tenant {
   expireAt           DateTime?
   maxCreditDays      Int              @default(30)
   creditReminderDays Int              @default(3)
+  importRevision     Int              @default(0)
   createdAt          DateTime         @default(now())
   updatedAt          DateTime         @updatedAt
   deletedAt          DateTime?

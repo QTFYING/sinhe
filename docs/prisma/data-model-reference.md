@@ -3,7 +3,7 @@
 > 本文件仅作为当前 `apps/api/prisma/schema.prisma` 的说明书，不作为 `schema.prisma` 设计或迭代的前置事实源。
 > 涉及业务语义、字段含义、状态机与对外结构时，以上游 `docs/api/*.md -> packages/types/src/enums -> packages/types/src/contracts` 为准。
 > `apps/api/prisma/schema.prisma` 是当前可执行基准，本文只做人工可读同步。
-> 确认日期：2026-04-16
+> 确认日期：2026-04-20
 > 枚举取值参见 [../enums/enum-manual.md](../enums/enum-manual.md)。
 
 ---
@@ -102,6 +102,7 @@
   expireAt: string | null        // 到期时间
   maxCreditDays: number          // 最大账期天数
   creditReminderDays: number     // 账期提醒提前天数
+  importRevision: number         // 租户导入代际号，每次成功创建导入任务后原子 +1
   createdAt: string              // 创建时间
   updatedAt: string              // 更新时间
   deletedAt: string | null       // 软删时间
@@ -113,6 +114,7 @@
 - 主键：`id`
 - 表名：`tenants`
 - 当前 schema 使用 `deletedAt` 软删
+- `importRevision` 用于 `/import/preview` 预检快照与 `/orders/import` 正式导入之间的一致性校验；预检快照会绑定生成时的 `importRevision`，若提交时租户 `importRevision` 已推进，则该预检结果整体失效
 
 **users**
 

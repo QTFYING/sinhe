@@ -4,12 +4,14 @@ import {
   ArrayMinSize,
   IsArray,
   IsBoolean,
+  IsIn,
   IsNotEmpty,
   IsOptional,
   IsString,
   MaxLength,
   ValidateNested,
 } from 'class-validator';
+import { OrderImportTemplateFieldSourceTypeEnum } from '@shou/types/enums';
 
 export class ImportTemplateFieldDto {
   @ApiProperty({ description: '字段名称', example: '客户名称' })
@@ -31,6 +33,15 @@ export class ImportTemplateFieldDto {
   @ApiProperty({ description: '是否系统必填', example: true })
   @IsBoolean()
   isRequired!: boolean;
+
+  @ApiProperty({
+    description: '字段来源',
+    enum: Object.values(OrderImportTemplateFieldSourceTypeEnum),
+    example: OrderImportTemplateFieldSourceTypeEnum.LIST,
+  })
+  @IsString()
+  @IsIn(Object.values(OrderImportTemplateFieldSourceTypeEnum))
+  type!: (typeof OrderImportTemplateFieldSourceTypeEnum)[keyof typeof OrderImportTemplateFieldSourceTypeEnum];
 }
 
 export class ImportTemplateCustomerFieldDto {
@@ -43,6 +54,16 @@ export class ImportTemplateCustomerFieldDto {
   @ApiProperty({ description: 'ERP 表头映射值', example: '客商编码' })
   @IsString()
   mapStr!: string;
+
+  @ApiPropertyOptional({
+    description: '字段来源，默认 list',
+    enum: Object.values(OrderImportTemplateFieldSourceTypeEnum),
+    example: OrderImportTemplateFieldSourceTypeEnum.LIST,
+  })
+  @IsOptional()
+  @IsString()
+  @IsIn(Object.values(OrderImportTemplateFieldSourceTypeEnum))
+  type?: (typeof OrderImportTemplateFieldSourceTypeEnum)[keyof typeof OrderImportTemplateFieldSourceTypeEnum];
 }
 
 export class CreateImportTemplateDto {
