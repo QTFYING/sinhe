@@ -59,6 +59,18 @@ export const OrderImportConflictPolicyEnum = {
 export type OrderImportConflictPolicy = EnumValue<typeof OrderImportConflictPolicyEnum>
 
 /**
+ * 导入模板字段来源
+ */
+export const OrderImportTemplateFieldSourceTypeEnum = {
+  /** 订单头 / 列表行字段 */
+  LIST: 'list',
+  /** 订单明细行字段 */
+  LINE: 'line',
+} as const
+
+export type OrderImportTemplateFieldSourceType = EnumValue<typeof OrderImportTemplateFieldSourceTypeEnum>
+
+/**
  * 导入模板字段类型
  */
 export const OrderTemplateFieldTypeEnum = {

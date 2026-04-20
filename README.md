@@ -79,7 +79,19 @@
 - Redis
 - Docker 可选
 
-## 快速启动
+## 启动模式
+
+本仓库默认区分两种启动方式：
+
+- 本地联调模式：前后端开发联调时使用，只启动 `db`、`redis` 容器，API 由本机 `dev` 进程启动。
+- 生产环境部署模式：构建 `dist` 并通过 Docker 编排启动完整服务。
+
+注意：
+
+- 直接执行 `docker compose up -d` 会按 `docker-compose.yml` 启动 `api`、`import-worker`、`nginx`，其中 `api` 和 `import-worker` 都依赖 `dist` 构建产物。
+- 如果你只是和前端联调，不要直接起整套 compose，应该走下面的“本地联调模式”。
+
+## 本地联调模式
 
 ### 1. 安装依赖
 
@@ -93,10 +105,37 @@ pnpm install
 cp apps/api/.env.example apps/api/.env
 ```
 
-### 3. 启动基础设施
+本地联调建议至少确认这些变量：
+
+```env
+DATABASE_URL=postgresql://postgres:postgres@localhost:5432/shou_db?schema=public
+REDIS_URL=redis://localhost:6379
+JWT_SECRET=replace-with-local-secret
+CORS_ORIGINS=http://localhost:5173
+PORT=3000
+NODE_ENV=development
+AUTH_COOKIE_SECURE=false
+IMPORT_JOB_WORKER_ENABLED=false
+```
+
+说明：
+
+- `CORS_ORIGINS` 改成你本地前端 dev server 地址；若有多个地址，用逗号分隔。
+- `AUTH_COOKIE_SECURE=false` 适用于本地 HTTP 联调。
+- `IMPORT_JOB_WORKER_ENABLED=false` 表示 API 进程不直接消费导入任务。
+
+### 3. 只启动基础设施
+
+推荐命令：
 
 ```bash
-docker-compose up -d
+docker compose up -d db redis
+```
+
+如你的 Docker 版本仍使用旧命令，也可以：
+
+```bash
+docker-compose up -d db redis
 ```
 
 ### 4. 同步 Prisma
@@ -117,22 +156,72 @@ pnpm db:seed
 - `admin` / `123456`
 - `boss` / `123456`
 
-### 6. 启动服务
+### 6. 启动开发态 API
 
 ```bash
 pnpm dev:api
 ```
 
-如需独立导入 Worker：
+如果你会同时修改 `packages/types`，推荐改用：
 
 ```bash
-pnpm dev:worker
+pnpm dev
 ```
 
 默认地址：
 
 - API: `http://localhost:3000`
 - Swagger: `http://localhost:3000/api/docs`
+
+补充：
+
+- 本地联调前端时，通常只需要 `pnpm dev:api`。
+- 若要验证独立导入 Worker 链路，需额外准备 `dist` 后再启动 Worker，不属于最小联调路径。
+
+## 生产环境部署模式
+
+适用于需要通过 Docker 编排启动完整服务的场景。
+
+### 1. 安装依赖并准备环境变量
+
+```bash
+pnpm install
+cp apps/api/.env.example apps/api/.env
+```
+
+### 2. 同步 Prisma 与初始化数据
+
+```bash
+pnpm -F api prisma:push
+pnpm -F api prisma:generate
+pnpm db:seed
+```
+
+### 3. 构建产物
+
+```bash
+pnpm build
+```
+
+### 4. 启动完整服务
+
+```bash
+docker compose up -d
+```
+
+该模式会启动：
+
+- `db`
+- `redis`
+- `api`
+- `import-worker`
+- `nginx`
+
+其中：
+
+- `api` 通过 Docker 构建并以 `dist` 产物启动。
+- `import-worker` 通过 `dist/import-worker.main` 启动。
+- `nginx` 会挂载根目录下的 `dist/admin`、`dist/tenant`、`dist/h5`。
 
 ## 常用命令
 

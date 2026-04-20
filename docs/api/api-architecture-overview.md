@@ -208,14 +208,20 @@ H5 前端                    后端                     支付网关
 **导入接口详细说明（已确认决策）：**
 - 完整链路为：`GET /import/default-template` → `GET/POST/PUT /import/templates` → `POST /import/preview` → `POST /orders/import` → `GET /orders/import/jobs/:jobId`
 - 模板结构统一为 `{ defaultFields, customerFields }`，不再使用旧三段式 `sourceColumns / fields / mappings`
-- `defaultFields` 固定 7 项：`sourceOrderNo / customer / customerPhone / customerAddress / totalAmount / orderTime / payType`
+- `defaultFields` 固定 13 项：7 项订单头字段 `sourceOrderNo / customer / customerPhone / customerAddress / totalAmount / orderTime / payType`，以及 6 项订单明细字段 `skuName / skuSpec / unit / quantity / unitPrice / lineAmount`
+- 模板字段统一新增 `type` 元数据：`list` 表示订单头字段，`line` 表示订单明细字段；默认值为 `list`
 - `customerFields` 与默认字段结构一致，但由服务端生成 `customerKey1...N`，且 `isRequired=false`
 - 前端 SheetJS 解析 Excel 后，必须先按模板把数据回填成标准订单数组，再调用 `/import/preview`
 - `/import/preview` 请求体采用 `{ templateId, orders }`，直接提交订单级标准结构，不再上传原始 `rows`
+- `/import/preview` 单次请求体最大 `20 MB`，最多允许 `5000` 条订单、`50000` 条订单明细
 - 订单级标准结构中的动态字段值统一命名为 `customerFieldValues`，不再使用 `customerValues`
 - `/orders/import` 只接收 `{ previewId, conflictPolicy? }`，不再支持直传 `orders / rows / templateId`
 - `/import/preview` 同步执行，目标是快速反馈；`/orders/import` 异步执行，正式入队后交由 `import-worker` 处理
 - `previewId` 为正式导入唯一凭证，且成功创建 `jobId` 后一次性消费
+- 预检快照需绑定生成时的租户 `importRevision`；若正式导入时发现快照版本已落后于租户最新版本，则该 `previewId` 整体失效，必须重新预检
+- 预检快照仅在 Redis 中短暂保留，默认 15 分钟；成功创建 `jobId` 后立即删除 Redis 快照，任务恢复依赖 `import_jobs.snapshot`
+- 同一用户存在预检进行中或导入任务 `pending / processing` 时，服务端拒绝重复发起并返回当前状态提示
+- `/orders/import` 成功创建 `jobId` 后，服务端应原子推进当前租户 `importRevision += 1`
 - 使用 `/orders/import/jobs/:jobId` 轮询正式导入进度，结果需包含 `previewId / overwrittenCount / conflictDetails`
 - 创建订单与正式导入成功时，同步生成 `orders.qrCodeToken`
 - `POST /orders/print-records` 建议携带 `requestId`，按 `tenantId + requestId` 实现批次级幂等

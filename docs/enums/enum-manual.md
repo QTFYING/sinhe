@@ -37,6 +37,7 @@
 | `OrderPayType` | `cash` `credit` | 现款、账期 | `orders.payType` |
 | `OrderImportJobStatus` | `pending` `processing` `completed` `failed` | 待处理、处理中、已完成、失败 | `import_jobs.status` |
 | `OrderImportConflictPolicy` | `skip` `overwrite` | 跳过、覆盖 | 导入冲突处理 |
+| `OrderImportTemplateFieldSourceType` | `list` `line` | 订单头字段、订单明细字段 | 导入模板字段 `type` |
 | `OrderTemplateFieldType` | `text` `number` `money` `date` `enum` | 文本、数字、金额、日期、枚举 | 导入模板字段类型 |
 | `CreditOrderStatus` | `normal` `soon` `today` `overdue` | 正常、即将到期、今日到期、已逾期 | 账期订单视图 |
 | `PaymentMethod` | `online` `cash` `other_paid` | 在线支付、现金支付、其他方式已支付 | `payment_orders.paymentMethod` |

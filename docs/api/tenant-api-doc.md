@@ -183,6 +183,7 @@ interface OrderImportTemplateField {
   key: string                  // 字段 key
   mapStr: string               // ERP 列头映射值
   isRequired: boolean          // 是否系统必填
+  type: OrderImportTemplateFieldSourceType // 字段来源：list=订单头，line=订单明细
 }
 
 interface OrderImportTemplate {
@@ -190,7 +191,7 @@ interface OrderImportTemplate {
   name: string                 // 模板名称
   isDefault: boolean           // 是否默认模板
   updatedAt: string            // 最近更新时间
-  defaultFields: OrderImportTemplateField[]  // 系统默认字段，固定 7 项
+  defaultFields: OrderImportTemplateField[]  // 系统默认字段，固定 13 项
   customerFields: OrderImportTemplateField[] // 租户自定义字段
 }
 
@@ -386,6 +387,7 @@ Array<{
   key: string                 // 系统字段 key
   mapStr: string              // ERP 列头映射值；默认返回空字符串
   isRequired: boolean         // 是否系统必填
+  type: OrderImportTemplateFieldSourceType // 字段来源：list=订单头，line=订单明细
 }>
 ```
 
@@ -393,13 +395,19 @@ Array<{
 
 ```json
 [
-  { "label": "源订单号", "key": "sourceOrderNo", "mapStr": "", "isRequired": true },
-  { "label": "客户名称", "key": "customer", "mapStr": "", "isRequired": true },
-  { "label": "客户电话", "key": "customerPhone", "mapStr": "", "isRequired": true },
-  { "label": "客户地址", "key": "customerAddress", "mapStr": "", "isRequired": true },
-  { "label": "总金额", "key": "totalAmount", "mapStr": "", "isRequired": true },
-  { "label": "下单时间", "key": "orderTime", "mapStr": "", "isRequired": true },
-  { "label": "结算方式", "key": "payType", "mapStr": "", "isRequired": true },
+  { "label": "源订单号", "key": "sourceOrderNo", "mapStr": "", "isRequired": true, "type": "list" },
+  { "label": "客户名称", "key": "customer", "mapStr": "", "isRequired": true, "type": "list" },
+  { "label": "客户电话", "key": "customerPhone", "mapStr": "", "isRequired": true, "type": "list" },
+  { "label": "客户地址", "key": "customerAddress", "mapStr": "", "isRequired": true, "type": "list" },
+  { "label": "总金额", "key": "totalAmount", "mapStr": "", "isRequired": true, "type": "list" },
+  { "label": "下单时间", "key": "orderTime", "mapStr": "", "isRequired": true, "type": "list" },
+  { "label": "结算方式", "key": "payType", "mapStr": "", "isRequired": true, "type": "list" },
+  { "label": "商品名称", "key": "skuName", "mapStr": "", "isRequired": false, "type": "line" },
+  { "label": "商品规格", "key": "skuSpec", "mapStr": "", "isRequired": false, "type": "line" },
+  { "label": "单位", "key": "unit", "mapStr": "", "isRequired": false, "type": "line" },
+  { "label": "数量", "key": "quantity", "mapStr": "", "isRequired": false, "type": "line" },
+  { "label": "单价（元）", "key": "unitPrice", "mapStr": "", "isRequired": false, "type": "line" },
+  { "label": "行金额（元）", "key": "lineAmount", "mapStr": "", "isRequired": false, "type": "line" }
 ]
 ```
 
@@ -422,20 +430,24 @@ Array<{
     label: string             // 字段展示名
     key: string               // 系统字段 key
     mapStr: string            // ERP 列头映射值
-    isRequired: boolean       // 默认字段固定为 true
+    isRequired: boolean       // 系统字段固定值由服务端定义
+    type: OrderImportTemplateFieldSourceType // 字段来源：list=订单头，line=订单明细
   }>
   customerFields: Array<{
     label: string             // 自定义字段展示名
     key: string               // 服务端生成的 customerKeyN
     mapStr: string            // ERP 列头映射值
     isRequired: boolean       // 自定义字段固定为 false
+    type: OrderImportTemplateFieldSourceType // 自定义字段默认 list；若前端显式传入可为 line
   }>
 }>
 ```
 
 **业务规则：**
 
-- `defaultFields` 固定 7 项，字段 key 与 `GET /import/default-template` 保持一致
+- `defaultFields` 固定 13 项，字段 key 与 `GET /import/default-template` 保持一致
+- 其中 7 项订单头字段的 `type=list` 且 `isRequired=true`
+- 其中 6 项订单明细字段的 `type=line` 且 `isRequired=false`
 - `customerFields` 为租户自定义字段，结构与默认字段一致
 - 当前模板列表只返回新结构，不再返回旧三段式 `sourceColumns / fields / mappings`
 
@@ -455,11 +467,13 @@ Array<{
     label: string             // 字段展示名
     key: string               // 系统字段 key
     mapStr: string            // ERP 列头映射值
-    isRequired: boolean       // 必须为 true
+    isRequired: boolean       // 由系统字段基准定义，不允许改写
+    type: OrderImportTemplateFieldSourceType // 字段来源：list=订单头，line=订单明细
   }>
   customerFields: Array<{
     label: string             // 自定义字段展示名
     mapStr: string            // ERP 列头映射值
+    type?: OrderImportTemplateFieldSourceType // 默认 list；仅作为模板元数据存储
   }>
 }
 ```
@@ -477,10 +491,11 @@ Array<{
 
 **服务端规则：**
 
-- `defaultFields` 必须完整包含 7 个系统字段，且 `key / label / isRequired` 不能改写
+- `defaultFields` 必须完整包含 13 个系统字段，且 `key / label / isRequired / type` 不能改写
 - `defaultFields[].mapStr` 由租户填写对应 ERP 列头
-- `customerFields` 由前端提交 `label + mapStr`，服务端统一补 `key=customerKey1...N`
+- `customerFields` 由前端提交 `label + mapStr + type?`，服务端统一补 `key=customerKey1...N`
 - 所有 `customerFields[].isRequired` 均由服务端固定为 `false`
+- `customerFields[].type` 默认值为 `list`，服务端仅校验闭集值并原样存储
 - 创建接口仅返回最小结果摘要；若前端需要完整模板结构，请重新调用 `GET /import/templates`
 - 同租户下模板名称唯一；服务端按去首尾空格后比较，大小写不敏感
 - 同一模板内 `defaultFields + customerFields` 的 `mapStr` 不允许重复
@@ -508,10 +523,12 @@ Array<{
     key: string
     mapStr: string
     isRequired: boolean
+    type: OrderImportTemplateFieldSourceType
   }>
   customerFields: Array<{
     label: string
     mapStr: string
+    type?: OrderImportTemplateFieldSourceType
   }>
 }
 ```
@@ -530,7 +547,7 @@ Array<{
 **服务端规则：**
 
 - 更新时仍按整包模板校验，不支持局部跳过系统字段
-- `defaultFields` 必须完整包含 7 个系统字段，且 `key / label / isRequired` 不能改写
+- `defaultFields` 必须完整包含 13 个系统字段，且 `key / label / isRequired / type` 不能改写
 - 更新接口仅返回最小结果摘要；若前端需要完整模板结构，请重新调用 `GET /import/templates`
 - 同租户下模板名称唯一；更新时排除当前模板自身
 - 同一模板内 `defaultFields + customerFields` 的 `mapStr` 不允许重复
@@ -668,12 +685,18 @@ Array<{
 
 **预检规则：**
 
+- 请求体最大 `20 MB`
+- `orders` 最多允许 `5000` 条
+- 全部订单的 `lineItems` 总数最多允许 `50000` 条
 - `orders` 必须为非空数组
 - 每张订单必须包含 7 个默认字段值：`sourceOrderNo / customer / customerPhone / customerAddress / totalAmount / orderTime / payType`
 - `customerFieldValues` 中的 key 必须全部命中该模板的 `customerFields[].key`
 - `payType` 当前只允许 `cash / credit`
 - `lineItems` 可为空数组；非空时继续沿用当前行项目结构校验
 - `invalidOrders.length === 0` 时，前端才应继续触发正式导入
+- 服务端将预检结果缓存到 Redis，默认保留 15 分钟；超时未发起正式导入时，前端需要重新调用 `/import/preview`
+- 同一用户若已有预检请求正在执行，服务端应直接提示“预检进行中”，避免重复提交同一批数据
+- 预检快照需绑定生成时的租户导入版本 `importRevision`
 
 ### 3.11 异步正式导入
 
@@ -707,6 +730,10 @@ Array<{
 - `/orders/import` 只能消费 `previewId`，不再支持直传 `orders / rows / templateId`
 - 一个 `previewId` 成功创建导入任务后立即视为已消费，不允许重复提交
 - 正式导入才进入 `import-worker`；预检始终同步执行
+- 同一用户若已有 `pending / processing` 导入任务，服务端应拒绝再次发起，并返回当前任务状态与 `jobId`
+- Redis 中的预检快照在 `/orders/import` 成功创建 `jobId` 后立即删除；后续任务恢复与轮询以 `import_jobs.snapshot` 为准
+- `/orders/import` 成功创建 `jobId` 后，服务端应原子推进当前租户 `importRevision += 1`
+- 若当前 `previewId` 绑定的 `importRevision` 已落后于租户最新值，则该预检结果整体失效，服务端应拒绝本次提交并要求重新预检
 
 ### 3.12 轮询导入进度
 

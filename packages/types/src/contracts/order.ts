@@ -3,6 +3,7 @@ import type {
   CreditOrderStatus,
   OrderImportConflictPolicy,
   OrderImportJobStatus,
+  OrderImportTemplateFieldSourceType,
   OrderPayType,
   OrderStatus,
 } from '../enums'
@@ -108,15 +109,42 @@ export interface VoidOrderRequest {
 }
 
 export interface OrderImportTemplateField {
+  /**
+   * 字段展示名。
+   */
   label: string
+  /**
+   * 字段 key。系统字段使用稳定 key，自定义字段由服务端补 `customerKeyN`。
+   */
   key: string
+  /**
+   * Excel / ERP 表头映射值。
+   */
   mapStr: string
+  /**
+   * 是否系统必填。
+   */
   isRequired: boolean
+  /**
+   * 字段来源：`list` 表示订单头，`line` 表示订单明细。
+   * 旧模板数据可能缺失该字段，读取时按 `list` 兼容。
+   */
+  type?: OrderImportTemplateFieldSourceType
 }
 
 export interface OrderImportCustomerFieldRequest {
+  /**
+   * 自定义字段展示名。
+   */
   label: string
+  /**
+   * Excel / ERP 表头映射值。
+   */
   mapStr: string
+  /**
+   * 字段来源，默认 `list`。
+   */
+  type?: OrderImportTemplateFieldSourceType
 }
 
 export interface OrderImportTemplate {
